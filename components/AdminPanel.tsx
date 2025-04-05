@@ -142,7 +142,6 @@ export default function AdminPanel() {
         <TableCaption>전체 사용자 목록</TableCaption>
         <TableHeader>
           <TableRow>
-            <TableHead>기본 이름</TableHead>
             <TableHead>이메일</TableHead>
             <TableHead>메타데이터 이름</TableHead>
             <TableHead>전화번호</TableHead>
@@ -155,9 +154,6 @@ export default function AdminPanel() {
         <TableBody>
           {users.map((user) => (
             <TableRow key={user.id}>
-              <TableCell className="font-medium">
-                {user.firstName} {user.lastName}
-              </TableCell>
               <TableCell>{user.email}</TableCell>
               <TableCell>{user.profile?.name || '-'}</TableCell>
               <TableCell>{user.profile?.phoneNumber || '-'}</TableCell>
