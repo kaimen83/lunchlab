@@ -143,7 +143,7 @@ export default function AdminPanel() {
         <TableHeader>
           <TableRow>
             <TableHead>이메일</TableHead>
-            <TableHead>메타데이터 이름</TableHead>
+            <TableHead>이름</TableHead>
             <TableHead>전화번호</TableHead>
             <TableHead>소속</TableHead>
             <TableHead>권한</TableHead>
