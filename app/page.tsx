@@ -19,9 +19,12 @@ export default async function Home() {
   const userIsAdmin = userRole === 'admin';
   const profileCompleted = await getUserProfileStatus(userId);
 
+  // 프로필이 완료되지 않았고, 역할이 'pending'인 경우에만 모달 표시
+  const showProfileModal = !profileCompleted && userRole === 'pending';
+
   return (
     <>
-      {!profileCompleted && <ProfileSetupModal />}
+      {showProfileModal && <ProfileSetupModal />}
       
       <div className="flex flex-col items-center justify-center pt-20 pb-10 px-4">
         <h1 className="text-4xl font-bold mb-4">안녕하세요!</h1>

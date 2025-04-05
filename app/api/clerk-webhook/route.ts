@@ -13,10 +13,10 @@ export async function POST(req: Request) {
   }
 
   // 요청 헤더에서 svix 서명 가져오기
-  const headersList = headers();
-  const svix_id = headersList.get('svix-id');
-  const svix_timestamp = headersList.get('svix-timestamp');
-  const svix_signature = headersList.get('svix-signature');
+  const headersList = await headers();
+  const svix_id = headersList.get('svix-id') || '';
+  const svix_timestamp = headersList.get('svix-timestamp') || '';
+  const svix_signature = headersList.get('svix-signature') || '';
 
   // 필요한 헤더가 없는 경우 처리
   if (!svix_id || !svix_timestamp || !svix_signature) {
@@ -53,8 +53,16 @@ export async function POST(req: Request) {
     try {
       // 새 사용자에게 '가입대기' 역할 부여
       const client = await clerkClient();
+      
+      // 기존 메타데이터 조회 (새 사용자지만 다른 서비스에서 메타데이터가 설정되었을 수 있음)
+      const user = await client.users.getUser(id);
+      const currentMetadata = user.publicMetadata || {};
+      
       await client.users.updateUser(id, {
-        publicMetadata: { role: 'pending' }
+        publicMetadata: {
+          ...currentMetadata,
+          role: 'pending'
+        }
       });
 
       return NextResponse.json({ success: true });

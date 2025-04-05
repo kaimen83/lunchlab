@@ -15,8 +15,16 @@ export async function getUserRole(userId: string): Promise<UserRole> {
 export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
   try {
     const client = await clerkClient();
+    // 현재 사용자의 메타데이터 조회
+    const user = await client.users.getUser(userId);
+    const currentMetadata = user.publicMetadata || {};
+    
+    // 기존 메타데이터를 유지하면서 역할만 업데이트
     await client.users.updateUser(userId, {
-      publicMetadata: { role }
+      publicMetadata: {
+        ...currentMetadata,
+        role
+      }
     });
   } catch (error) {
     console.error('Error updating user role:', error);
@@ -81,6 +89,8 @@ export async function getAllUsers() {
       lastName: user.lastName,
       imageUrl: user.imageUrl,
       role: user.publicMetadata.role as UserRole || 'pending',
+      profileCompleted: !!user.publicMetadata.profileCompleted,
+      profile: user.publicMetadata.profile as UserProfile,
       createdAt: user.createdAt
     }));
   } catch (error) {

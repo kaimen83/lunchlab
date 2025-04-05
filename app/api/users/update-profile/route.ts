@@ -28,10 +28,15 @@ export async function POST(req: Request) {
       affiliation,
     };
     
-    // 사용자 메타데이터에 프로필 정보 저장
+    // 현재 사용자의 메타데이터 조회
     const client = await clerkClient();
+    const user = await client.users.getUser(userId);
+    const currentMetadata = user.publicMetadata || {};
+    
+    // 기존 메타데이터를 유지하면서 프로필 정보만 업데이트
     await client.users.updateUser(userId, {
       publicMetadata: {
+        ...currentMetadata,  // 기존 메타데이터(role 포함) 유지
         profileCompleted: true,
         profile
       }

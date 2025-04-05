@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { UserRole } from '@/lib/types';
+import { UserRole, UserProfile } from '@/lib/types';
 import { 
   Table, 
   TableBody, 
@@ -30,6 +30,8 @@ interface User {
   lastName?: string;
   imageUrl: string;
   role: UserRole;
+  profileCompleted?: boolean;
+  profile?: UserProfile;
   createdAt: string;
 }
 
@@ -140,8 +142,11 @@ export default function AdminPanel() {
         <TableCaption>전체 사용자 목록</TableCaption>
         <TableHeader>
           <TableRow>
-            <TableHead>이름</TableHead>
+            <TableHead>기본 이름</TableHead>
             <TableHead>이메일</TableHead>
+            <TableHead>메타데이터 이름</TableHead>
+            <TableHead>전화번호</TableHead>
+            <TableHead>소속</TableHead>
             <TableHead>권한</TableHead>
             <TableHead>가입일</TableHead>
             <TableHead>작업</TableHead>
@@ -154,6 +159,9 @@ export default function AdminPanel() {
                 {user.firstName} {user.lastName}
               </TableCell>
               <TableCell>{user.email}</TableCell>
+              <TableCell>{user.profile?.name || '-'}</TableCell>
+              <TableCell>{user.profile?.phoneNumber || '-'}</TableCell>
+              <TableCell>{user.profile?.affiliation || '-'}</TableCell>
               <TableCell>{getRoleName(user.role)}</TableCell>
               <TableCell>{new Date(user.createdAt).toLocaleDateString('ko-KR')}</TableCell>
               <TableCell>
