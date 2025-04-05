@@ -1,5 +1,5 @@
 import { clerkClient } from '@clerk/nextjs/server';
-import { UserRole } from './types';
+import { UserRole, UserProfile } from './types';
 
 export async function getUserRole(userId: string): Promise<UserRole> {
   try {
@@ -27,6 +27,43 @@ export async function updateUserRole(userId: string, role: UserRole): Promise<vo
 export async function isAdmin(userId: string): Promise<boolean> {
   const role = await getUserRole(userId);
   return role === 'admin';
+}
+
+export async function getUserProfileStatus(userId: string): Promise<boolean> {
+  try {
+    const client = await clerkClient();
+    const user = await client.users.getUser(userId);
+    return !!user.publicMetadata.profileCompleted;
+  } catch (error) {
+    console.error('Error fetching user profile status:', error);
+    return false;
+  }
+}
+
+export async function getUserProfile(userId: string): Promise<UserProfile | null> {
+  try {
+    const client = await clerkClient();
+    const user = await client.users.getUser(userId);
+    
+    if (!user.publicMetadata.profileCompleted) {
+      return null;
+    }
+    
+    const profile = user.publicMetadata.profile as UserProfile;
+    
+    // 새로운 UserProfile 형식에 맞게 타입 확인
+    if (profile && typeof profile === 'object' && 
+        'name' in profile && 
+        'phoneNumber' in profile && 
+        'affiliation' in profile) {
+      return profile;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    return null;
+  }
 }
 
 export async function getAllUsers() {
