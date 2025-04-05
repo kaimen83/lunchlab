@@ -1,0 +1,82 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# ShadCN Components
+
+- 모든 컴포넌트는 ShadCN Components를 사용하세요.
+- 컴포넌트 사용 전 설치 여부를 확인해야 합니다 : '/components/ui' 체크하기
+- 컴포넌트 설치 명령어를 사용해야 합니다 : 'npx shadcn@latest add [component-name]'
+- 주의 : 'npx shadcn-ui@latest add [component-name]' 사용 금지
+
+# Icons
+- 모든 아이콘은 Lucide Icons를 사용하세요.
+- 아이콘 임포트 문법 : import { IconName } from 'lucide-react'
+
+# Components Structure
+
+- 컴포넌트는 '/components' 폴더 내에 정의해야 합니다.
+- UI 컴포넌트는 '/components/ui' 폴더 내에 정의해야 합니다.
+- 페이지별 컴포넌트는 '/app' 폴더내 해당 라우트에 위치해야 합니다.
+
+# Next.js: Route Handler 우선 사용
+
+- 모든 API 엔드포인트는 Route Handler를 사용하여 구현하세요.
+- 데이터베이스 작업, 외부 API 호출, 인증 등 복잡한 서버 작업은 반드시 Route Handler를 사용하세요.
+- Server Action은 단순 폼 제출 또는 간단한 데이터 처리에만 사용하세요.
+
+# Next.js 라우팅: App Router 사용
+
+- 프로젝트 내 라우팅은 Pages Router 대신 App Router를 사용하세요.
+
+# TypeScript 사용: TS 사용 권장
+
+- typescript 타입은 반드시 정의해야 합니다.
+- 컴포넌트는 재사용 가능하도록 설계해야 합니다.
+
+# Clerk 인증: clerkMiddleware() 사용
+
+모든 인증은 Clerk을 사용하세요.
+middleware.ts 파일에서는 **clerkMiddleware()**를 사용하세요.
+authMiddleware는 사용하지 않습니다.
+
+기본 미들웨어 설정:
+
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)'])
+export default clerkMiddleware(async (auth, request) => {
+if (!isPublicRoute(request)) {
+await auth.protect()
+}
+})
+
+export const config = {
+matcher: ['/((?!.*\\..*|_next).*)', '/', '/(api|trpc)(.*)']
+}
+
+ClerkClient: 유저 정보 조회 규칙
+
+ClerkClient를 사용하여 유저 정보를 조회할 때는 다음 규칙을 따르세요:
+
+기본 사용법:
+
+import { clerkClient } from '@clerk/nextjs/server'
+
+const client = await clerkClient()
+
+// 단일 유저 조회
+
+const user = await client.users.getUser(userId)
+
+// 다수 유저 조회 (권장)
+
+const users = await client.users.getUserList({
+
+userId: userIds // string[] 타입
+
+})
+
+
+
