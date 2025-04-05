@@ -22,4 +22,32 @@ export async function updateUserRole(userId: string, role: UserRole): Promise<vo
     console.error('Error updating user role:', error);
     throw error;
   }
+}
+
+export async function isAdmin(userId: string): Promise<boolean> {
+  const role = await getUserRole(userId);
+  return role === 'admin';
+}
+
+export async function getAllUsers() {
+  try {
+    const client = await clerkClient();
+    const usersResponse = await client.users.getUserList({
+      limit: 100,
+    });
+    
+    return usersResponse.data.map((user: any) => ({
+      id: user.id,
+      email: user.emailAddresses[0]?.emailAddress,
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      imageUrl: user.imageUrl,
+      role: user.publicMetadata.role as UserRole || 'pending',
+      createdAt: user.createdAt
+    }));
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    throw error;
+  }
 } 
