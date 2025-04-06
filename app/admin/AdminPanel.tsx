@@ -21,9 +21,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { UserPlus } from 'lucide-react';
 
 interface User {
   id: string;

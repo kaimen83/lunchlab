@@ -81,16 +81,17 @@ export async function getAllUsers() {
       limit: 100,
     });
     
-    return usersResponse.data.map((user: any) => ({
+    // Clerk API 응답에서 사용자 데이터를 변환
+    return usersResponse.data.map((user) => ({
       id: user.id,
       email: user.emailAddresses[0]?.emailAddress,
       username: user.username,
       firstName: user.firstName,
       lastName: user.lastName,
       imageUrl: user.imageUrl,
-      role: user.publicMetadata.role as UserRole || 'pending',
-      profileCompleted: !!user.publicMetadata.profileCompleted,
-      profile: user.publicMetadata.profile as UserProfile,
+      role: (user.publicMetadata?.role as UserRole) || 'pending',
+      profileCompleted: !!user.publicMetadata?.profileCompleted,
+      profile: user.publicMetadata?.profile as UserProfile,
       createdAt: user.createdAt
     }));
   } catch (error) {

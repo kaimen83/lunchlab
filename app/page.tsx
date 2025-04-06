@@ -2,8 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from 'next/navigation';
 import { RoleDisplay } from "@/components/RoleDisplay";
 import { RoleGuidance } from "@/components/RoleGuidance";
-import { isAdmin, getUserRole, getUserProfileStatus } from "@/lib/clerk";
-import { UserRole } from "@/lib/types";
+import { getUserRole, getUserProfileStatus } from "@/lib/clerk";
 import Link from "next/link";
 import { ProfileSetupModal } from "@/components/ProfileSetupModal";
 

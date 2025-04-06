@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   };
 
   // 웹훅 서명 검증
-  let evt: any;
+  let evt: unknown;
   try {
     const webhook = new Webhook(WEBHOOK_SECRET);
     evt = webhook.verify(body, svixHeaders);
@@ -45,10 +45,18 @@ export async function POST(req: Request) {
   }
 
   // 이벤트 유형 확인
-  const eventType = evt.type;
+  if (typeof evt !== 'object' || !evt || !('type' in evt) || !('data' in evt)) {
+    return new NextResponse('유효하지 않은 이벤트 데이터', { status: 400 });
+  }
+
+  const eventType = evt.type as string;
 
   if (eventType === 'user.created') {
-    const { id } = evt.data;
+    if (!evt.data || typeof evt.data !== 'object' || !('id' in evt.data)) {
+      return new NextResponse('유효하지 않은 사용자 데이터', { status: 400 });
+    }
+    
+    const { id } = evt.data as { id: string };
 
     try {
       // 새 사용자에게 '가입대기' 역할 부여

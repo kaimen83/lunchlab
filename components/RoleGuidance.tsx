@@ -44,7 +44,7 @@ export function RoleGuidance() {
         <>
           <h2 className="text-2xl font-bold mb-3">사용 안내</h2>
           <p className="mb-3">
-            현재 권한이 '가입대기' 상태입니다. 관리자에게 권한 승인을 요청하세요.
+            현재 권한이 &apos;가입대기&apos; 상태입니다. 관리자에게 권한 승인을 요청하세요.
           </p>
           <p className="mb-3">
             관리자 계정을 설정하려면 <Link href="/setup-admin" className="text-blue-500 hover:underline">관리자 설정 페이지</Link>로 이동하세요.
