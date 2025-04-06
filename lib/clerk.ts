@@ -32,9 +32,34 @@ export async function updateUserRole(userId: string, role: UserRole): Promise<vo
   }
 }
 
-export async function isAdmin(userId: string): Promise<boolean> {
+export async function isHeadAdmin(userId: string): Promise<boolean> {
   const role = await getUserRole(userId);
-  return role === 'admin';
+  return role === 'headAdmin';
+}
+
+export async function isCompanyAdmin(userId: string): Promise<boolean> {
+  const role = await getUserRole(userId);
+  return role === 'companyAdmin';
+}
+
+export async function isAnyAdmin(userId: string): Promise<boolean> {
+  const role = await getUserRole(userId);
+  return role === 'headAdmin' || role === 'companyAdmin';
+}
+
+// 기존 isAdmin 함수는 isAnyAdmin으로 리디렉션 (하위 호환성 유지)
+export async function isAdmin(userId: string): Promise<boolean> {
+  return isAnyAdmin(userId);
+}
+
+export async function isTester(userId: string): Promise<boolean> {
+  const role = await getUserRole(userId);
+  return role === 'tester';
+}
+
+export async function isWorker(userId: string): Promise<boolean> {
+  const role = await getUserRole(userId);
+  return role === 'worker';
 }
 
 export async function getUserProfileStatus(userId: string): Promise<boolean> {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { isAdmin, updateUserRole } from '@/lib/clerk';
+import { isAnyAdmin, updateUserRole, isHeadAdmin } from '@/lib/clerk';
 import { UserRole } from '@/lib/types';
 
 export async function POST(req: Request) {
@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     }
     
     // 관리자 권한 확인
-    const adminCheck = await isAdmin(userId);
+    const adminCheck = await isAnyAdmin(userId);
     if (!adminCheck) {
       return NextResponse.json({ error: '관리자만 접근할 수 있습니다.' }, { status: 403 });
     }
@@ -27,9 +27,17 @@ export async function POST(req: Request) {
     }
     
     // 역할 유효성 검사
-    const validRoles: UserRole[] = ['admin', 'employee', 'viewer', 'pending'];
+    const validRoles: UserRole[] = ['headAdmin', 'companyAdmin', 'worker', 'tester', 'pending'];
     if (!validRoles.includes(role as UserRole)) {
       return NextResponse.json({ error: '유효하지 않은 역할입니다.' }, { status: 400 });
+    }
+    
+    // 최고 관리자 권한으로 변경 시 추가 검증
+    if (role === 'headAdmin') {
+      const isUserHeadAdmin = await isHeadAdmin(userId);
+      if (!isUserHeadAdmin) {
+        return NextResponse.json({ error: '최고 관리자 권한은 기존 최고 관리자만 부여할 수 있습니다.' }, { status: 403 });
+      }
     }
     
     // 사용자 역할 업데이트

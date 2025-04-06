@@ -52,29 +52,41 @@ export function RoleGuidance() {
         </>
       )}
       
-      {role === 'employee' && (
+      {role === 'worker' && (
         <>
-          <h2 className="text-2xl font-bold mb-3">일반직원 안내</h2>
+          <h2 className="text-2xl font-bold mb-3">일반사용자 안내</h2>
           <p className="mb-3">
-            일반직원 권한으로 로그인하셨습니다. 일반 기능을 사용할 수 있습니다.
+            일반사용자 권한으로 로그인하셨습니다. 기본 기능을 사용할 수 있습니다.
           </p>
         </>
       )}
       
-      {role === 'viewer' && (
+      {role === 'tester' && (
         <>
-          <h2 className="text-2xl font-bold mb-3">뷰어 안내</h2>
+          <h2 className="text-2xl font-bold mb-3">테스터 안내</h2>
           <p className="mb-3">
-            뷰어 권한으로 로그인하셨습니다. 읽기 전용으로 정보를 조회할 수 있습니다.
+            테스터 권한으로 로그인하셨습니다. 테스트 목적으로 시스템을 사용할 수 있습니다.
           </p>
         </>
       )}
       
-      {role === 'admin' && (
+      {role === 'companyAdmin' && (
         <>
-          <h2 className="text-2xl font-bold mb-3">관리자 안내</h2>
+          <h2 className="text-2xl font-bold mb-3">업체별 관리자 안내</h2>
           <p className="mb-3">
-            관리자 권한으로 로그인하셨습니다. 시스템의 모든 기능에 접근하실 수 있습니다.
+            업체별 관리자 권한으로 로그인하셨습니다. 소속 업체의 관리 기능에 접근할 수 있습니다.
+          </p>
+          <p className="mb-3">
+            사용자 권한 관리는 <Link href="/admin" className="text-blue-500 hover:underline">관리자 페이지</Link>에서 수행할 수 있습니다.
+          </p>
+        </>
+      )}
+      
+      {role === 'headAdmin' && (
+        <>
+          <h2 className="text-2xl font-bold mb-3">최고 관리자 안내</h2>
+          <p className="mb-3">
+            최고 관리자 권한으로 로그인하셨습니다. 시스템의 모든 기능에 접근하실 수 있습니다.
           </p>
           <p className="mb-3">
             사용자 권한 관리는 <Link href="/admin" className="text-blue-500 hover:underline">관리자 페이지</Link>에서 수행할 수 있습니다.

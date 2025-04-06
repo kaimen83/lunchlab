@@ -112,9 +112,10 @@ export default function AdminPanel() {
 
   const getRoleName = (role: UserRole): string => {
     const roleMap: Record<UserRole, string> = {
-      admin: '관리자',
-      employee: '일반직원',
-      viewer: '뷰어',
+      headAdmin: '최고 관리자',
+      companyAdmin: '업체별 관리자',
+      worker: '일반사용자',
+      tester: '테스터',
       pending: '가입대기'
     };
     return roleMap[role] || '가입대기';
@@ -195,9 +196,10 @@ export default function AdminPanel() {
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value as UserRole)}
               >
-                <option value="admin">관리자</option>
-                <option value="employee">일반직원</option>
-                <option value="viewer">뷰어</option>
+                <option value="headAdmin">최고 관리자</option>
+                <option value="companyAdmin">업체별 관리자</option>
+                <option value="worker">일반사용자</option>
+                <option value="tester">테스터</option>
                 <option value="pending">가입대기</option>
               </select>
             </div>

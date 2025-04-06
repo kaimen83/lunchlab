@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { isAdmin, getAllUsers } from '@/lib/clerk';
+import { isAnyAdmin, getAllUsers } from '@/lib/clerk';
 
 export async function GET() {
   try {
@@ -12,7 +12,7 @@ export async function GET() {
     }
     
     // 관리자 권한 확인
-    const adminCheck = await isAdmin(userId);
+    const adminCheck = await isAnyAdmin(userId);
     if (!adminCheck) {
       return NextResponse.json({ error: '관리자만 접근할 수 있습니다.' }, { status: 403 });
     }

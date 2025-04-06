@@ -25,8 +25,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
     
-    // 사용자에게 관리자 권한 부여
-    await updateUserRole(userId, 'admin');
+    // 사용자에게 최고 관리자 권한 부여
+    await updateUserRole(userId, 'headAdmin');
     
     return NextResponse.json({ success: true });
   } catch (error) {
