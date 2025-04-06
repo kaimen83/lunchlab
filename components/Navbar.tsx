@@ -5,7 +5,7 @@ import { UserButton, useUser } from '@clerk/nextjs';
 import { useEffect, useState } from 'react';
 import { UserRole } from '@/lib/types';
 import { usePathname, useRouter } from 'next/navigation';
-import { Mail } from 'lucide-react';
+import { Mail, Shield } from 'lucide-react';
 
 export function Navbar() {
   const { user, isLoaded, isSignedIn } = useUser();
@@ -46,20 +46,6 @@ export function Navbar() {
     return null;
   }
 
-  // 역할에 따른 배경색 변경
-  const getRoleBgColor = (userRole: UserRole | null): string => {
-    switch (userRole) {
-      case 'headAdmin':
-        return 'bg-purple-100 text-purple-800';
-      case 'user':
-        return 'bg-green-100 text-green-800';
-      case 'tester':
-        return 'bg-orange-100 text-orange-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   return (
     <header className="bg-white shadow">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -75,7 +61,8 @@ export function Navbar() {
                 홈
               </Link>
               {role === 'headAdmin' && (
-                <Link href="/admin" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">
+                <Link href="/admin" className="px-3 py-2 rounded-md text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 flex items-center">
+                  <Shield className="w-4 h-4 mr-1" />
                   관리자
                 </Link>
               )}
@@ -86,14 +73,6 @@ export function Navbar() {
             </nav>
           </div>
           <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBgColor(role)} mr-2`}>
-                {role === 'headAdmin' && '최고 관리자'}
-                {role === 'user' && '일반사용자'}
-                {role === 'tester' && '테스터'}
-                {!role && '역할 없음'}
-              </span>
-            </div>
             <div className="ml-3 relative">
               <UserButton afterSignOutUrl="/sign-in" />
             </div>
