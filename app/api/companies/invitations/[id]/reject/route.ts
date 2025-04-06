@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 
+// Next.js 15에서 라우트 핸들러 컨텍스트에 대한 타입 정의
+interface RouteContext {
+  params: Promise<{
+    id: string;
+  }>;
+}
+
 // Next.js 15 타입 문제 해결을 위해 인터페이스 주석 처리
 // interface RejectInvitationParams {
 //   params: {
@@ -9,12 +16,10 @@ import { createServerSupabaseClient } from '@/lib/supabase';
 //   };
 // }
 
-// Next.js 15에서 타입 이슈를 해결하기 위해 임시로 any 타입 사용
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function POST(req: Request, context: any) {
+export async function POST(req: Request, context: RouteContext) {
   try {
-    // params 객체 추출
-    const invitationId = context.params.id;
+    // Next.js 15에서는 params가 Promise이므로 await로 처리
+    const { id: invitationId } = await context.params;
     
     // 현재 로그인한 사용자 확인
     const { userId } = await auth();
