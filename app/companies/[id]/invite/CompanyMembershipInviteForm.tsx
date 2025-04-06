@@ -103,7 +103,14 @@ export function CompanyMembershipInviteForm({
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || '초대 생성에 실패했습니다.');
+        // 오류 메시지 명확하게 처리 (이미 초대된 사용자인 경우 등)
+        if (response.status === 400 && data.error.includes('이미 초대')) {
+          throw new Error(data.error);
+        } else if (response.status === 400 && data.error.includes('이미 회사에 소속된')) {
+          throw new Error(data.error);
+        } else {
+          throw new Error(data.error || '초대 생성에 실패했습니다.');
+        }
       }
       
       setSuccess('초대가 성공적으로 전송되었습니다.');
@@ -118,6 +125,9 @@ export function CompanyMembershipInviteForm({
     } catch (err) {
       console.error('초대 생성 중 오류:', err);
       setError(err instanceof Error ? err.message : '오류가 발생했습니다.');
+      
+      // 사용자가 이미 초대되었거나 회원인 경우에는 리다이렉트하지 않음
+      // 나머지 경우는 원래 계획대로 진행
     } finally {
       setIsSubmitting(false);
     }

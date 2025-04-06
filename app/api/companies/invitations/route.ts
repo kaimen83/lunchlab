@@ -40,28 +40,53 @@ export async function POST(req: Request) {
     }
     
     // 초대할 사용자가 이미 회사 멤버인지 확인
-    const { data: existingMembership } = await supabase
+    const { data: existingMembership, error: membershipCheckError } = await supabase
       .from('company_memberships')
-      .select()
+      .select('*')
       .eq('company_id', company_id)
-      .eq('user_id', invited_user_id)
-      .single();
+      .eq('user_id', invited_user_id);
     
-    if (existingMembership) {
+    if (membershipCheckError) {
+      console.error('멤버십 확인 오류:', membershipCheckError);
+      return NextResponse.json({ error: '멤버십 상태 확인에 실패했습니다.' }, { status: 500 });
+    }
+    
+    // 활성 멤버십이 있는지 확인
+    if (existingMembership && existingMembership.length > 0) {
       return NextResponse.json({ error: '이미 회사에 소속된 멤버입니다.' }, { status: 400 });
     }
     
-    // 이미 초대가 진행 중인지 확인
-    const { data: existingInvitation } = await supabase
+    // 이미 초대가 진행 중인지 확인 (수정된 부분)
+    const { data: existingInvitations, error: invitationCheckError } = await supabase
       .from('company_invitations')
       .select()
       .eq('company_id', company_id)
-      .eq('invited_user_id', invited_user_id)
-      .eq('status', 'pending')
-      .single();
+      .eq('invited_user_id', invited_user_id);
     
-    if (existingInvitation) {
-      return NextResponse.json({ error: '이미 초대가 진행 중입니다.' }, { status: 400 });
+    // 오류 처리 추가
+    if (invitationCheckError) {
+      console.error('초대 확인 오류:', invitationCheckError);
+      return NextResponse.json({ error: '초대 상태 확인에 실패했습니다.' }, { status: 500 });
+    }
+    
+    // 모든 초대 상태 확인
+    if (existingInvitations && existingInvitations.length > 0) {
+      const pendingInvitation = existingInvitations.find(inv => inv.status === 'pending');
+      if (pendingInvitation) {
+        return NextResponse.json({ error: '이미 초대가 진행 중입니다.' }, { status: 400 });
+      }
+      
+      // 기존 초대가 있지만 모두 수락/거절된 상태인 경우, 기존 초대를 삭제하고 새로 생성
+      const { error: deleteError } = await supabase
+        .from('company_invitations')
+        .delete()
+        .eq('company_id', company_id)
+        .eq('invited_user_id', invited_user_id);
+      
+      if (deleteError) {
+        console.error('초대 삭제 오류:', deleteError);
+        return NextResponse.json({ error: '이전 초대 기록을 삭제하는데 실패했습니다.' }, { status: 500 });
+      }
     }
     
     // 초대 만료 시간 설정 (7일 후)
@@ -84,6 +109,12 @@ export async function POST(req: Request) {
     
     if (invitationError) {
       console.error('초대 생성 오류:', invitationError);
+      
+      // 구체적인 오류 메시지 제공
+      if (invitationError.code === '23505') {
+        return NextResponse.json({ error: '동일한 사용자에게 이미 초대장이 발송되었습니다.' }, { status: 400 });
+      }
+      
       return NextResponse.json({ error: '초대장 생성에 실패했습니다.' }, { status: 500 });
     }
     
