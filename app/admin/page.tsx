@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
-import { isAdmin } from '@/lib/clerk';
+import { isHeadAdmin } from '@/lib/clerk';
 import AdminPanel from '@/components/AdminPanel';
 
 export default async function AdminPage() {
@@ -11,11 +11,11 @@ export default async function AdminPage() {
     redirect('/sign-in');
   }
   
-  // 관리자 권한 확인
-  const isAdminUser = await isAdmin(userId);
+  // 최고 관리자 권한 확인
+  const isHeadAdminUser = await isHeadAdmin(userId);
   
-  // 관리자가 아닌 경우 메인 페이지로 리다이렉트
-  if (!isAdminUser) {
+  // 최고 관리자가 아닌 경우 메인 페이지로 리다이렉트
+  if (!isHeadAdminUser) {
     redirect('/');
   }
   

@@ -76,9 +76,6 @@ export function RoleGuidance() {
           <p className="mb-3">
             업체별 관리자 권한으로 로그인하셨습니다. 소속 업체의 관리 기능에 접근할 수 있습니다.
           </p>
-          <p className="mb-3">
-            사용자 권한 관리는 <Link href="/admin" className="text-blue-500 hover:underline">관리자 페이지</Link>에서 수행할 수 있습니다.
-          </p>
         </>
       )}
       

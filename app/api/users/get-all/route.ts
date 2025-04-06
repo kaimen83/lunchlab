@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { isAnyAdmin, getAllUsers } from '@/lib/clerk';
+import { isHeadAdmin, getAllUsers } from '@/lib/clerk';
 
 export async function GET() {
   try {
@@ -11,10 +11,10 @@ export async function GET() {
       return NextResponse.json({ error: '인증되지 않은 사용자입니다.' }, { status: 401 });
     }
     
-    // 관리자 권한 확인
-    const adminCheck = await isAnyAdmin(userId);
-    if (!adminCheck) {
-      return NextResponse.json({ error: '관리자만 접근할 수 있습니다.' }, { status: 403 });
+    // 최고 관리자 권한 확인
+    const headAdminCheck = await isHeadAdmin(userId);
+    if (!headAdminCheck) {
+      return NextResponse.json({ error: '최고 관리자만 접근할 수 있습니다.' }, { status: 403 });
     }
     
     // 모든 사용자 목록 조회

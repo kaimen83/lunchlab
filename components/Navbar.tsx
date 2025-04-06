@@ -76,7 +76,7 @@ export function Navbar() {
               <Link href="/" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">
                 홈
               </Link>
-              {(role === 'headAdmin' || role === 'companyAdmin') && (
+              {role === 'headAdmin' && (
                 <Link href="/admin" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">
                   관리자
                 </Link>
