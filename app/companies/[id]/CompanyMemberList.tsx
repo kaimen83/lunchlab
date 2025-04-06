@@ -8,13 +8,13 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Dialog, 
-  DialogTrigger, 
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
   DialogDescription, 
   DialogFooter 
 } from '@/components/ui/dialog';
+import Image from 'next/image';
 
 interface CompanyMemberListProps {
   companyId: string;
@@ -27,6 +27,15 @@ interface MemberWithUser {
   displayName: string;
   email: string;
   imageUrl?: string;
+}
+
+// 사용자 정보에 대한 인터페이스 정의
+interface UserInfo {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  imageUrl: string | null;
 }
 
 export function CompanyMemberList({ companyId, members, currentUserMembership }: CompanyMemberListProps) {
@@ -76,7 +85,7 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
         
         // 멤버십과 사용자 정보 결합
         const membersWithUserInfo = members.map((membership) => {
-          const userInfo = data.users.find((u: any) => u.id === membership.user_id);
+          const userInfo = data.users.find((u: UserInfo) => u.id === membership.user_id);
           return {
             membership,
             displayName: userInfo ? `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim() : '알 수 없음',
@@ -129,11 +138,11 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
         // API 응답에 리다이렉트 경로가 있으면 그 경로로, 없으면 메인 페이지('/')로 이동
         window.location.href = result.redirect || '/';
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('멤버 삭제 중 오류:', err);
       toast({
         title: '멤버 삭제 실패',
-        description: err.message || '멤버 삭제 중 오류가 발생했습니다.',
+        description: err instanceof Error ? err.message : '멤버 삭제 중 오류가 발생했습니다.',
         variant: 'destructive',
       });
     } finally {
@@ -228,10 +237,12 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
                 <div className="flex items-center">
                   <div className="bg-gray-100 p-2 rounded-full mr-3">
                     {member.imageUrl ? (
-                      <img 
+                      <Image 
                         src={member.imageUrl} 
                         alt={member.displayName} 
-                        className="w-8 h-8 rounded-full"
+                        width={32}
+                        height={32}
+                        className="rounded-full"
                       />
                     ) : (
                       <UserRoundIcon className="w-8 h-8 text-gray-500" />

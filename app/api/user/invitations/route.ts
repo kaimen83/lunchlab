@@ -3,6 +3,15 @@ import { auth } from '@clerk/nextjs/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { clerkClient } from '@clerk/nextjs/server';
 
+// 초대자 정보를 담을 인터페이스 정의
+interface InviterInfo {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  imageUrl: string | null;
+  email: string;
+}
+
 export async function GET(req: NextRequest) {
   try {
     // 현재 로그인한 사용자 확인
@@ -58,7 +67,7 @@ export async function GET(req: NextRequest) {
     const inviterIds = Array.from(new Set(invitations.map(invitation => invitation.invited_by)));
     
     // 초대자 정보 가져오기 (Clerk에서)
-    let inviterDetails: Record<string, any> = {};
+    let inviterDetails: Record<string, InviterInfo> = {};
     
     if (inviterIds.length > 0) {
       try {
@@ -77,7 +86,7 @@ export async function GET(req: NextRequest) {
             email: user.emailAddresses[0]?.emailAddress || '',
           };
           return acc;
-        }, {} as Record<string, any>);
+        }, {} as Record<string, InviterInfo>);
       } catch (error) {
         console.error('초대자 정보 조회 오류:', error);
         // 초대자 정보 조회 실패해도 초대 목록은 반환

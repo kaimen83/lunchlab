@@ -13,14 +13,13 @@ interface ClerkMembership {
   role?: string;
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string; userId: string } }
-) {
+// Next.js 15에서 타입 이슈를 해결하기 위해 임시로 any 타입 사용
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function DELETE(request: NextRequest, context: any) {
   try {
     const { userId } = await auth();
-    const paramsData = await Promise.resolve(params);
-    const { id: companyId, userId: targetUserId } = paramsData;
+    // params 객체 추출
+    const { id: companyId, userId: targetUserId } = context.params;
 
     // 디버깅을 위한 로그 추가
     console.log('API 호출 시작 - 조직 ID:', companyId, '대상 사용자 ID:', targetUserId);

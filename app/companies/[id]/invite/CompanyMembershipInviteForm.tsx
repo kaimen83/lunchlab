@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CompanyMembership, CompanyMemberRole } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { UserRoundIcon, Search, Users } from 'lucide-react';
+import Image from 'next/image';
 
 interface User {
   id: string;
@@ -176,10 +177,12 @@ export function CompanyMembershipInviteForm({
                 >
                   <div className="bg-gray-100 p-2 rounded-full mr-3">
                     {user.imageUrl ? (
-                      <img
+                      <Image
                         src={user.imageUrl}
                         alt={`${user.firstName || ''} ${user.lastName || ''}`}
-                        className="w-8 h-8 rounded-full"
+                        width={32}
+                        height={32}
+                        className="rounded-full"
                       />
                     ) : (
                       <UserRoundIcon className="w-8 h-8 text-gray-500" />
