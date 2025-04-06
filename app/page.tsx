@@ -5,6 +5,7 @@ import { RoleGuidance } from "@/components/RoleGuidance";
 import { getUserRole, getUserProfileStatus } from "@/lib/clerk";
 import Link from "next/link";
 import { ProfileSetupModal } from "@/components/ProfileSetupModal";
+import { Building, Plus } from "lucide-react";
 
 export default async function Home() {
   const { userId } = await auth();
@@ -17,6 +18,7 @@ export default async function Home() {
   // 사용자 권한 및 프로필 완료 여부 확인
   const userRole = await getUserRole(userId);
   const userIsAdmin = userRole === 'headAdmin';
+  const userCanCreateCompany = userRole === 'headAdmin' || userRole === 'user';
   const profileCompleted = await getUserProfileStatus(userId);
 
   // 프로필이 완료되지 않은 경우에만 모달 표시
@@ -32,13 +34,21 @@ export default async function Home() {
         
         <RoleDisplay />
         
-        {userIsAdmin && (
-          <div className="mt-8">
-            <Link href="/admin" className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+        <div className="mt-8 space-y-4">
+          {userIsAdmin && (
+            <Link href="/admin" className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded inline-flex items-center">
               관리자 페이지로 이동
             </Link>
-          </div>
-        )}
+          )}
+          
+          {userCanCreateCompany && (
+            <Link href="/companies/new" className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+              <Plus className="w-4 h-4 mr-2" />
+              <Building className="w-4 h-4 mr-2" />
+              회사 페이지 생성하기
+            </Link>
+          )}
+        </div>
         
         {/* 클라이언트 컴포넌트로 역할별 안내 문구 표시 */}
         <RoleGuidance />
