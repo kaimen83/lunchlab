@@ -3,8 +3,18 @@
 import { useState, useEffect } from 'react';
 import { CompanyMembership, CompanyMemberRole } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
-import { UserRoundIcon, ShieldCheck, Crown, UserPlus, X } from 'lucide-react';
+import { UserRoundIcon, ShieldCheck, Crown, UserPlus, X, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { 
+  Dialog, 
+  DialogTrigger, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription, 
+  DialogFooter 
+} from '@/components/ui/dialog';
 
 interface CompanyMemberListProps {
   companyId: string;
@@ -21,9 +31,14 @@ interface MemberWithUser {
 
 export function CompanyMemberList({ companyId, members, currentUserMembership }: CompanyMemberListProps) {
   const { user: currentUser } = useUser();
+  const { toast } = useToast();
   const [membersWithUsers, setMembersWithUsers] = useState<MemberWithUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [memberToDelete, setMemberToDelete] = useState<MemberWithUser | null>(null);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const isOwner = currentUserMembership?.role === 'owner';
   const isAdmin = currentUserMembership?.role === 'admin' || isOwner;
@@ -82,6 +97,66 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
     fetchUsers();
   }, [members]);
   
+  // 멤버 삭제 함수
+  const deleteMember = async (userId: string) => {
+    try {
+      setIsProcessing(true);
+      
+      const response = await fetch(`/api/companies/${companyId}/members/${userId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '멤버 삭제에 실패했습니다.');
+      }
+      
+      const result = await response.json();
+      
+      // 삭제 성공 시 UI 업데이트
+      setMembersWithUsers((prevMembers) => 
+        prevMembers.filter((m) => m.membership.user_id !== userId)
+      );
+      
+      toast({
+        title: '멤버 삭제 완료',
+        description: '멤버가 성공적으로 삭제되었습니다.',
+        variant: 'default',
+      });
+      
+      // 내가 탈퇴한 경우 메인 페이지로 리다이렉트
+      if (userId === currentUser?.id) {
+        // API 응답에 리다이렉트 경로가 있으면 그 경로로, 없으면 메인 페이지('/')로 이동
+        window.location.href = result.redirect || '/';
+      }
+    } catch (err: any) {
+      console.error('멤버 삭제 중 오류:', err);
+      toast({
+        title: '멤버 삭제 실패',
+        description: err.message || '멤버 삭제 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsProcessing(false);
+      setIsConfirmDialogOpen(false);
+      setMemberToDelete(null);
+      setIsLeaving(false);
+    }
+  };
+  
+  // 멤버 삭제 확인 다이얼로그 열기
+  const openDeleteConfirm = (member: MemberWithUser) => {
+    setMemberToDelete(member);
+    setIsLeaving(false);
+    setIsConfirmDialogOpen(true);
+  };
+  
+  // 탈퇴 확인 다이얼로그 열기
+  const openLeaveConfirm = () => {
+    setIsLeaving(true);
+    setIsConfirmDialogOpen(true);
+  };
+  
   // 역할에 따른 아이콘 표시
   const getRoleIcon = (role: CompanyMemberRole) => {
     switch (role) {
@@ -110,17 +185,30 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
     <div className="bg-white shadow rounded-lg p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold">회사 멤버</h2>
-        {isAdmin && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.location.href = `/companies/${companyId}/invite`}
-            className="flex items-center"
-          >
-            <UserPlus className="w-4 h-4 mr-2" />
-            멤버 초대
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {currentUserMembership && currentUser && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openLeaveConfirm}
+              className="flex items-center text-red-500 border-red-200 hover:bg-red-50"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              회사 탈퇴
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.href = `/companies/${companyId}/invite`}
+              className="flex items-center"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              멤버 초대
+            </Button>
+          )}
+        </div>
       </div>
       
       {isLoading ? (
@@ -162,7 +250,12 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
                   </div>
                   
                   {isOwner && member.membership.user_id !== currentUser?.id && (
-                    <Button variant="ghost" size="icon" className="text-red-500">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-red-500"
+                      onClick={() => openDeleteConfirm(member)}
+                    >
                       <X className="w-4 h-4" />
                     </Button>
                   )}
@@ -172,6 +265,43 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
           )}
         </div>
       )}
+      
+      {/* 확인 다이얼로그 */}
+      <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {isLeaving ? '회사 탈퇴' : '멤버 삭제'}
+            </DialogTitle>
+            <DialogDescription>
+              {isLeaving ? 
+                '정말 이 회사에서 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.' : 
+                `정말 ${memberToDelete?.displayName} 멤버를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsConfirmDialogOpen(false)}
+              disabled={isProcessing}
+            >
+              취소
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={() => 
+                isLeaving ? 
+                  deleteMember(currentUser?.id || '') : 
+                  memberToDelete ? deleteMember(memberToDelete.membership.user_id) : null
+              }
+              disabled={isProcessing}
+            >
+              {isProcessing ? '처리 중...' : isLeaving ? '탈퇴하기' : '삭제하기'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 
