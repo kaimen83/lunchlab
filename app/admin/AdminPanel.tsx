@@ -42,7 +42,7 @@ export default function AdminPanel({ users }: AdminPanelProps) {
   const router = useRouter();
   const [isUpdating, setIsUpdating] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [selectedRole, setSelectedRole] = useState<UserRole>('pending');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('user');
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const handleRoleChange = async () => {
@@ -69,12 +69,11 @@ export default function AdminPanel({ users }: AdminPanelProps) {
 
   const getRoleName = (role: UserRole): string => {
     const roleMap: Record<UserRole, string> = {
-      admin: '관리자',
-      employee: '일반직원',
-      viewer: '뷰어',
-      pending: '가입대기'
+      headAdmin: '최고 관리자',
+      user: '일반사용자',
+      tester: '테스터'
     };
-    return roleMap[role] || '가입대기';
+    return roleMap[role] || '일반사용자';
   };
 
   return (
@@ -134,10 +133,9 @@ export default function AdminPanel({ users }: AdminPanelProps) {
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value as UserRole)}
               >
-                <option value="admin">관리자</option>
-                <option value="employee">일반직원</option>
-                <option value="viewer">뷰어</option>
-                <option value="pending">가입대기</option>
+                <option value="headAdmin">최고 관리자</option>
+                <option value="user">일반사용자</option>
+                <option value="tester">테스터</option>
               </select>
             </div>
           </div>

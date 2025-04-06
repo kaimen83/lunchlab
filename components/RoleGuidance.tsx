@@ -12,13 +12,13 @@ export function RoleGuidance() {
   // 사용자 로드 및 메타데이터 변경 감지
   useEffect(() => {
     if (isLoaded && user) {
-      setRole(user.publicMetadata.role as UserRole || 'pending');
+      setRole(user.publicMetadata.role as UserRole || 'user');
       
       // 메타데이터 변경 감지를 위한 주기적 체크 (3초마다)
       const intervalId = setInterval(() => {
         const currentRole = user.publicMetadata.role as UserRole;
         if (currentRole !== role) {
-          setRole(currentRole || 'pending');
+          setRole(currentRole || 'user');
         }
       }, 3000);
       
@@ -29,7 +29,7 @@ export function RoleGuidance() {
   // 로그인 상태나 사용자 변경 감지
   useEffect(() => {
     if (isLoaded && user) {
-      setRole(user.publicMetadata.role as UserRole || 'pending');
+      setRole(user.publicMetadata.role as UserRole || 'user');
     }
   }, [isLoaded, user, isSignedIn]);
 
@@ -40,19 +40,7 @@ export function RoleGuidance() {
   // 사용자 역할에 따른 안내 문구 렌더링
   return (
     <div className="mt-12 text-center max-w-lg">
-      {role === 'pending' && (
-        <>
-          <h2 className="text-2xl font-bold mb-3">사용 안내</h2>
-          <p className="mb-3">
-            현재 권한이 &apos;가입대기&apos; 상태입니다. 관리자에게 권한 승인을 요청하세요.
-          </p>
-          <p className="mb-3">
-            관리자 계정을 설정하려면 <Link href="/setup-admin" className="text-blue-500 hover:underline">관리자 설정 페이지</Link>로 이동하세요.
-          </p>
-        </>
-      )}
-      
-      {role === 'worker' && (
+      {role === 'user' && (
         <>
           <h2 className="text-2xl font-bold mb-3">일반사용자 안내</h2>
           <p className="mb-3">
@@ -66,15 +54,6 @@ export function RoleGuidance() {
           <h2 className="text-2xl font-bold mb-3">테스터 안내</h2>
           <p className="mb-3">
             테스터 권한으로 로그인하셨습니다. 테스트 목적으로 시스템을 사용할 수 있습니다.
-          </p>
-        </>
-      )}
-      
-      {role === 'companyAdmin' && (
-        <>
-          <h2 className="text-2xl font-bold mb-3">업체별 관리자 안내</h2>
-          <p className="mb-3">
-            업체별 관리자 권한으로 로그인하셨습니다. 소속 업체의 관리 기능에 접근할 수 있습니다.
           </p>
         </>
       )}

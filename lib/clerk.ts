@@ -5,10 +5,10 @@ export async function getUserRole(userId: string): Promise<UserRole> {
   try {
     const client = await clerkClient();
     const user = await client.users.getUser(userId);
-    return user.publicMetadata.role as UserRole || 'pending';
+    return user.publicMetadata.role as UserRole || 'user';
   } catch (error) {
     console.error('Error fetching user role:', error);
-    return 'pending';
+    return 'user';
   }
 }
 
@@ -37,29 +37,14 @@ export async function isHeadAdmin(userId: string): Promise<boolean> {
   return role === 'headAdmin';
 }
 
-export async function isCompanyAdmin(userId: string): Promise<boolean> {
+export async function isUser(userId: string): Promise<boolean> {
   const role = await getUserRole(userId);
-  return role === 'companyAdmin';
-}
-
-export async function isAnyAdmin(userId: string): Promise<boolean> {
-  const role = await getUserRole(userId);
-  return role === 'headAdmin' || role === 'companyAdmin';
-}
-
-// 기존 isAdmin 함수는 isAnyAdmin으로 리디렉션 (하위 호환성 유지)
-export async function isAdmin(userId: string): Promise<boolean> {
-  return isAnyAdmin(userId);
+  return role === 'user';
 }
 
 export async function isTester(userId: string): Promise<boolean> {
   const role = await getUserRole(userId);
   return role === 'tester';
-}
-
-export async function isWorker(userId: string): Promise<boolean> {
-  const role = await getUserRole(userId);
-  return role === 'worker';
 }
 
 export async function getUserProfileStatus(userId: string): Promise<boolean> {
@@ -114,7 +99,7 @@ export async function getAllUsers() {
       firstName: user.firstName,
       lastName: user.lastName,
       imageUrl: user.imageUrl,
-      role: (user.publicMetadata?.role as UserRole) || 'pending',
+      role: (user.publicMetadata?.role as UserRole) || 'user',
       profileCompleted: !!user.publicMetadata?.profileCompleted,
       profile: user.publicMetadata?.profile as UserProfile,
       createdAt: user.createdAt

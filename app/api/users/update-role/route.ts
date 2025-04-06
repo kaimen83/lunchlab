@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     }
     
     // 역할 유효성 검사
-    const validRoles: UserRole[] = ['headAdmin', 'companyAdmin', 'worker', 'tester', 'pending'];
+    const validRoles: UserRole[] = ['headAdmin', 'user', 'tester'];
     if (!validRoles.includes(role as UserRole)) {
       return NextResponse.json({ error: '유효하지 않은 역할입니다.' }, { status: 400 });
     }

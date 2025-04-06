@@ -16,11 +16,11 @@ export default async function Home() {
 
   // 사용자 권한 및 프로필 완료 여부 확인
   const userRole = await getUserRole(userId);
-  const userIsAdmin = userRole === 'admin';
+  const userIsAdmin = userRole === 'headAdmin';
   const profileCompleted = await getUserProfileStatus(userId);
 
-  // 프로필이 완료되지 않았고, 역할이 'pending'인 경우에만 모달 표시
-  const showProfileModal = !profileCompleted && userRole === 'pending';
+  // 프로필이 완료되지 않은 경우에만 모달 표시
+  const showProfileModal = !profileCompleted;
 
   return (
     <>

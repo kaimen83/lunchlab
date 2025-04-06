@@ -41,7 +41,7 @@ export default function AdminPanel() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [selectedRole, setSelectedRole] = useState<UserRole>('pending');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('user');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,12 +113,10 @@ export default function AdminPanel() {
   const getRoleName = (role: UserRole): string => {
     const roleMap: Record<UserRole, string> = {
       headAdmin: '최고 관리자',
-      companyAdmin: '업체별 관리자',
-      worker: '일반사용자',
-      tester: '테스터',
-      pending: '가입대기'
+      user: '일반사용자',
+      tester: '테스터'
     };
-    return roleMap[role] || '가입대기';
+    return roleMap[role] || '일반사용자';
   };
 
   if (isLoading) {
@@ -197,10 +195,8 @@ export default function AdminPanel() {
                 onChange={(e) => setSelectedRole(e.target.value as UserRole)}
               >
                 <option value="headAdmin">최고 관리자</option>
-                <option value="companyAdmin">업체별 관리자</option>
-                <option value="worker">일반사용자</option>
+                <option value="user">일반사용자</option>
                 <option value="tester">테스터</option>
-                <option value="pending">가입대기</option>
               </select>
             </div>
           </div>
