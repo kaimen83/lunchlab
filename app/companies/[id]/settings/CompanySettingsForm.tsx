@@ -17,7 +17,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Save } from 'lucide-react';
 
 // 폼 스키마 정의
@@ -36,6 +36,7 @@ interface CompanySettingsFormProps {
 export function CompanySettingsForm({ company, isOwner }: CompanySettingsFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
   
   // 폼 초기화
   const form = useForm<z.infer<typeof formSchema>>({
