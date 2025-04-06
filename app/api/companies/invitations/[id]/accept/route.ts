@@ -10,7 +10,9 @@ interface AcceptInvitationParams {
 
 export async function POST(req: Request, { params }: AcceptInvitationParams) {
   try {
-    const invitationId = params.id;
+    // params를 await 처리
+    const paramsData = await params;
+    const invitationId = paramsData.id;
     
     // 현재 로그인한 사용자 확인
     const { userId } = await auth();
@@ -52,11 +54,24 @@ export async function POST(req: Request, { params }: AcceptInvitationParams) {
       return NextResponse.json({ error: '만료된 초대입니다.' }, { status: 400 });
     }
     
+    // 이미 해당 회사의 멤버인지 확인
+    const { data: existingMembership, error: membershipCheckError } = await supabase
+      .from('company_memberships')
+      .select('*')
+      .eq('company_id', invitation.company_id)
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (membershipCheckError) {
+      console.error('멤버십 확인 오류:', membershipCheckError);
+      return NextResponse.json({ error: '멤버십 확인에 실패했습니다.' }, { status: 500 });
+    }
+    
     // 트랜잭션 시작 (여러 작업을 하나의 단위로 처리)
-    // 1. 초대 상태 업데이트
+    // 1. 초대 상태 업데이트 (updated_at 필드 제거)
     const { error: updateError } = await supabase
       .from('company_invitations')
-      .update({ status: 'accepted', updated_at: new Date().toISOString() })
+      .update({ status: 'accepted' })
       .eq('id', invitationId);
     
     if (updateError) {
@@ -64,21 +79,37 @@ export async function POST(req: Request, { params }: AcceptInvitationParams) {
       return NextResponse.json({ error: '초대 수락 처리에 실패했습니다.' }, { status: 500 });
     }
     
-    // 2. 회사 멤버십 생성
-    const { error: membershipError } = await supabase
-      .from('company_memberships')
-      .insert({
-        company_id: invitation.company_id,
-        user_id: userId,
-        role: invitation.role
-      });
+    // 2. 회사 멤버십 생성 또는 업데이트
+    let membershipError = null;
+    
+    if (existingMembership) {
+      // 이미 멤버십이 존재하면 역할 업데이트
+      const { error } = await supabase
+        .from('company_memberships')
+        .update({ role: invitation.role })
+        .eq('company_id', invitation.company_id)
+        .eq('user_id', userId);
+      
+      membershipError = error;
+    } else {
+      // 멤버십이 없으면 새로 생성
+      const { error } = await supabase
+        .from('company_memberships')
+        .insert({
+          company_id: invitation.company_id,
+          user_id: userId,
+          role: invitation.role
+        });
+      
+      membershipError = error;
+    }
     
     if (membershipError) {
-      console.error('멤버십 생성 오류:', membershipError);
-      // 초대 상태를 원래대로 되돌림
+      console.error('멤버십 생성/업데이트 오류:', membershipError);
+      // 초대 상태를 원래대로 되돌림 (updated_at 필드 제거)
       await supabase
         .from('company_invitations')
-        .update({ status: 'pending', updated_at: null })
+        .update({ status: 'pending' })
         .eq('id', invitationId);
       
       return NextResponse.json({ error: '회사 멤버십 생성에 실패했습니다.' }, { status: 500 });

@@ -10,7 +10,9 @@ interface RejectInvitationParams {
 
 export async function POST(req: Request, { params }: RejectInvitationParams) {
   try {
-    const invitationId = params.id;
+    // params를 await 처리
+    const paramsData = await params;
+    const invitationId = paramsData.id;
     
     // 현재 로그인한 사용자 확인
     const { userId } = await auth();
@@ -42,10 +44,10 @@ export async function POST(req: Request, { params }: RejectInvitationParams) {
       return NextResponse.json({ error: '이미 처리된 초대입니다.' }, { status: 400 });
     }
     
-    // 초대 상태 업데이트
+    // 초대 상태 업데이트 (updated_at 필드 제거)
     const { error: updateError } = await supabase
       .from('company_invitations')
-      .update({ status: 'rejected', updated_at: new Date().toISOString() })
+      .update({ status: 'rejected' })
       .eq('id', invitationId);
     
     if (updateError) {

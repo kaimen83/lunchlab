@@ -2,7 +2,6 @@ import { auth } from '@clerk/nextjs/server';
 import { notFound, redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { Company, CompanyMembership } from '@/lib/types';
-import { getUserRole } from '@/lib/clerk';
 import { CompanyHeader } from './CompanyHeader';
 import { CompanyMemberList } from './CompanyMemberList';
 
@@ -43,14 +42,10 @@ export default async function CompanyPage({ params }: CompanyPageProps) {
     .eq('user_id', userId)
     .single();
   
-  // 멤버가 아니라면 접근 불가
+  // 멤버가 아니라면 접근 불가 - headAdmin 예외 제거
   if (membershipError || !membership) {
-    // 최고 관리자(headAdmin)인 경우에는 접근 가능
-    const userRole = await getUserRole(userId);
-    if (userRole !== 'headAdmin') {
-      // 접근 권한이 없는 경우 홈으로 리다이렉트
-      redirect('/');
-    }
+    // 접근 권한이 없는 경우 홈으로 리다이렉트
+    redirect('/');
   }
   
   // 회사 멤버 목록 조회
