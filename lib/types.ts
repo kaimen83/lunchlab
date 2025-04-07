@@ -179,4 +179,123 @@ export interface ModuleEvent {
   event_data?: any;
   processed: boolean;
   created_at: string;
+  updated_at?: string;
+}
+
+// 모듈 이벤트 구독 타입 추가
+export interface ModuleEventSubscription {
+  id: string;
+  company_id: string;
+  module_id: string;
+  event_type: string;
+  callback_url?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+// 모듈 데이터 연동 관련 타입들
+
+// 모듈 데이터 스키마 정의
+export interface ModuleDataSchema {
+  id: string;
+  module_id: string;
+  name: string;
+  description?: string;
+  schema: Record<string, any>; // JSON 스키마 형식 (필드 정의)
+  version: string;
+  is_shared: boolean;      // 다른 모듈과 공유 가능 여부
+  created_at: string;
+  updated_at?: string;
+}
+
+// 데이터 액세스 요청 상태
+export type DataAccessRequestStatus = 'pending' | 'approved' | 'rejected';
+
+// 모듈 간 데이터 액세스 요청
+export interface ModuleDataAccessRequest {
+  id: string;
+  company_id: string;
+  requester_module_id: string;
+  provider_module_id: string;
+  data_schema_id: string;
+  access_level: 'read' | 'write' | 'read_write';
+  status: DataAccessRequestStatus;
+  requested_by: string;
+  reviewed_by?: string;
+  created_at: string;
+  updated_at?: string;
+  expires_at?: string;
+}
+
+// 모듈 간 데이터 액세스 권한
+export interface ModuleDataAccess {
+  id: string;
+  company_id: string;
+  requester_module_id: string;
+  provider_module_id: string;
+  data_schema_id: string;
+  access_level: 'read' | 'write' | 'read_write';
+  access_token: string;
+  created_at: string;
+  updated_at?: string;
+  expires_at?: string;
+  is_active: boolean;
+}
+
+// 공유 데이터 캐시 항목
+export interface SharedDataCacheItem {
+  id: string;
+  company_id: string;
+  module_id: string;
+  data_schema_id: string;
+  data_id: string;
+  cache_key: string;
+  data: Record<string, any>;
+  created_at: string;
+  updated_at?: string;
+  expires_at?: string;
+}
+
+// 분기 캐싱 정책 종류
+export type CachingStrategy = 'time_based' | 'event_based' | 'hybrid';
+
+// 모듈별 캐싱 정책 설정
+export interface ModuleCachingPolicy {
+  id: string;
+  module_id: string;
+  data_schema_id: string;
+  strategy: CachingStrategy;
+  ttl_seconds?: number;      // time_based 캐싱일 경우 TTL
+  invalidate_on_events?: string[]; // event_based 캐싱일 경우 무효화 트리거 이벤트 목록
+  created_at: string;
+  updated_at?: string;
+}
+
+// 모듈 데이터 매핑 정의
+export interface ModuleDataMapping {
+  id: string;
+  company_id: string;
+  source_module_id: string;
+  target_module_id: string;
+  source_schema_id: string;
+  target_schema_id: string;
+  field_mappings: Record<string, string>; // 필드 간 매핑 정보 (key: 타겟 필드, value: 소스 필드)
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+// 데이터 동기화 로그
+export interface DataSyncLog {
+  id: string;
+  company_id: string;
+  source_module_id: string;
+  target_module_id: string;
+  mapping_id: string;
+  status: 'success' | 'failed' | 'partial';
+  error_message?: string;
+  items_processed: number;
+  items_synced: number;
+  created_at: string;
 } 
