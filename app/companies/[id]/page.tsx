@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { notFound, redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase';
-import { Company, CompanyMembership } from '@/lib/types';
+import { CompanyMembership } from '@/lib/types';
 import { CompanyMemberList } from './CompanyMemberList';
 import { Building, Info } from 'lucide-react';
 

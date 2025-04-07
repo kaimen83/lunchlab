@@ -39,6 +39,7 @@ export default function CompanySearch() {
     }
     
     searchCompanies(debouncedSearchQuery);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearchQuery]);
   
   // 회사 검색 함수

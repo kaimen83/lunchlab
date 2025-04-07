@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Building, Plus, Users, Settings, ChevronDown, ChevronRight } from 'lucide-react';
 import { Company } from '@/lib/types';
@@ -184,7 +185,13 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
         <div className="flex items-center text-sm">
           <div className="bg-white w-7 h-7 rounded-sm flex items-center justify-center mr-2 overflow-hidden">
             {user?.imageUrl ? (
-              <img src={user.imageUrl} alt={user?.username || '사용자'} className="w-full h-full object-cover" />
+              <Image 
+                src={user.imageUrl} 
+                alt={user?.username || '사용자'} 
+                width={28}
+                height={28}
+                className="w-full h-full object-cover" 
+              />
             ) : (
               <span className="text-gray-800 font-bold">{user?.username?.charAt(0) || '?'}</span>
             )}

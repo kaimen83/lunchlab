@@ -1,12 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
-// 페이지 컴포넌트 Props에 대한 타입 정의
-interface PageProps {
-  params: Promise<Record<string, string>>;
-}
-
-export default async function CompanySettingsPage({ params }: PageProps) {
+export default async function CompanySettingsPage() {
   // 인증 확인
   const { userId } = await auth();
 

@@ -35,7 +35,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     const supabase = createServerSupabaseClient();
 
     // 회사가 존재하는지 확인
-    const { data: company, error: companyError } = await supabase
+    const { data: _, error: companyError } = await supabase
       .from('companies')
       .select('*')
       .eq('id', companyId)

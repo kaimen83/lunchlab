@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { CompanyJoinRequest, CompanyMembership } from '@/lib/types';
-import { useUser } from '@clerk/nextjs';
 import { UserRoundIcon, Check, X, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -169,7 +168,7 @@ export default function JoinRequestsList({ companyId, requests, currentUserMembe
   const formatDate = (dateString: string) => {
     try {
       return formatDistanceToNow(new Date(dateString), { addSuffix: true, locale: ko });
-    } catch (e) {
+    } catch (_) {
       return dateString;
     }
   };
