@@ -1,0 +1,170 @@
+# Next.js 15 타입 규칙 가이드
+
+## 라우트 핸들러 (Route Handler) 사용 규칙
+
+Next.js 15에서는 라우트 핸들러와 페이지 컴포넌트의 파라미터 타입이 변경되었습니다. 이 문서는 올바른 타입 사용법을 제시합니다.
+
+### 1. 동적 라우트 핸들러 (`app/api/*/route.ts`)
+
+#### 올바른 타입 정의:
+
+```typescript
+// 라우트 핸들러 컨텍스트에 대한 타입 정의
+interface RouteContext {
+  params: Promise<{
+    // 라우트에 정의된 모든 동적 세그먼트를 포함
+    id: string;
+    // 다른 동적 세그먼트가 있다면 추가
+    userId?: string;
+  }>;
+}
+
+// 라우트 핸들러 함수
+export async function GET(request: NextRequest, context: RouteContext) {
+  // params는 Promise이므로 await 사용
+  const { id } = await context.params;
+  
+  // 로직 구현...
+}
+```
+
+#### 주의 사항:
+
+- `params`는 `Promise` 타입으로 전달되므로 반드시 `await`로 접근해야 합니다.
+- 이전 버전 코드는 동작하지 않습니다 (예: `const id = context.params.id`).
+- `any` 타입은 사용하지 마세요. 구체적인 타입을 정의하세요.
+
+### 2. 다중 동적 세그먼트 예시
+
+```typescript
+// 경로: app/api/companies/[id]/members/[userId]/route.ts
+interface RouteContext {
+  params: Promise<{
+    id: string;
+    userId: string;
+  }>;
+}
+
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  const { id: companyId, userId: targetUserId } = await context.params;
+  
+  // 로직 구현...
+}
+```
+
+## 페이지 컴포넌트 규칙
+
+### 1. 페이지 컴포넌트 (`app/*/page.tsx`)
+
+#### 올바른 타입 정의:
+
+```typescript
+// 페이지 컴포넌트 Props에 대한 타입 정의
+interface PageProps {
+  params: Promise<{
+    // 라우트에 정의된 모든 동적 세그먼트를 포함
+    id: string;
+  }>;
+}
+
+export default async function SomePage({ params }: PageProps) {
+  // params는 Promise이므로 await 사용
+  const { id } = await params;
+  
+  // 로직 구현...
+}
+```
+
+### 2. 다중 동적 세그먼트 예시
+
+```typescript
+// 경로: app/companies/[id]/products/[productId]/page.tsx
+interface ProductPageProps {
+  params: Promise<{
+    id: string;
+    productId: string;
+  }>;
+}
+
+export default async function ProductPage({ params }: ProductPageProps) {
+  const { id: companyId, productId } = await params;
+  
+  // 로직 구현...
+}
+```
+
+## Next.js 15 파라미터 접근 규칙 요약
+
+1. **항상 `await` 사용하기**: 
+   - 이전: `const { id } = params;`
+   - 이후: `const { id } = await params;`
+
+2. **올바른 타입 정의**:
+   - `any` 타입 대신 명시적인 인터페이스 정의
+   - `params`를 `Promise<{ ... }>`로 정의
+
+3. **타입스크립트 ESLint 규칙**:
+   - `@typescript-eslint/no-explicit-any` 규칙을 준수하세요.
+   - 임시 해결책으로 `any` 사용은 권장하지 않습니다.
+
+4. **테스트**:
+   - 코드 변경 후 `npm run build`로 타입 검사를 확인하세요.
+
+## 타입 오류 발생 시 진단
+
+다음과 같은 오류가 발생한다면 이 문서의 규칙을 따라야 합니다:
+
+```
+Type error: Route has an invalid "METHOD" export:
+  Type "..." is not a valid type for the function's second argument.
+```
+
+```
+Type error: Type 'PageProps' does not satisfy the constraint 'PageProps'.
+  Types of property 'params' are incompatible.
+```
+
+## 코드 변환 예시
+
+### 변환 전 (Next.js 14 이하):
+
+```typescript
+interface PageParams {
+  params: {
+    id: string;
+  };
+}
+
+export default async function Page({ params }: PageParams) {
+  const { id } = params;
+  // ...
+}
+```
+
+### 변환 후 (Next.js 15):
+
+```typescript
+interface PageParams {
+  params: Promise<{
+    id: string;
+  }>;
+}
+
+export default async function Page({ params }: PageParams) {
+  const { id } = await params;
+  // ...
+}
+```
+
+이 가이드를 따라 Next.js 15에서 타입 오류 없이 안정적으로 개발할 수 있습니다. 
+
+# ShadCN Components
+
+- 모든 컴포넌트는 ShadCN Components를 사용하세요.
+- 컴포넌트 사용 전 설치 여부를 확인해야 합니다 : '/components/ui' 체크하기
+- 컴포넌트 설치 명령어를 사용해야 합니다 : 'npx shadcn@latest add [component-name]'
+- 주의 : 'npx shadcn-ui@latest add [component-name]' 사용 금지
+
+# Icons
+- 모든 아이콘은 Lucide Icons를 사용하세요.
+- 아이콘 임포트 문법 : import { IconName } from 'lucide-react'

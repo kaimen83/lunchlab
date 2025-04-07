@@ -1,5 +1,6 @@
 import { Company } from '@/lib/types';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { CompanyJoinRequest } from './types';
 
 interface CompanyWithRole extends Company {
   role: string;
@@ -56,6 +57,67 @@ export async function getUserCompanies(userId: string): Promise<{
     console.error('회사 목록 조회 중 오류 발생:', error);
     return { 
       companies: [], 
+      error: error instanceof Error ? error : new Error('Unknown error')
+    };
+  }
+}
+
+// 사용자가 신청한 회사 가입 신청 목록을 가져오는 함수
+export async function getUserJoinRequests(userId: string): Promise<{
+  requests: CompanyJoinRequest[];
+  error: Error | null;
+}> {
+  try {
+    const supabase = createServerSupabaseClient();
+    
+    // 사용자의 가입 신청 목록 조회
+    const { data: requests, error } = await supabase
+      .from('company_join_requests')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('가입 신청 목록 조회 오류:', error);
+      return { requests: [], error: new Error(error.message) };
+    }
+    
+    return { requests: requests || [], error: null };
+  } catch (error) {
+    console.error('가입 신청 목록 조회 중 오류 발생:', error);
+    return { 
+      requests: [], 
+      error: error instanceof Error ? error : new Error('Unknown error')
+    };
+  }
+}
+
+// 회사의 가입 신청 목록을 가져오는 함수
+export async function getCompanyJoinRequests(companyId: string): Promise<{
+  requests: CompanyJoinRequest[];
+  error: Error | null;
+}> {
+  try {
+    const supabase = createServerSupabaseClient();
+    
+    // 회사의 가입 신청 목록 조회
+    const { data: requests, error } = await supabase
+      .from('company_join_requests')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('status', 'pending') // 대기 중인 신청만 가져옴
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('회사 가입 신청 목록 조회 오류:', error);
+      return { requests: [], error: new Error(error.message) };
+    }
+    
+    return { requests: requests || [], error: null };
+  } catch (error) {
+    console.error('회사 가입 신청 목록 조회 중 오류 발생:', error);
+    return { 
+      requests: [], 
       error: error instanceof Error ? error : new Error('Unknown error')
     };
   }

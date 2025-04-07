@@ -46,4 +46,15 @@ export interface CompanyInvitation {
   created_at: string;
   updated_at?: string;
   expires_at?: string;
+}
+
+// 회사 가입 신청
+export interface CompanyJoinRequest {
+  id: string;
+  company_id: string;
+  user_id: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  message?: string;
+  created_at: string;
+  updated_at?: string;
 } 

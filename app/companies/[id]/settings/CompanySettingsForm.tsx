@@ -58,7 +58,14 @@ export function CompanySettingsForm({ company, isOwner }: CompanySettingsFormPro
         body: JSON.stringify(values),
       });
       
-      const data = await response.json();
+      let data;
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const text = await response.text();
+        data = text ? JSON.parse(text) : {};
+      } else {
+        data = {};
+      }
       
       if (!response.ok) {
         throw new Error(data.error || '회사 정보 업데이트에 실패했습니다.');
