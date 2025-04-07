@@ -1,7 +1,9 @@
 import { auth } from '@clerk/nextjs/server';
 import { notFound, redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase';
-import { Settings, AlertTriangle } from 'lucide-react';
+import { Settings, AlertTriangle, Menu } from 'lucide-react';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 import { CompanySettingsForm } from './CompanySettingsForm';
 import { DangerZone } from './DangerZone';
 
@@ -53,7 +55,7 @@ export default async function CompanySettingsPage({ params }: CompanySettingsPag
   return (
     <div className="flex flex-col h-full">
       {/* 채널 헤더 */}
-      <header className="border-b border-gray-200 bg-white p-3 flex items-center">
+      <header className="border-b border-gray-200 bg-white p-3 flex items-center justify-between">
         <div className="flex items-center">
           <Settings className="h-5 w-5 text-gray-500 mr-2" />
           <h1 className="text-xl font-bold">설정</h1>
@@ -71,6 +73,20 @@ export default async function CompanySettingsPage({ params }: CompanySettingsPag
               company={company}
               isOwner={membership.role === 'owner'}
             />
+          </div>
+          
+          {/* 메뉴 관리 링크 */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5 mb-6">
+            <h2 className="text-xl font-bold mb-4">메뉴 관리</h2>
+            <p className="text-gray-600 mb-4">
+              사이드바에 표시될 메뉴 항목을 설정하고 순서를 조정할 수 있습니다.
+            </p>
+            <Link href={`/companies/${id}/settings/menu`}>
+              <Button className="flex items-center">
+                <Menu className="h-4 w-4 mr-2" />
+                메뉴 설정
+              </Button>
+            </Link>
           </div>
           
           {/* 위험 영역 - 삭제 등 */}

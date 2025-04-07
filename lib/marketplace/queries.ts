@@ -289,11 +289,11 @@ export async function unsubscribeCompanyFromModule(companyId: string, moduleId: 
   try {
     const supabase = createServerSupabaseClient();
     
-    // 1. 구독 상태를 'canceled'로 변경
+    // 1. 구독 상태를 'cancelled'로 변경
     const { error } = await supabase
       .from('company_modules')
       .update({ 
-        status: 'canceled',
+        status: 'cancelled',
         updated_at: new Date().toISOString()
       })
       .eq('company_id', companyId)
@@ -602,5 +602,40 @@ export async function getModuleSubscriptionsByModuleId(moduleId: string) {
   } catch (error) {
     console.error('모듈 구독 조회 오류:', error);
     return { error: '서버 오류가 발생했습니다.' };
+  }
+}
+
+/**
+ * 모듈을 검색하는 함수
+ */
+export async function searchMarketplaceModules(query: string): Promise<{
+  modules: MarketplaceModule[];
+  error: Error | null;
+}> {
+  try {
+    const supabase = createServerSupabaseClient();
+    
+    const searchTerm = query.trim().toLowerCase();
+    
+    // 이름, 설명, 카테고리를 기준으로 검색
+    const { data, error } = await supabase
+      .from('marketplace_modules')
+      .select('*')
+      .eq('is_active', true)
+      .or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,category.ilike.%${searchTerm}%`)
+      .order('name');
+    
+    if (error) {
+      console.error('모듈 검색 오류:', error);
+      return { modules: [], error: new Error(error.message) };
+    }
+    
+    return { modules: data || [], error: null };
+  } catch (error) {
+    console.error('모듈 검색 중 오류 발생:', error);
+    return { 
+      modules: [], 
+      error: error instanceof Error ? error : new Error('Unknown error')
+    };
   }
 } 

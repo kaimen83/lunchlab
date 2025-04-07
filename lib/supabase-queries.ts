@@ -121,4 +121,39 @@ export async function getCompanyJoinRequests(companyId: string): Promise<{
       error: error instanceof Error ? error : new Error('Unknown error')
     };
   }
+}
+
+// 사용자의 회사 접근 권한을 확인하는 함수
+export async function checkUserCompanyAccess(userId: string, companyId: string): Promise<{
+  role: string | null;
+  error: Error | null;
+}> {
+  try {
+    const supabase = createServerSupabaseClient();
+    
+    // 사용자의 회사 멤버십 조회
+    const { data, error } = await supabase
+      .from('company_memberships')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('company_id', companyId)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('회사 접근 권한 확인 오류:', error);
+      return { role: null, error: new Error(error.message) };
+    }
+    
+    if (!data) {
+      return { role: null, error: null };
+    }
+    
+    return { role: data.role, error: null };
+  } catch (error) {
+    console.error('회사 접근 권한 확인 중 오류 발생:', error);
+    return { 
+      role: null, 
+      error: error instanceof Error ? error : new Error('Unknown error')
+    };
+  }
 } 
