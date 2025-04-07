@@ -38,7 +38,8 @@ interface JoinRequestWithUser {
   imageUrl?: string;
 }
 
-export default function JoinRequestsList({ companyId, requests, currentUserMembership }: JoinRequestsListProps) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export default function JoinRequestsList({ companyId: _companyId, requests, currentUserMembership }: JoinRequestsListProps) {
   const { toast } = useToast();
   const [requestsWithUsers, setRequestsWithUsers] = useState<JoinRequestWithUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
