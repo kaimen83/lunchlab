@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { createClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase';
 import { ModuleConfig } from '@/lib/modules/module-template';
 import { MarketplaceModule } from '@/lib/types';
 
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const supabase = createClient();
+    const supabase = createServerSupabaseClient();
     
     // 1. 모듈 등록
     const { data: moduleData, error: moduleError } = await supabase

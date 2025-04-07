@@ -1,201 +1,146 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { createClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { moduleId: string } }
-) {
-  try {
-    const { userId } = await auth();
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: '인증되지 않은 요청입니다.' },
-        { status: 401 }
-      );
-    }
-    
-    const { searchParams } = new URL(request.url);
-    const companyId = searchParams.get('companyId');
-    const key = searchParams.get('key');
-    
-    if (!companyId) {
-      return NextResponse.json(
-        { error: 'companyId가 누락되었습니다.' },
-        { status: 400 }
-      );
-    }
-    
-    const supabase = createClient();
-    
-    let query = supabase
-      .from('module_settings')
-      .select('*')
-      .eq('company_id', companyId)
-      .eq('module_id', params.moduleId);
-    
-    if (key) {
-      query = query.eq('key', key);
-    }
-    
-    const { data: settings, error } = await query;
-    
-    if (error) {
-      console.error('설정 조회 오류:', error);
-      return NextResponse.json(
-        { error: '설정 조회 중 오류가 발생했습니다.' },
-        { status: 500 }
-      );
-    }
-    
-    if (key) {
-      // 단일 설정 조회인 경우
-      return NextResponse.json(settings?.length > 0 ? settings[0] : null);
-    }
-    
-    // 모든 설정 조회인 경우
-    return NextResponse.json(settings);
-  } catch (error) {
-    console.error('설정 조회 오류:', error);
-    return NextResponse.json(
-      { error: '설정 조회 중 오류가 발생했습니다.' },
-      { status: 500 }
-    );
-  }
+interface RouteContext {
+  params: Promise<{
+    moduleId: string;
+  }>;
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { moduleId: string } }
+/**
+ * 특정 마켓플레이스 모듈의 설정 정보를 조회하는 API
+ * GET /api/marketplace/modules/[moduleId]/settings
+ * 
+ * 참고: 관리자만 접근 가능
+ */
+export async function GET(
+  req: Request,
+  context: RouteContext
 ) {
   try {
     const { userId } = await auth();
     
     if (!userId) {
-      return NextResponse.json(
-        { error: '인증되지 않은 요청입니다.' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: '인증되지 않은 요청입니다.' }, { status: 401 });
     }
     
-    const { companyId, key, value } = await request.json();
+    // params를 await로 처리
+    const { moduleId } = await context.params;
     
-    if (!companyId || !key) {
-      return NextResponse.json(
-        { error: '필수 필드가 누락되었습니다.' },
-        { status: 400 }
-      );
+    if (!moduleId) {
+      return NextResponse.json({ error: '모듈 ID는 필수 항목입니다.' }, { status: 400 });
     }
     
-    const supabase = createClient();
-    
-    // 이미 존재하는 설정인지 확인
-    const { data: existingSetting } = await supabase
-      .from('module_settings')
-      .select('id')
-      .eq('company_id', companyId)
-      .eq('module_id', params.moduleId)
-      .eq('key', key)
+    // 관리자 권한 확인
+    const supabase = createServerSupabaseClient();
+    const { data: adminCheck, error: adminError } = await supabase
+      .from('users')
+      .select('is_admin')
+      .eq('id', userId)
       .single();
     
-    if (existingSetting) {
-      // 기존 설정 업데이트
-      const { error: updateError } = await supabase
-        .from('module_settings')
-        .update({
-          value: value !== undefined ? JSON.stringify(value) : null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingSetting.id);
-      
-      if (updateError) {
-        console.error('설정 업데이트 오류:', updateError);
-        return NextResponse.json(
-          { error: '설정 업데이트 중 오류가 발생했습니다.' },
-          { status: 500 }
-        );
-      }
-    } else {
-      // 새 설정 생성
-      const { error: insertError } = await supabase
-        .from('module_settings')
-        .insert({
-          company_id: companyId,
-          module_id: params.moduleId,
-          key,
-          value: value !== undefined ? JSON.stringify(value) : null,
-        });
-      
-      if (insertError) {
-        console.error('설정 생성 오류:', insertError);
-        return NextResponse.json(
-          { error: '설정 생성 중 오류가 발생했습니다.' },
-          { status: 500 }
-        );
-      }
+    if (adminError) {
+      console.error('관리자 확인 오류:', adminError);
+      return NextResponse.json({ error: '권한 확인 중 오류가 발생했습니다.' }, { status: 500 });
     }
     
-    // 설정 변경 이벤트 발행 (추후 구현)
+    if (!adminCheck?.is_admin) {
+      return NextResponse.json({ error: '이 API에 접근할 권한이 없습니다. 관리자만 접근 가능합니다.' }, { status: 403 });
+    }
     
-    return NextResponse.json({ success: true });
+    // 모듈 설정 정보 조회
+    const { data: settings, error: settingsError } = await supabase
+      .from('marketplace_module_settings')
+      .select('*')
+      .eq('module_id', moduleId);
+    
+    if (settingsError) {
+      console.error('모듈 설정 조회 오류:', settingsError);
+      return NextResponse.json({ error: '모듈 설정 정보 조회 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+    
+    return NextResponse.json({ settings });
   } catch (error) {
-    console.error('설정 저장 오류:', error);
-    return NextResponse.json(
-      { error: '설정 저장 중 오류가 발생했습니다.' },
-      { status: 500 }
-    );
+    console.error('모듈 설정 정보 조회 중 오류 발생:', error);
+    return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { moduleId: string } }
+/**
+ * 특정 마켓플레이스 모듈의 설정 정보를 업데이트하는 API
+ * PUT /api/marketplace/modules/[moduleId]/settings
+ * 
+ * 참고: 관리자만 접근 가능
+ */
+export async function PUT(
+  req: Request,
+  context: RouteContext
 ) {
   try {
     const { userId } = await auth();
     
     if (!userId) {
-      return NextResponse.json(
-        { error: '인증되지 않은 요청입니다.' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: '인증되지 않은 요청입니다.' }, { status: 401 });
     }
     
-    const { searchParams } = new URL(request.url);
-    const companyId = searchParams.get('companyId');
-    const key = searchParams.get('key');
+    // params를 await로 처리
+    const { moduleId } = await context.params;
     
-    if (!companyId || !key) {
-      return NextResponse.json(
-        { error: '필수 파라미터가 누락되었습니다.' },
-        { status: 400 }
-      );
+    if (!moduleId) {
+      return NextResponse.json({ error: '모듈 ID는 필수 항목입니다.' }, { status: 400 });
     }
     
-    const supabase = createClient();
+    // 관리자 권한 확인
+    const supabase = createServerSupabaseClient();
+    const { data: adminCheck, error: adminError } = await supabase
+      .from('users')
+      .select('is_admin')
+      .eq('id', userId)
+      .single();
     
-    const { error } = await supabase
-      .from('module_settings')
-      .delete()
-      .eq('company_id', companyId)
-      .eq('module_id', params.moduleId)
-      .eq('key', key);
-    
-    if (error) {
-      console.error('설정 삭제 오류:', error);
-      return NextResponse.json(
-        { error: '설정 삭제 중 오류가 발생했습니다.' },
-        { status: 500 }
-      );
+    if (adminError) {
+      console.error('관리자 확인 오류:', adminError);
+      return NextResponse.json({ error: '권한 확인 중 오류가 발생했습니다.' }, { status: 500 });
     }
     
-    return NextResponse.json({ success: true });
+    if (!adminCheck?.is_admin) {
+      return NextResponse.json({ error: '이 API에 접근할 권한이 없습니다. 관리자만 접근 가능합니다.' }, { status: 403 });
+    }
+    
+    // 요청 바디 파싱
+    let settingsData;
+    try {
+      settingsData = await req.json();
+    } catch (e) {
+      return NextResponse.json({ error: '잘못된 요청 형식입니다.' }, { status: 400 });
+    }
+    
+    if (!settingsData || typeof settingsData !== 'object') {
+      return NextResponse.json({ error: '설정 데이터가 필요합니다.' }, { status: 400 });
+    }
+    
+    // 설정 업데이트
+    const { data: updatedSettings, error: updateError } = await supabase
+      .from('marketplace_module_settings')
+      .upsert({
+        module_id: moduleId,
+        ...settingsData,
+        updated_at: new Date().toISOString()
+      })
+      .select();
+    
+    if (updateError) {
+      console.error('모듈 설정 업데이트 오류:', updateError);
+      return NextResponse.json({ error: '모듈 설정 업데이트 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+    
+    return NextResponse.json({ 
+      success: true, 
+      settings: updatedSettings[0]
+    });
   } catch (error) {
-    console.error('설정 삭제 오류:', error);
-    return NextResponse.json(
-      { error: '설정 삭제 중 오류가 발생했습니다.' },
-      { status: 500 }
-    );
+    console.error('모듈 설정 업데이트 중 오류 발생:', error);
+    return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 } 

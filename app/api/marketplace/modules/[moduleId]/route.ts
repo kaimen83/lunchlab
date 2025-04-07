@@ -4,13 +4,13 @@ import { getMarketplaceModule } from '@/lib/marketplace/queries';
 
 interface RouteContext {
   params: Promise<{
-    id: string;
+    moduleId: string;
   }>;
 }
 
 /**
  * 특정 마켓플레이스 모듈 정보를 조회하는 API
- * GET /api/marketplace/modules/[id]
+ * GET /api/marketplace/modules/[moduleId]
  */
 export async function GET(
   req: Request, 
@@ -25,7 +25,7 @@ export async function GET(
     }
     
     // params를 await로 처리
-    const { id: moduleId } = await context.params;
+    const { moduleId } = await context.params;
     
     if (!moduleId) {
       return NextResponse.json({ error: '모듈 ID는 필수 항목입니다.' }, { status: 400 });

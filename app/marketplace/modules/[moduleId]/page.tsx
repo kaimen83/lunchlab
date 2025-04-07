@@ -11,12 +11,12 @@ import { SubscribeModule } from "../components/SubscribeModule";
 
 interface ModuleDetailPageProps {
   params: Promise<{
-    id: string;
+    moduleId: string;
   }>;
 }
 
 export default async function ModuleDetailPage({ params }: ModuleDetailPageProps) {
-  const { id: moduleId } = await params;
+  const { moduleId } = await params;
   const { userId } = await auth();
   
   if (!userId) {

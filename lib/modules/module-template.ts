@@ -56,7 +56,7 @@ export async function registerModule(config: ModuleConfig): Promise<MarketplaceM
   try {
     // 서버 환경에서는 절대 URL이 필요합니다
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const response = await fetch(`${baseUrl}/api/marketplace/modules/register`, {
+    const response = await fetch(`${baseUrl}/api/admin/modules/register-module`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -15,7 +15,7 @@ export function RegisterModuleButton({ moduleId }: RegisterModuleButtonProps) {
   const handleRegister = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/admin/modules/register`, {
+      const response = await fetch(`/api/admin/modules/register-module`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
