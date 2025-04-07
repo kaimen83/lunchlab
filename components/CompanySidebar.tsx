@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building, Plus, Users, Settings, ChevronDown, ChevronRight, UserPlus } from 'lucide-react';
+import { Building, Plus, Users, Settings, ChevronDown, ChevronRight } from 'lucide-react';
 import { Company } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 interface CompanySidebarProps {
   companies: Array<Company & { role: string }>;
@@ -19,6 +20,7 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
     // 현재 URL에서 회사 ID 추출
     pathname.startsWith('/companies/') ? pathname.split('/')[2] : null
   );
+  const [joinRequestCounts, setJoinRequestCounts] = useState<Record<string, number>>({});
 
   // 사용자 권한 확인 (회사 생성 권한 체크)
   const userRole = user?.publicMetadata?.role as string;
@@ -26,6 +28,38 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
   
   // 현재 선택된 회사 ID 확인
   const currentCompanyId = pathname.startsWith('/companies/') ? pathname.split('/')[2] : null;
+
+  // 가입 신청 개수 가져오기
+  useEffect(() => {
+    const fetchJoinRequestCounts = async () => {
+      try {
+        // 소유자나 관리자인 회사만 필터링
+        const adminCompanies = companies.filter(
+          company => company.role === 'owner' || company.role === 'admin'
+        );
+
+        if (adminCompanies.length === 0) return;
+
+        const result: Record<string, number> = {};
+        
+        for (const company of adminCompanies) {
+          const response = await fetch(`/api/companies/${company.id}/join-requests/count`);
+          if (response.ok) {
+            const data = await response.json();
+            result[company.id] = data.count;
+          }
+        }
+        
+        setJoinRequestCounts(result);
+      } catch (error) {
+        console.error('가입 신청 개수 조회 중 오류:', error);
+      }
+    };
+
+    if (expandedCompanyId) {
+      fetchJoinRequestCounts();
+    }
+  }, [expandedCompanyId, companies]);
 
   const toggleCompany = (companyId: string) => {
     setExpandedCompanyId(expandedCompanyId === companyId ? null : companyId);
@@ -58,6 +92,8 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
             {companies.map((company) => {
               const isCurrentCompany = company.id === currentCompanyId;
               const isExpanded = company.id === expandedCompanyId;
+              const requestCount = joinRequestCounts[company.id] || 0;
+              const isAdmin = company.role === 'owner' || company.role === 'admin';
               
               return (
                 <li key={company.id} className="px-2">
@@ -101,46 +137,39 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
                       </Link>
                       
                       <Link 
-                        href={`/companies/${company.id}/members`} 
+                        href={isAdmin && requestCount > 0 
+                          ? `/companies/${company.id}/members?tab=requests` 
+                          : `/companies/${company.id}/members`} 
                         className={cn(
                           "flex items-center px-2 py-1.5 text-sm rounded",
-                          pathname === `/companies/${company.id}/members` 
+                          pathname.startsWith(`/companies/${company.id}/members`) || 
+                          pathname.startsWith(`/companies/${company.id}/join-requests`)
                             ? "bg-[#1164A3] text-white" 
                             : "hover:bg-gray-700"
                         )}
                       >
                         <Users className="h-3.5 w-3.5 mr-2 text-gray-400" />
-                        멤버
+                        <span>멤버</span>
+                        {isAdmin && requestCount > 0 && (
+                          <Badge variant="destructive" className="ml-2 text-xs bg-red-500 px-1.5 py-0.5 h-4 min-w-4 flex items-center justify-center">
+                            {requestCount}
+                          </Badge>
+                        )}
                       </Link>
                       
                       {(company.role === 'owner' || company.role === 'admin') && (
-                        <>
-                          <Link 
-                            href={`/companies/${company.id}/join-requests`} 
-                            className={cn(
-                              "flex items-center px-2 py-1.5 text-sm rounded",
-                              pathname === `/companies/${company.id}/join-requests` 
-                                ? "bg-[#1164A3] text-white" 
-                                : "hover:bg-gray-700"
-                            )}
-                          >
-                            <UserPlus className="h-3.5 w-3.5 mr-2 text-gray-400" />
-                            가입 신청
-                          </Link>
-                          
-                          <Link 
-                            href={`/companies/${company.id}/settings`} 
-                            className={cn(
-                              "flex items-center px-2 py-1.5 text-sm rounded",
-                              pathname === `/companies/${company.id}/settings` 
-                                ? "bg-[#1164A3] text-white" 
-                                : "hover:bg-gray-700"
-                            )}
-                          >
-                            <Settings className="h-3.5 w-3.5 mr-2 text-gray-400" />
-                            설정
-                          </Link>
-                        </>
+                        <Link 
+                          href={`/companies/${company.id}/settings`} 
+                          className={cn(
+                            "flex items-center px-2 py-1.5 text-sm rounded",
+                            pathname === `/companies/${company.id}/settings` 
+                              ? "bg-[#1164A3] text-white" 
+                              : "hover:bg-gray-700"
+                          )}
+                        >
+                          <Settings className="h-3.5 w-3.5 mr-2 text-gray-400" />
+                          설정
+                        </Link>
                       )}
                     </div>
                   )}

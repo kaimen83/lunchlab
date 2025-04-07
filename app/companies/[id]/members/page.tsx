@@ -3,18 +3,24 @@ import { notFound, redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { CompanyMembership } from '@/lib/types';
 import { CompanyMemberList } from '../CompanyMemberList';
-import { Users } from 'lucide-react';
+import { Users, UserPlus, AlertCircle } from 'lucide-react';
+import { getCompanyJoinRequests } from '@/lib/supabase-queries';
+import JoinRequestsList from '../join-requests/JoinRequestsList';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 
 // Next.js 15에서 페이지 컴포넌트 Props에 대한 타입 정의
 interface CompanyMembersPageProps {
   params: Promise<{
     id: string;
   }>;
+  searchParams: Promise<{ tab?: string }>;
 }
 
-export default async function CompanyMembersPage({ params }: CompanyMembersPageProps) {
-  // Next.js 15에서는 params가 Promise이므로 await로 처리
+export default async function CompanyMembersPage({ params, searchParams }: CompanyMembersPageProps) {
+  // Next.js 15에서는 params와 searchParams가 Promise이므로 await로 처리
   const { id } = await params;
+  const { tab } = await searchParams;
   const { userId } = await auth();
   
   // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
@@ -61,6 +67,18 @@ export default async function CompanyMembersPage({ params }: CompanyMembersPageP
   
   const isOwnerOrAdmin = membership.role === 'owner' || membership.role === 'admin';
   
+  // 관리자 또는 소유자인 경우에만 가입 신청 목록 조회
+  const { requests = [], error: requestsError } = isOwnerOrAdmin
+    ? await getCompanyJoinRequests(id)
+    : { requests: [], error: null };
+  
+  if (requestsError) {
+    console.error('가입 신청 목록 조회 오류:', requestsError);
+  }
+  
+  // 초기 탭 결정 (쿼리 파라미터 또는 기본값)
+  const initialTab = tab === 'requests' && isOwnerOrAdmin ? 'requests' : 'members';
+  
   return (
     <div className="flex flex-col h-full">
       {/* 채널 헤더 */}
@@ -75,7 +93,7 @@ export default async function CompanyMembersPage({ params }: CompanyMembersPageP
       <div className="flex-1 overflow-y-auto p-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold">{company.name} 멤버</h2>
+            <h2 className="text-xl font-bold">{company.name} 멤버 관리</h2>
             
             {isOwnerOrAdmin && (
               <a
@@ -87,11 +105,51 @@ export default async function CompanyMembersPage({ params }: CompanyMembersPageP
             )}
           </div>
           
-          <CompanyMemberList 
-            companyId={id}
-            members={members || []} 
-            currentUserMembership={membership as CompanyMembership}
-          />
+          <Tabs defaultValue={initialTab} className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="members" className="flex items-center">
+                <Users className="h-4 w-4 mr-2" />
+                멤버
+              </TabsTrigger>
+              
+              {isOwnerOrAdmin && (
+                <TabsTrigger value="requests" className="flex items-center">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  가입 신청
+                  {requests.length > 0 && (
+                    <Badge variant="destructive" className="ml-2 bg-red-500">
+                      {requests.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              )}
+            </TabsList>
+            
+            <TabsContent value="members">
+              <CompanyMemberList 
+                companyId={id}
+                members={members || []} 
+                currentUserMembership={membership as CompanyMembership}
+              />
+            </TabsContent>
+            
+            {isOwnerOrAdmin && (
+              <TabsContent value="requests">
+                {requests.length === 0 ? (
+                  <div className="text-center py-10 text-gray-500">
+                    <AlertCircle className="h-10 w-10 mx-auto text-gray-400 mb-4" />
+                    <p>현재 가입 신청이 없습니다.</p>
+                  </div>
+                ) : (
+                  <JoinRequestsList 
+                    companyId={id}
+                    requests={requests}
+                    currentUserMembership={membership as CompanyMembership}
+                  />
+                )}
+              </TabsContent>
+            )}
+          </Tabs>
         </div>
       </div>
     </div>
