@@ -54,7 +54,9 @@ export async function registerModule(config: ModuleConfig): Promise<MarketplaceM
   // 여기서 API를 호출하여 모듈을 시스템에 등록합니다
   // 실제 구현에서는 모듈 등록, 메뉴 아이템 생성, 권한 설정 등의 작업 수행
   try {
-    const response = await fetch('/api/marketplace/modules/register', {
+    // 서버 환경에서는 절대 URL이 필요합니다
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const response = await fetch(`${baseUrl}/api/marketplace/modules/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -104,7 +106,8 @@ export const ModuleHelpers = {
   // 모듈 설정 값 가져오기
   async getSetting(companyId: string, moduleId: string, key: string): Promise<any> {
     try {
-      const response = await fetch(`/api/marketplace/modules/${moduleId}/settings/${key}?companyId=${companyId}`);
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const response = await fetch(`${baseUrl}/api/marketplace/modules/${moduleId}/settings/${key}?companyId=${companyId}`);
       if (!response.ok) {
         throw new Error(`설정 조회 실패: ${response.statusText}`);
       }
@@ -119,7 +122,8 @@ export const ModuleHelpers = {
   // 모듈 설정 값 저장하기
   async setSetting(companyId: string, moduleId: string, key: string, value: any): Promise<boolean> {
     try {
-      const response = await fetch(`/api/marketplace/modules/${moduleId}/settings`, {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const response = await fetch(`${baseUrl}/api/marketplace/modules/${moduleId}/settings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -136,7 +140,8 @@ export const ModuleHelpers = {
   // 이벤트 발행하기
   async publishEvent(companyId: string, moduleId: string, eventType: string, data: any): Promise<boolean> {
     try {
-      const response = await fetch(`/api/marketplace/events/publish`, {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const response = await fetch(`${baseUrl}/api/marketplace/events/publish`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
