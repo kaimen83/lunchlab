@@ -4,7 +4,7 @@ import { getUserRole, getUserProfileStatus } from "@/lib/clerk";
 import { getUserCompanies } from "@/lib/supabase-queries";
 import Link from "next/link";
 import { ProfileSetupModal } from "@/components/ProfileSetupModal";
-import { Building, Plus, ArrowRight } from "lucide-react";
+import { Building, Plus, ArrowRight, Search } from "lucide-react";
 
 export default async function Home() {
   const { userId } = await auth();
@@ -65,9 +65,17 @@ export default async function Home() {
         <h1 className="text-3xl font-bold mb-8">내 회사</h1>
         
         <div className="w-full max-w-xl">
-          {/* 회사 생성 버튼 */}
-          {userCanCreateCompany && (
-            <div className="mb-6 flex justify-end">
+          {/* 회사 생성 및 검색 버튼 */}
+          <div className="mb-6 flex justify-end items-center space-x-2">
+            <Link 
+              href="/companies/search" 
+              className="bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded inline-flex items-center"
+            >
+              <Search className="w-4 h-4 mr-2" />
+              회사 검색
+            </Link>
+            
+            {userCanCreateCompany && (
               <Link 
                 href="/companies/new" 
                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center"
@@ -75,26 +83,36 @@ export default async function Home() {
                 <Plus className="w-4 h-4 mr-2" />
                 새 회사 생성
               </Link>
-            </div>
-          )}
+            )}
+          </div>
           
           {/* 내 회사 목록 - Slack 스타일 */}
           {companies.length === 0 ? (
             <div className="bg-white shadow-lg rounded-lg p-8 text-center">
               <Building className="h-16 w-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-xl font-medium text-gray-900 mb-2">아직 회사가 없습니다</h3>
-              <p className="text-gray-500 mb-4">
-                새 회사를 생성하거나 초대를 받아 회사에 참여하세요.
+              <p className="text-gray-500 mb-6">
+                새 회사를 생성하거나 기존 회사에 참여하세요.
               </p>
-              {userCanCreateCompany && (
+              <div className="flex justify-center space-x-3">
                 <Link 
-                  href="/companies/new" 
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded inline-flex items-center"
+                  href="/companies/search" 
+                  className="bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-2 px-4 rounded inline-flex items-center"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  새 회사 생성
+                  <Search className="w-4 h-4 mr-2" />
+                  회사 검색
                 </Link>
-              )}
+                
+                {userCanCreateCompany && (
+                  <Link 
+                    href="/companies/new" 
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded inline-flex items-center"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    새 회사 생성
+                  </Link>
+                )}
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">

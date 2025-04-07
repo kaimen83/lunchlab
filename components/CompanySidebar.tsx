@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building, Plus, Users, Settings, ChevronDown, ChevronRight } from 'lucide-react';
+import { Building, Plus, Users, Settings, ChevronDown, ChevronRight, UserPlus } from 'lucide-react';
 import { Company } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
@@ -114,18 +114,33 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
                       </Link>
                       
                       {(company.role === 'owner' || company.role === 'admin') && (
-                        <Link 
-                          href={`/companies/${company.id}/settings`} 
-                          className={cn(
-                            "flex items-center px-2 py-1.5 text-sm rounded",
-                            pathname === `/companies/${company.id}/settings` 
-                              ? "bg-[#1164A3] text-white" 
-                              : "hover:bg-gray-700"
-                          )}
-                        >
-                          <Settings className="h-3.5 w-3.5 mr-2 text-gray-400" />
-                          설정
-                        </Link>
+                        <>
+                          <Link 
+                            href={`/companies/${company.id}/join-requests`} 
+                            className={cn(
+                              "flex items-center px-2 py-1.5 text-sm rounded",
+                              pathname === `/companies/${company.id}/join-requests` 
+                                ? "bg-[#1164A3] text-white" 
+                                : "hover:bg-gray-700"
+                            )}
+                          >
+                            <UserPlus className="h-3.5 w-3.5 mr-2 text-gray-400" />
+                            가입 신청
+                          </Link>
+                          
+                          <Link 
+                            href={`/companies/${company.id}/settings`} 
+                            className={cn(
+                              "flex items-center px-2 py-1.5 text-sm rounded",
+                              pathname === `/companies/${company.id}/settings` 
+                                ? "bg-[#1164A3] text-white" 
+                                : "hover:bg-gray-700"
+                            )}
+                          >
+                            <Settings className="h-3.5 w-3.5 mr-2 text-gray-400" />
+                            설정
+                          </Link>
+                        </>
                       )}
                     </div>
                   )}

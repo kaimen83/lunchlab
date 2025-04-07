@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Building, Users, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react';
+import { Building, Users, ArrowLeft, Trash2, AlertTriangle, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { Company, CompanyMembership } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -85,14 +85,25 @@ export function CompanyHeader({ company, membership }: CompanyHeaderProps) {
         
         <div className="flex items-center space-x-2">
           {isAdmin && (
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/companies/${company.id}/invite`)}
-              className="flex items-center"
-            >
-              <Users className="h-4 w-4 mr-2" />
-              멤버 초대
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/companies/${company.id}/join-requests`)}
+                className="flex items-center"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                가입 신청 관리
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/companies/${company.id}/invite`)}
+                className="flex items-center"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                멤버 초대
+              </Button>
+            </>
           )}
           
           {isOwner && (
