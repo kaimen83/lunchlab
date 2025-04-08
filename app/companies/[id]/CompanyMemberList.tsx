@@ -26,6 +26,7 @@ interface CompanyMemberListProps {
   companyId: string;
   members: CompanyMembership[];
   currentUserMembership?: CompanyMembership;
+  showInviteButton?: boolean;
 }
 
 interface MemberWithUser {
@@ -46,7 +47,12 @@ interface UserInfo {
   profile?: UserProfile;
 }
 
-export function CompanyMemberList({ companyId, members, currentUserMembership }: CompanyMemberListProps) {
+export function CompanyMemberList({ 
+  companyId, 
+  members, 
+  currentUserMembership,
+  showInviteButton = true
+}: CompanyMemberListProps) {
   const { user: currentUser } = useUser();
   const { toast } = useToast();
   const [membersWithUsers, setMembersWithUsers] = useState<MemberWithUser[]>([]);
@@ -231,46 +237,48 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
   
   return (
     <div className="bg-white shadow-sm rounded-lg">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 p-3 sm:p-4">
-        <h2 className="text-lg sm:text-xl font-bold mb-2 sm:mb-0">회사 멤버</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 sm:mb-4 p-2 sm:p-3 md:p-4">
+        <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-0">회사 멤버</h2>
         
-        {/* 모바일용 액션 버튼 */}
-        <div className="flex flex-wrap gap-2">
+        {/* 모바일용 액션 버튼 - 더 컴팩트하게 */}
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
           {currentUserMembership && currentUser && (
             <Button
               variant="outline"
               size="sm"
               onClick={openLeaveConfirm}
-              className="flex items-center text-red-500 border-red-200 hover:bg-red-50 text-xs sm:text-sm"
+              className="flex items-center text-red-500 border-red-200 hover:bg-red-50 text-xs py-1 h-7 sm:h-8"
             >
-              <LogOut className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-              회사 탈퇴
+              <LogOut className="w-3 h-3 mr-1" />
+              <span className="hidden xs:inline">회사 탈퇴</span>
+              <span className="xs:hidden">탈퇴</span>
             </Button>
           )}
-          {isAdmin && (
+          {isAdmin && showInviteButton && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => window.location.href = `/companies/${companyId}/invite`}
-              className="flex items-center text-xs sm:text-sm"
+              className="flex items-center text-xs py-1 h-7 sm:h-8"
             >
-              <UserPlus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-              멤버 초대
+              <UserPlus className="w-3 h-3 mr-1" />
+              <span className="hidden xs:inline">멤버 초대</span>
+              <span className="xs:hidden">초대</span>
             </Button>
           )}
         </div>
       </div>
       
       {isLoading ? (
-        <div className="flex justify-center items-center p-8">
-          <p className="text-gray-500">멤버 정보를 불러오는 중...</p>
+        <div className="flex justify-center items-center p-4 sm:p-8">
+          <p className="text-xs sm:text-sm text-gray-500">멤버 정보를 불러오는 중...</p>
         </div>
       ) : error ? (
-        <div className="p-4 text-red-500 text-center">
+        <div className="p-4 text-red-500 text-center text-xs sm:text-sm">
           {error}
         </div>
       ) : membersWithUsers.length === 0 ? (
-        <div className="p-4 text-gray-500 text-center">
+        <div className="p-4 text-gray-500 text-center text-xs sm:text-sm">
           멤버가 없습니다.
         </div>
       ) : (
@@ -278,17 +286,17 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-2 sm:px-3 md:px-6 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
                   멤버
                 </th>
-                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                <th scope="col" className="px-2 sm:px-3 md:px-6 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
                   이메일
                 </th>
-                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-2 sm:px-3 md:px-6 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
                   역할
                 </th>
                 {isAdmin && (
-                  <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th scope="col" className="px-2 sm:px-3 md:px-6 py-2 sm:py-3 text-right text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <span className="sr-only">액션</span>
                   </th>
                 )}
@@ -297,9 +305,9 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
             <tbody className="bg-white divide-y divide-gray-200">
               {membersWithUsers.map((member) => (
                 <tr key={member.membership.id} className="hover:bg-gray-50">
-                  <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap">
+                  <td className="px-2 sm:px-3 md:px-6 py-2 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10 relative rounded-full overflow-hidden bg-gray-100">
+                      <div className="flex-shrink-0 h-6 w-6 sm:h-8 sm:w-8 md:h-10 md:w-10 relative rounded-full overflow-hidden bg-gray-100">
                         {member.imageUrl ? (
                           <Image
                             src={member.imageUrl}
@@ -309,33 +317,33 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
                           />
                         ) : (
                           <div className="h-full w-full flex items-center justify-center bg-gray-200">
-                            <UserRoundIcon className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500" />
+                            <UserRoundIcon className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-gray-500" />
                           </div>
                         )}
                       </div>
-                      <div className="ml-2 sm:ml-4">
-                        <div className="text-xs sm:text-sm font-medium text-gray-900">
+                      <div className="ml-2 sm:ml-3 md:ml-4">
+                        <div className="text-xs font-medium text-gray-900 line-clamp-1 max-w-[100px] sm:max-w-none">
                           {member.displayName}
                         </div>
-                        <div className="text-xs text-gray-500 sm:hidden">
+                        <div className="text-[10px] text-gray-500 sm:hidden line-clamp-1 max-w-[100px]">
                           {member.email}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap hidden sm:table-cell">
-                    <div className="text-xs sm:text-sm text-gray-500">{member.email}</div>
+                  <td className="px-2 sm:px-3 md:px-6 py-2 whitespace-nowrap hidden sm:table-cell">
+                    <div className="text-xs text-gray-500">{member.email}</div>
                   </td>
-                  <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap">
+                  <td className="px-2 sm:px-3 md:px-6 py-2 whitespace-nowrap">
                     <div className="flex items-center">
                       <span className="mr-1">{getRoleIcon(member.membership.role)}</span>
-                      <span className="text-xs sm:text-sm text-gray-700">
+                      <span className="text-[10px] sm:text-xs text-gray-700">
                         {getRoleName(member.membership.role)}
                       </span>
                     </div>
                   </td>
                   {isAdmin && (
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
+                    <td className="px-2 sm:px-3 md:px-6 py-2 whitespace-nowrap text-right text-[10px] sm:text-xs font-medium">
                       {/* 데스크톱 버전 - 삭제 버튼 표시 */}
                       <div className="hidden sm:block">
                         {(isOwner || (isAdmin && member.membership.role !== 'owner')) && 
@@ -350,25 +358,19 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
                         )}
                       </div>
                       
-                      {/* 모바일 버전 - 드롭다운 메뉴 */}
+                      {/* 모바일 버전 - 작은 버튼으로 변경 */}
                       <div className="sm:hidden">
                         {(isOwner || (isAdmin && member.membership.role !== 'owner')) && 
                           member.membership.user_id !== currentUser?.id && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem 
-                                className="text-red-500 cursor-pointer"
-                                onClick={() => openDeleteConfirm(member)}
-                              >
-                                삭제
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openDeleteConfirm(member)}
+                            className="h-6 w-6 p-0 text-red-500"
+                            disabled={isProcessing}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
                         )}
                       </div>
                     </td>
@@ -380,27 +382,27 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
         </div>
       )}
       
-      {/* 회원 삭제 확인 다이얼로그 */}
+      {/* 회원 삭제 확인 다이얼로그 - 모바일 최적화 */}
       <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
+        <DialogContent className="sm:max-w-md max-w-[90vw] rounded-lg p-4 sm:p-6">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-base sm:text-lg">
               {isLeaving ? '회사 탈퇴 확인' : '멤버 삭제 확인'}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs sm:text-sm">
               {isLeaving 
                 ? '정말로 이 회사에서 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.'
                 : `정말로 ${memberToDelete?.displayName} 멤버를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
             </DialogDescription>
           </DialogHeader>
           
-          <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
+          <DialogFooter className="flex flex-row sm:justify-end gap-2 mt-4">
             <Button
               type="button"
               variant="outline"
               onClick={() => setIsConfirmDialogOpen(false)}
               disabled={isProcessing}
-              className="mt-2 sm:mt-0"
+              className="flex-1 sm:flex-none h-8 text-xs"
             >
               취소
             </Button>
@@ -412,7 +414,7 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
                 : deleteMember(memberToDelete!.membership.user_id)
               }
               disabled={isProcessing}
-              className="mt-2 sm:mt-0"
+              className="flex-1 sm:flex-none h-8 text-xs"
             >
               {isProcessing ? '처리 중...' : isLeaving ? '탈퇴하기' : '삭제하기'}
             </Button>

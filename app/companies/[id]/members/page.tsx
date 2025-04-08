@@ -8,6 +8,7 @@ import { getCompanyJoinRequests } from '@/lib/supabase-queries';
 import JoinRequestsList from '../join-requests/JoinRequestsList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 // Next.js 15에서 페이지 컴포넌트 Props에 대한 타입 정의
 interface CompanyMembersPageProps {
@@ -80,56 +81,54 @@ export default async function CompanyMembersPage({ params, searchParams }: Compa
   const initialTab = tab === 'requests' && isOwnerOrAdmin ? 'requests' : 'members';
   
   return (
-    <div className="flex flex-col h-full">
-      {/* 채널 헤더 - Slack 스타일 */}
-      <header className="border-b border-gray-200 bg-white p-3 flex items-center justify-between">
-        <div className="flex items-center">
-          <Users className="h-5 w-5 text-gray-500 mr-2" />
-          <h1 className="text-xl font-semibold">멤버</h1>
-        </div>
-        
-        <div className="flex items-center">
-          <button className="text-gray-500 hover:text-gray-800 p-1.5 rounded-sm hover:bg-gray-100 transition-colors duration-150 flex items-center mr-2">
-            <Users className="h-5 w-5 mr-1" />
-            <span className="text-sm font-medium">{members?.length || 0}</span>
-          </button>
+    <div className="flex flex-col h-full bg-gray-50">
+      {/* 페이지 헤더 - 모바일에서 더 컴팩트하게 */}
+      <header className="bg-white shadow-sm py-3 px-4 sm:py-4 sm:px-6 border-b border-gray-200">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Users className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500" />
+            <h1 className="text-base sm:text-lg font-semibold text-gray-900 truncate max-w-[200px] sm:max-w-none">
+              {company.name} 멤버
+            </h1>
+          </div>
           
-          <button className="text-gray-500 hover:text-gray-800 p-1.5 rounded-sm hover:bg-gray-100 transition-colors duration-150">
-            <Info className="h-5 w-5" />
-          </button>
+          {isOwnerOrAdmin && (
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              className="h-8 w-8 sm:w-auto sm:px-3 p-0 sm:p-auto rounded-full sm:rounded-md"
+            >
+              <a href={`/companies/${id}/invite`} aria-label="멤버 초대">
+                <UserPlus className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">초대</span>
+              </a>
+            </Button>
+          )}
         </div>
       </header>
       
-      {/* 채널 콘텐츠 - Slack 스타일 */}
-      <div className="flex-1 overflow-y-auto bg-white">
-        <div className="max-w-4xl mx-auto p-4">
-          <div className="bg-white rounded-lg border border-gray-200 p-5 my-4">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold">{company.name} 멤버 관리</h2>
-              
-              {isOwnerOrAdmin && (
-                <a
-                  href={`/companies/${id}/invite`}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium flex items-center"
-                >
-                  <span className="mr-1">+</span> 멤버 초대
-                </a>
-              )}
-            </div>
-            
-            <Tabs defaultValue={initialTab} className="w-full">
-              <TabsList className="mb-4">
-                <TabsTrigger value="members" className="flex items-center">
-                  <Users className="h-4 w-4 mr-2" />
-                  멤버
+      {/* 메인 콘텐츠 - 패딩 최적화 */}
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
+        <div className="max-w-6xl mx-auto">
+          <Tabs defaultValue={initialTab} className="w-full">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 md:p-6">
+              {/* 탭 네비게이션 - 모바일에서 전체 너비 사용 */}
+              <TabsList className="mb-4 w-full h-9">
+                <TabsTrigger value="members" className="flex items-center gap-1 flex-1 h-full text-xs sm:text-sm">
+                  <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>멤버</span>
+                  <Badge variant="outline" className="ml-1 bg-gray-100 text-xs px-1.5 py-0 h-5">
+                    {members?.length || 0}
+                  </Badge>
                 </TabsTrigger>
                 
                 {isOwnerOrAdmin && (
-                  <TabsTrigger value="requests" className="flex items-center">
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    가입 신청
+                  <TabsTrigger value="requests" className="flex items-center gap-1 flex-1 h-full text-xs sm:text-sm">
+                    <UserPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <span>가입요청</span>
                     {requests.length > 0 && (
-                      <Badge variant="destructive" className="ml-2 bg-red-500">
+                      <Badge variant="destructive" className="ml-1 text-xs px-1.5 py-0 h-5">
                         {requests.length}
                       </Badge>
                     )}
@@ -137,20 +136,21 @@ export default async function CompanyMembersPage({ params, searchParams }: Compa
                 )}
               </TabsList>
               
-              <TabsContent value="members">
+              <TabsContent value="members" className="mt-0">
                 <CompanyMemberList 
                   companyId={id}
                   members={members || []} 
                   currentUserMembership={membership as CompanyMembership}
+                  showInviteButton={false} // 멤버 초대 버튼 숨김 (페이지 헤더에 이미 있음)
                 />
               </TabsContent>
               
               {isOwnerOrAdmin && (
-                <TabsContent value="requests">
+                <TabsContent value="requests" className="mt-0">
                   {requests.length === 0 ? (
-                    <div className="text-center py-10 text-gray-500">
-                      <AlertCircle className="h-10 w-10 mx-auto text-gray-400 mb-4" />
-                      <p>현재 가입 신청이 없습니다.</p>
+                    <div className="text-center py-8 text-gray-500">
+                      <AlertCircle className="h-8 w-8 mx-auto text-gray-400 mb-3" />
+                      <p className="text-sm">현재 가입 신청이 없습니다.</p>
                     </div>
                   ) : (
                     <JoinRequestsList 
@@ -161,8 +161,8 @@ export default async function CompanyMembersPage({ params, searchParams }: Compa
                   )}
                 </TabsContent>
               )}
-            </Tabs>
-          </div>
+            </div>
+          </Tabs>
         </div>
       </div>
     </div>
