@@ -151,6 +151,11 @@ export default function JoinRequestsList({ companyId: _companyId, requests, curr
       setRequestsWithUsers((prevRequests) => 
         prevRequests.filter((r) => r.request.id !== selectedRequest.request.id)
       );
+
+      // 페이지 새로고침 (브라우저에서 실행되는 경우에만)
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
     } catch (err) {
       console.error(`가입 신청 ${actionType === 'accept' ? '수락' : '거절'} 중 오류:`, err);
       toast({
