@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from '@/lib/supabase';
 import { Settings, AlertTriangle } from 'lucide-react';
 import { CompanySettingsForm } from './CompanySettingsForm';
 import { DangerZone } from './DangerZone';
+import { CompanyFeaturesSection } from './CompanyFeaturesSection';
 
 // Next.js 15에서 페이지 컴포넌트 Props에 대한 타입 정의
 interface CompanySettingsPageProps {
@@ -50,6 +51,12 @@ export default async function CompanySettingsPage({ params }: CompanySettingsPag
     redirect(`/companies/${id}`);
   }
   
+  // 회사 기능 목록 조회
+  const { data: features, error: featuresError } = await supabase
+    .from('company_features')
+    .select('*')
+    .eq('company_id', id);
+  
   return (
     <div className="flex flex-col h-full">
       {/* 채널 헤더 */}
@@ -62,14 +69,22 @@ export default async function CompanySettingsPage({ params }: CompanySettingsPag
       
       {/* 채널 콘텐츠 */}
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto space-y-6">
           {/* 회사 설정 폼 */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5 mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
             <h2 className="text-xl font-bold mb-4">회사 정보</h2>
             
             <CompanySettingsForm 
               company={company}
               isOwner={membership.role === 'owner'}
+            />
+          </div>
+          
+          {/* 기능 관리 섹션 */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+            <CompanyFeaturesSection 
+              companyId={id}
+              initialFeatures={features || []}
             />
           </div>
           
