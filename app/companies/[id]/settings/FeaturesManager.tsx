@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, ClipboardList, BookOpen } from 'lucide-react';
+import { Settings, ClipboardList, BookOpen, CalendarDays } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Feature {
@@ -39,6 +39,12 @@ export default function FeaturesManager({ companyId }: { companyId: string }) {
       display_name: '메뉴 관리',
       description: '메뉴 등록 및 식재료 조합 관리',
       icon: <BookOpen className="w-5 h-5" />
+    },
+    'mealPlanning': {
+      name: 'mealPlanning',
+      display_name: '식단 관리',
+      description: '식단 계획 및 일정 관리',
+      icon: <CalendarDays className="w-5 h-5" />
     }
   };
 
@@ -51,13 +57,58 @@ export default function FeaturesManager({ companyId }: { companyId: string }) {
         }
         
         const data = await response.json();
+        console.log("API에서 받아온 기능 목록:", data);
+        
+        // 기본 기능 정의를 확인하여 누락된 기능을 식별
+        const existingFeatureNames = data.map((feature: any) => feature.feature_name);
+        const missingFeatures: any[] = [];
+        
+        // 필수 기능 목록
+        const requiredFeatures = ['settings', 'ingredients', 'menus', 'mealPlanning'];
+        
+        // 누락된 기능 확인
+        for (const featureName of requiredFeatures) {
+          if (!existingFeatureNames.includes(featureName)) {
+            console.log(`누락된 기능 발견: ${featureName}`);
+            missingFeatures.push({
+              feature_name: featureName,
+              is_enabled: true,
+              ...featureDefinitions[featureName]
+            });
+          }
+        }
+        
+        // 누락된 기능이 있으면 API에 추가 요청
+        if (missingFeatures.length > 0) {
+          console.log("누락된 기능 추가 중:", missingFeatures);
+          
+          // 각 누락된 기능에 대해 활성화 요청
+          for (const feature of missingFeatures) {
+            try {
+              await fetch(`/api/companies/${companyId}/features`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  featureName: feature.feature_name,
+                  isEnabled: true
+                })
+              });
+            } catch (error) {
+              console.error(`${feature.feature_name} 기능 추가 실패:`, error);
+            }
+          }
+        }
         
         // DB에서 받아온 기능 목록과 정의된 기능 목록을 합침
-        const enrichedFeatures = data.map((feature: any) => ({
+        const allFeatures = [...data, ...missingFeatures];
+        const enrichedFeatures = allFeatures.map((feature: any) => ({
           ...feature,
           ...featureDefinitions[feature.feature_name]
         }));
         
+        console.log("최종 처리된 기능 목록:", enrichedFeatures);
         setFeatures(enrichedFeatures);
       } catch (error) {
         console.error('기능 목록 로딩 오류:', error);
@@ -101,13 +152,21 @@ export default function FeaturesManager({ companyId }: { companyId: string }) {
       ));
 
       // 네비게이션 메뉴 업데이트를 위한 이벤트 발생
-      window.localStorage.setItem('feature-change', JSON.stringify({
+      const changeData = {
         companyId,
         featureName, 
         isEnabled: newState,
         timestamp: new Date().getTime()
-      }));
+      };
+      window.localStorage.setItem('feature-change', JSON.stringify(changeData));
+      
+      // storage 이벤트는 다른 탭에서만 발생하므로, 현재 탭에서도 이벤트 발생
       window.dispatchEvent(new Event('storage'));
+      
+      // 커스텀 이벤트 발생
+      window.dispatchEvent(new CustomEvent('feature-change', { 
+        detail: changeData 
+      }));
 
       toast({
         title: '설정 변경 완료',
@@ -188,6 +247,34 @@ export default function FeaturesManager({ companyId }: { companyId: string }) {
                 handleToggleFeature('ingredients', checked);
                 handleToggleFeature('menus', checked);
               }}
+            />
+          </div>
+        );
+      })()}
+      
+      {/* 식단 관리 기능 */}
+      {(() => {
+        const mealPlanningFeature = features.find(f => f.name === 'mealPlanning');
+        
+        // 기능이 없으면 렌더링하지 않음
+        if (!mealPlanningFeature) return null;
+        
+        return (
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="flex items-center space-x-3">
+              <div className="bg-blue-100 p-2 rounded-md text-blue-700">
+                <CalendarDays className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-medium">식단 관리</h3>
+                <p className="text-sm text-gray-500">식단 계획 및 일정 관리</p>
+              </div>
+            </div>
+            
+            <Switch 
+              checked={mealPlanningFeature.is_enabled}
+              disabled={updating === 'mealPlanning'}
+              onCheckedChange={(checked) => handleToggleFeature('mealPlanning', checked)}
             />
           </div>
         );

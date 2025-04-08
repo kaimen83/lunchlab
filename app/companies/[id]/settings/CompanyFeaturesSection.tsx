@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ToggleLeft, ToggleRight, Package, UtensilsCrossed } from 'lucide-react';
+import { ToggleLeft, ToggleRight, Package, UtensilsCrossed, CalendarDays } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +33,12 @@ export function CompanyFeaturesSection({ companyId, initialFeatures }: CompanyFe
       label: '식재료 및 메뉴 관리',
       description: '식재료 및 메뉴를 관리할 수 있습니다. 식재료 원가 계산, 메뉴 원가 계산 등의 기능을 제공합니다.',
       icon: <UtensilsCrossed className="h-5 w-5 text-blue-500" />
+    },
+    {
+      name: 'mealPlanning',
+      label: '식단 관리',
+      description: '날짜별 식단 계획을 관리할 수 있습니다. 식단표 작성, 식단 조회 등의 기능을 제공합니다.',
+      icon: <CalendarDays className="h-5 w-5 text-blue-500" />
     }
   ];
 
@@ -131,7 +137,24 @@ export function CompanyFeaturesSection({ companyId, initialFeatures }: CompanyFe
                   variant="outline"
                   size="sm"
                   className="ml-auto"
-                  onClick={() => router.push(`/companies/${companyId}/${feature.name}`)}
+                  onClick={() => {
+                    // 기능별 올바른 경로로 이동
+                    let path: string;
+                    
+                    // 기능명에 따라 경로 명확하게 지정
+                    if (feature.name === 'mealPlanning') {
+                      path = `/companies/${companyId}/meal-plans`;
+                      console.log(`식단 관리 경로로 이동: ${path}`);
+                    } else if (feature.name === 'ingredients') {
+                      path = `/companies/${companyId}/ingredients`;
+                    } else if (feature.name === 'menus') {
+                      path = `/companies/${companyId}/menus`;
+                    } else {
+                      path = `/companies/${companyId}/${feature.name}`;
+                    }
+                    
+                    router.push(path);
+                  }}
                 >
                   관리하기
                 </Button>

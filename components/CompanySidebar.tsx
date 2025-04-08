@@ -94,6 +94,38 @@ export function CompanySidebar({ companies, isMobile = false }: CompanySidebarPr
           
           if (!hasMealPlanningFeature) {
             console.warn(`회사 ID ${expandedCompanyId}에 mealPlanning 기능이 누락되어 있습니다.`);
+            
+            // mealPlanning 기능이 누락된 경우 자동 추가 시도
+            try {
+              console.log('mealPlanning 기능 자동 추가 시도');
+              await fetch(`/api/companies/${expandedCompanyId}/features`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  featureName: 'mealPlanning',
+                  isEnabled: true
+                })
+              });
+              
+              // 성공 시 다시 기능 목록 불러오기
+              const refreshResponse = await fetch(`/api/companies/${expandedCompanyId}/features`);
+              if (refreshResponse.ok) {
+                const refreshData = await refreshResponse.json();
+                const enabledFeatures = refreshData
+                  .filter((feature: any) => feature.is_enabled)
+                  .map((feature: any) => feature.feature_name);
+                
+                setCompanyFeatures(prev => ({
+                  ...prev,
+                  [expandedCompanyId]: enabledFeatures
+                }));
+                return; // 재호출했으므로 여기서 종료
+              }
+            } catch (error) {
+              console.error('mealPlanning 기능 자동 추가 실패:', error);
+            }
           }
           
           // 활성화된 기능들만 필터링
@@ -137,12 +169,23 @@ export function CompanySidebar({ companies, isMobile = false }: CompanySidebarPr
         console.error('기능 변경 이벤트 처리 중 오류:', error);
       }
     };
+    
+    // 커스텀 이벤트 핸들러
+    const handleCustomFeatureChange = (event: any) => {
+      const featureChange = event.detail;
+      if (featureChange && featureChange.companyId === expandedCompanyId) {
+        console.log('커스텀 이벤트 수신:', featureChange);
+        fetchCompanyFeatures();
+      }
+    };
 
-    // storage 이벤트 리스너 등록
+    // 이벤트 리스너 등록
     window.addEventListener('storage', handleFeatureChange);
+    window.addEventListener('feature-change', handleCustomFeatureChange);
     
     return () => {
       window.removeEventListener('storage', handleFeatureChange);
+      window.removeEventListener('feature-change', handleCustomFeatureChange);
     };
   }, [expandedCompanyId]);
 
@@ -152,6 +195,20 @@ export function CompanySidebar({ companies, isMobile = false }: CompanySidebarPr
 
   // 회사에 특정 기능이 활성화되어 있는지 확인
   const isFeatureEnabled = (companyId: string, featureName: string) => {
+    // 기본 제공 기능인 경우 항상 true 반환
+    if (featureName === 'settings') return true;
+    
+    // mealPlanning 기능은 누락되었어도 기본적으로 표시
+    if (featureName === 'mealPlanning') {
+      // companyFeatures에 해당 회사의 기능이 정의되어 있지 않거나
+      // mealPlanning이 정의되지 않은 경우 true 반환 (기본 활성화)
+      if (!companyFeatures[companyId]) {
+        console.log(`${companyId} 회사의 기능 정보가 아직 로드되지 않았습니다. ${featureName} 기능 임시 활성화`);
+        return true;
+      }
+    }
+    
+    // 일반적인 경우 기능 활성화 여부 확인
     return companyFeatures[companyId]?.includes(featureName) || false;
   };
 
@@ -215,6 +272,14 @@ export function CompanySidebar({ companies, isMobile = false }: CompanySidebarPr
               const hasIngredientsFeature = isFeatureEnabled(company.id, 'ingredients');
               const hasMenusFeature = isFeatureEnabled(company.id, 'menus');
               const hasMealPlanningFeature = isFeatureEnabled(company.id, 'mealPlanning');
+              
+              // 디버깅용 로그 추가
+              console.log(`회사 ${company.name}(${company.id}) 기능 상태:`, {
+                ingredients: hasIngredientsFeature,
+                menus: hasMenusFeature,
+                mealPlanning: hasMealPlanningFeature,
+                features: companyFeatures[company.id] || []
+              });
               
               return (
                 <li key={company.id} className="px-2">
@@ -302,11 +367,11 @@ export function CompanySidebar({ companies, isMobile = false }: CompanySidebarPr
                       {/* 식단 관리 메뉴 - 모든 회원에게 표시 */}
                       {hasMealPlanningFeature && (
                         <Link 
-                          href={`/companies/${company.id}/meal-planning`} 
+                          href={`/companies/${company.id}/meal-plans`} 
                           className={cn(
                             "flex items-center px-2 py-1.5 text-sm rounded",
-                            pathname === `/companies/${company.id}/meal-planning` ||
-                            pathname.startsWith(`/companies/${company.id}/meal-planning`)
+                            pathname === `/companies/${company.id}/meal-plans` ||
+                            pathname.startsWith(`/companies/${company.id}/meal-plans`)
                               ? "bg-[#1164A3] text-white" 
                               : "hover:bg-gray-700"
                           )}

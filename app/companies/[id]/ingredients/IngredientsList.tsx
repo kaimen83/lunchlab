@@ -282,7 +282,11 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
             </div>
           ) : (
             <div>
-              {filteredIngredients.map(ingredient => renderMobileCard(ingredient))}
+              {filteredIngredients.map(ingredient => (
+                <div key={ingredient.id}>
+                  {renderMobileCard(ingredient)}
+                </div>
+              ))}
             </div>
           )}
         </div>
