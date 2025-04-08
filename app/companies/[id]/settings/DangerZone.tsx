@@ -16,6 +16,22 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 
+// 회사 변경 이벤트를 발생시키는 함수
+const dispatchCompanyChangeEvent = (type: 'add' | 'delete', companyId: string) => {
+  // 로컬 스토리지 이벤트
+  localStorage.setItem('company-change', JSON.stringify({
+    type,
+    companyId,
+    timestamp: new Date().toISOString()
+  }));
+  
+  // 커스텀 이벤트
+  const event = new CustomEvent('company-change', { 
+    detail: { type, companyId }
+  });
+  window.dispatchEvent(event);
+};
+
 interface DangerZoneProps {
   companyId: string;
   companyName: string;
@@ -49,9 +65,11 @@ export function DangerZone({ companyId, companyName }: DangerZoneProps) {
         throw new Error(data.error || '회사 삭제에 실패했습니다.');
       }
       
-      // 삭제 성공 시 홈으로 이동
-      router.push('/');
-      router.refresh();
+      // 회사 삭제 이벤트 발생
+      dispatchCompanyChangeEvent('delete', companyId);
+      
+      // 삭제 성공 시 홈으로 이동 (강제 리다이렉트)
+      window.location.href = '/';
     } catch (err) {
       console.error('회사 삭제 중 오류:', err);
       setError(err instanceof Error ? err.message : '오류가 발생했습니다.');

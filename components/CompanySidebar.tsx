@@ -67,6 +67,40 @@ export function CompanySidebar({ companies, isMobile = false }: CompanySidebarPr
     }
   }, [expandedCompanyId, companies]);
 
+  // 회사 추가/삭제 이벤트 감지
+  useEffect(() => {
+    // 회사 변경 이벤트 핸들러
+    const handleCompanyChange = (event: StorageEvent) => {
+      if (event.key === 'company-change') {
+        // URL에서 변경된 부분 확인하고 페이지 새로고침 없이 상태 업데이트
+        console.log('회사 정보 변경 감지');
+        
+        // 회사 변경 시 페이지 새로고침 (임시 방법)
+        window.location.reload();
+      }
+    };
+    
+    // 커스텀 이벤트 핸들러
+    const handleCustomCompanyChange = (event: CustomEvent) => {
+      console.log('커스텀 회사 변경 이벤트 감지:', event.detail);
+      
+      // 변경된 회사 정보 처리
+      if (event.detail?.type === 'add' || event.detail?.type === 'delete') {
+        // 페이지 새로고침
+        window.location.reload();
+      }
+    };
+    
+    // 이벤트 리스너 등록
+    window.addEventListener('storage', handleCompanyChange);
+    window.addEventListener('company-change', handleCustomCompanyChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('storage', handleCompanyChange);
+      window.removeEventListener('company-change', handleCustomCompanyChange as EventListener);
+    };
+  }, []);
+
   // 회사의 활성화된 기능 가져오기
   useEffect(() => {
     const fetchCompanyFeatures = async () => {

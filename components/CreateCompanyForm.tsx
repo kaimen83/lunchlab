@@ -8,6 +8,22 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Building } from 'lucide-react';
 
+// 회사 변경 이벤트를 발생시키는 함수
+const dispatchCompanyChangeEvent = (type: 'add' | 'delete', companyId: string) => {
+  // 로컬 스토리지 이벤트
+  localStorage.setItem('company-change', JSON.stringify({
+    type,
+    companyId,
+    timestamp: new Date().toISOString()
+  }));
+  
+  // 커스텀 이벤트
+  const event = new CustomEvent('company-change', { 
+    detail: { type, companyId }
+  });
+  window.dispatchEvent(event);
+};
+
 export function CreateCompanyForm() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,8 +67,11 @@ export function CreateCompanyForm() {
         throw new Error(data.error || '회사 페이지 생성에 실패했습니다.');
       }
 
-      // 생성된 회사 페이지로 리다이렉트
-      router.push(`/companies/${data.company.id}`);
+      // 회사 추가 이벤트 발생
+      dispatchCompanyChangeEvent('add', data.company.id);
+
+      // 생성된 회사 페이지로 강제 리다이렉트
+      window.location.href = `/companies/${data.company.id}`;
     } catch (err) {
       setError(err instanceof Error ? err.message : '오류가 발생했습니다.');
       setIsSubmitting(false);
