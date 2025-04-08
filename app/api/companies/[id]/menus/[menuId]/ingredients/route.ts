@@ -38,12 +38,12 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: '해당 회사에 접근 권한이 없습니다.' }, { status: 403 });
     }
     
-    // 회사의 식재료 기능 활성화 상태 확인
+    // 회사의 메뉴 기능 활성화 상태 확인
     const { data: featureData, error: featureError } = await supabase
       .from('company_features')
       .select('is_enabled')
       .eq('company_id', companyId)
-      .eq('feature_name', 'ingredients')
+      .eq('feature_name', 'menus')
       .maybeSingle();
     
     if (featureError) {
@@ -54,7 +54,7 @@ export async function GET(request: Request, context: RouteContext) {
     // 기능이 비활성화된 경우
     if (!featureData || !featureData.is_enabled) {
       return NextResponse.json({ 
-        error: '식재료 및 메뉴 관리 기능이 활성화되지 않았습니다. 관리자에게 문의하세요.' 
+        error: '메뉴 관리 기능이 활성화되지 않았습니다. 관리자에게 문의하세요.' 
       }, { status: 403 });
     }
     

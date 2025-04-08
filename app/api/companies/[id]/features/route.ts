@@ -42,14 +42,23 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return Response.json({ error: '회사를 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    // 관리자 권한 확인
-    const isAdmin = await isUserCompanyAdmin({ userId, companyId });
-    if (!isAdmin) {
-      return Response.json({ error: '이 작업을 수행할 권한이 없습니다.' }, { status: 403 });
-    }
-
-    // Supabase 클라이언트 생성
+    // 멤버십 확인 (관리자 체크 대신 멤버십만 확인)
     const supabase = createServerSupabaseClient();
+    const { data: membership, error: membershipError } = await supabase
+      .from('company_memberships')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (membershipError && membershipError.code !== 'PGRST116') {
+      console.error('멤버십 조회 오류:', membershipError);
+      return Response.json({ error: '회사 정보 조회 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+    
+    if (!membership) {
+      return Response.json({ error: '해당 회사에 접근 권한이 없습니다.' }, { status: 403 });
+    }
 
     // 회사 기능 조회
     const { data: features, error } = await supabase
@@ -87,7 +96,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return Response.json({ error: '회사를 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    // 관리자 권한 확인
+    // 관리자 권한 확인 - POST는 여전히 관리자만 가능
     const isAdmin = await isUserCompanyAdmin({ userId, companyId });
     if (!isAdmin) {
       return Response.json({ error: '이 작업을 수행할 권한이 없습니다.' }, { status: 403 });

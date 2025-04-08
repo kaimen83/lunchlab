@@ -253,15 +253,15 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
                         )}
                       </Link>
                       
-                      {/* 식자재/메뉴 관리 메뉴 - 식재료 또는 메뉴 기능이 활성화된 경우 표시 */}
+                      {/* 식자재/메뉴 관리 메뉴 - 모든 회원에게 표시 */}
                       {(hasIngredientsFeature || hasMenusFeature) && (
                         <Link 
                           href={`/companies/${company.id}/inventory`} 
                           className={cn(
                             "flex items-center px-2 py-1.5 text-sm rounded",
                             pathname === `/companies/${company.id}/inventory` ||
-                            pathname === `/companies/${company.id}/ingredients` ||
-                            pathname === `/companies/${company.id}/menus`
+                            pathname.startsWith(`/companies/${company.id}/ingredients`) ||
+                            pathname.startsWith(`/companies/${company.id}/menus`)
                               ? "bg-[#1164A3] text-white" 
                               : "hover:bg-gray-700"
                           )}
@@ -271,7 +271,7 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
                         </Link>
                       )}
                       
-                      {/* 회사 설정 메뉴 */}
+                      {/* 회사 설정 메뉴 - 관리자만 접근 가능 */}
                       {isAdmin && (
                         <Link 
                           href={`/companies/${company.id}/settings`} 

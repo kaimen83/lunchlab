@@ -299,23 +299,25 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
                       >
                         <LineChart className="h-4 w-4" />
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        onClick={() => handleEditIngredient(ingredient)}
-                        title="수정하기"
-                      >
-                        <FilePen className="h-4 w-4" />
-                      </Button>
                       {isOwnerOrAdmin && (
-                        <Button 
-                          variant="outline" 
-                          size="icon"
-                          onClick={() => handleDeleteConfirm(ingredient)}
-                          title="삭제하기"
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
+                        <>
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            onClick={() => handleEditIngredient(ingredient)}
+                            title="수정하기"
+                          >
+                            <FilePen className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="icon"
+                            onClick={() => handleDeleteConfirm(ingredient)}
+                            title="삭제하기"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </>
                       )}
                     </TableCell>
                   </TableRow>

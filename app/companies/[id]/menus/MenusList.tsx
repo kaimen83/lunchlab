@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Plus, FilePen, Trash2, Search, FileText, 
-  ChevronDown, ChevronUp, LineChart, CookingPot 
+  ChevronDown, ChevronUp, LineChart, CookingPot, PackageOpen 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -301,14 +301,6 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                         <Button 
                           variant="outline" 
                           size="icon" 
-                          onClick={() => handleViewIngredients(menu)}
-                          title="식재료 보기"
-                        >
-                          <CookingPot className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="icon" 
                           onClick={() => handleViewPriceHistory(menu)}
                           title="가격 이력 보기"
                         >
@@ -317,20 +309,30 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                         <Button 
                           variant="outline" 
                           size="icon" 
-                          onClick={() => handleEditMenu(menu)}
-                          title="수정하기"
+                          onClick={() => handleViewIngredients(menu)}
+                          title="재료 보기"
                         >
-                          <FilePen className="h-4 w-4" />
+                          <PackageOpen className="h-4 w-4" />
                         </Button>
                         {isOwnerOrAdmin && (
-                          <Button 
-                            variant="outline" 
-                            size="icon"
-                            onClick={() => handleDeleteConfirm(menu)}
-                            title="삭제하기"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
+                          <>
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              onClick={() => handleEditMenu(menu)}
+                              title="수정하기"
+                            >
+                              <FilePen className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              onClick={() => handleDeleteConfirm(menu)}
+                              title="삭제하기"
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </>
                         )}
                       </TableCell>
                     </TableRow>
