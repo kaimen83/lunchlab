@@ -136,7 +136,7 @@ export default function FeaturesManager({ companyId }: { companyId: string }) {
 
   return (
     <div className="space-y-4">
-      {features.map((feature) => (
+      {features.filter(feature => feature.name === 'settings').map((feature) => (
         <div key={feature.name} className="flex items-center justify-between p-4 border rounded-lg">
           <div className="flex items-center space-x-3">
             <div className="bg-blue-100 p-2 rounded-md text-blue-700">
@@ -155,6 +155,43 @@ export default function FeaturesManager({ companyId }: { companyId: string }) {
           />
         </div>
       ))}
+
+      {/* 식자재/메뉴 관리 통합 */}
+      {(() => {
+        const ingredientsFeature = features.find(f => f.name === 'ingredients');
+        const menusFeature = features.find(f => f.name === 'menus');
+        
+        // 두 기능 중 하나라도 없으면 렌더링하지 않음
+        if (!ingredientsFeature || !menusFeature) return null;
+        
+        // 통합된 기능의 활성화 상태 확인 (두 기능이 모두 활성화되어 있거나 모두 비활성화되어 있어야 함)
+        const isEnabled = ingredientsFeature.is_enabled && menusFeature.is_enabled;
+        const isDisabled = updating === 'ingredients' || updating === 'menus';
+        
+        return (
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="flex items-center space-x-3">
+              <div className="bg-blue-100 p-2 rounded-md text-blue-700">
+                <ClipboardList className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-medium">식자재/메뉴 관리</h3>
+                <p className="text-sm text-gray-500">식재료 및 메뉴 관리 통합 기능</p>
+              </div>
+            </div>
+            
+            <Switch 
+              checked={isEnabled}
+              disabled={isDisabled}
+              onCheckedChange={(checked) => {
+                // 두 기능을 동시에 활성화/비활성화
+                handleToggleFeature('ingredients', checked);
+                handleToggleFeature('menus', checked);
+              }}
+            />
+          </div>
+        );
+      })()}
     </div>
   );
 }

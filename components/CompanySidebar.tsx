@@ -73,18 +73,39 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
         if (response.ok) {
           const data = await response.json();
           
+          console.log(`회사 ID ${expandedCompanyId}의 기능 목록:`, data);
+          
+          // 중요 기능 누락 여부 확인
+          const hasIngredientsFeature = data.some((feature: any) => feature.feature_name === 'ingredients');
+          const hasMenusFeature = data.some((feature: any) => feature.feature_name === 'menus');
+          
+          if (!hasIngredientsFeature) {
+            console.warn(`회사 ID ${expandedCompanyId}에 ingredients 기능이 누락되어 있습니다.`);
+          }
+          
+          if (!hasMenusFeature) {
+            console.warn(`회사 ID ${expandedCompanyId}에 menus 기능이 누락되어 있습니다.`);
+          }
+          
           // 활성화된 기능들만 필터링
           const enabledFeatures = data
             .filter((feature: any) => feature.is_enabled)
             .map((feature: any) => feature.feature_name);
           
+          console.log(`회사 ID ${expandedCompanyId}의 활성화된 기능:`, enabledFeatures);
+          
           setCompanyFeatures(prev => ({
             ...prev,
             [expandedCompanyId]: enabledFeatures
           }));
+        } else {
+          // 응답이 실패한 경우 상세 오류 정보 출력
+          const errorText = await response.text();
+          console.error(`회사 ID ${expandedCompanyId}의 기능 조회 실패:`, 
+            response.status, response.statusText, errorText);
         }
       } catch (error) {
-        console.error('회사 기능 조회 중 오류:', error);
+        console.error(`회사 ID ${expandedCompanyId}의 기능 조회 중 오류:`, error);
       }
     };
     
@@ -219,35 +240,21 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
                         )}
                       </Link>
                       
-                      {/* 식재료 관리 메뉴 - 기능이 활성화된 경우만 표시 */}
-                      {hasIngredientsFeature && (
+                      {/* 식자재/메뉴 관리 메뉴 - 식재료 또는 메뉴 기능이 활성화된 경우 표시 */}
+                      {(hasIngredientsFeature || hasMenusFeature) && (
                         <Link 
-                          href={`/companies/${company.id}/ingredients`} 
+                          href={`/companies/${company.id}/inventory`} 
                           className={cn(
                             "flex items-center px-2 py-1.5 text-sm rounded",
-                            pathname === `/companies/${company.id}/ingredients` 
+                            pathname === `/companies/${company.id}/inventory` ||
+                            pathname === `/companies/${company.id}/ingredients` ||
+                            pathname === `/companies/${company.id}/menus`
                               ? "bg-[#1164A3] text-white" 
                               : "hover:bg-gray-700"
                           )}
                         >
                           <ClipboardList className="h-3.5 w-3.5 mr-2 text-gray-400" />
-                          식재료 관리
-                        </Link>
-                      )}
-                      
-                      {/* 메뉴 관리 메뉴 - 기능이 활성화된 경우만 표시 */}
-                      {hasMenusFeature && (
-                        <Link 
-                          href={`/companies/${company.id}/menus`} 
-                          className={cn(
-                            "flex items-center px-2 py-1.5 text-sm rounded",
-                            pathname === `/companies/${company.id}/menus` 
-                              ? "bg-[#1164A3] text-white" 
-                              : "hover:bg-gray-700"
-                          )}
-                        >
-                          <BookOpen className="h-3.5 w-3.5 mr-2 text-gray-400" />
-                          메뉴 관리
+                          식자재/메뉴 관리
                         </Link>
                       )}
                       
