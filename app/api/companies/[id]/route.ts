@@ -8,6 +8,72 @@ interface RouteContext {
   }>;
 }
 
+// 회사 세부 정보 조회
+export async function GET(request: Request, context: RouteContext) {
+  try {
+    const { userId } = await auth();
+    const { id: companyId } = await context.params;
+    
+    if (!userId) {
+      return NextResponse.json({ error: '인증되지 않은 요청입니다.' }, { status: 401 });
+    }
+    
+    const supabase = createServerSupabaseClient();
+    
+    // 사용자가 해당 회사의 멤버인지 확인
+    const { data: membershipData, error: membershipError } = await supabase
+      .from('company_memberships')
+      .select('id, role')
+      .eq('company_id', companyId)
+      .eq('user_id', userId)
+      .single();
+    
+    if (membershipError && membershipError.code !== 'PGRST116') {
+      console.error('멤버십 조회 오류:', membershipError);
+      return NextResponse.json({ error: '회사 정보 조회 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+    
+    if (!membershipData) {
+      return NextResponse.json({ error: '해당 회사에 접근 권한이 없습니다.' }, { status: 403 });
+    }
+    
+    // 회사 정보 조회
+    const { data: company, error: companyError } = await supabase
+      .from('companies')
+      .select('*')
+      .eq('id', companyId)
+      .single();
+    
+    if (companyError) {
+      console.error('회사 정보 조회 오류:', companyError);
+      return NextResponse.json({ error: '회사 정보 조회 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+    
+    // 회사의 기능 목록 조회
+    const { data: features, error: featuresError } = await supabase
+      .from('company_features')
+      .select('feature_name, is_enabled, config')
+      .eq('company_id', companyId);
+    
+    if (featuresError) {
+      console.error('회사 기능 조회 오류:', featuresError);
+      // 기능 조회 오류는 치명적이지 않으므로, 빈 배열로 처리
+    }
+    
+    // 응답 데이터 구성
+    const responseData = {
+      ...company,
+      features: features || [],
+      role: membershipData.role
+    };
+    
+    return NextResponse.json(responseData);
+  } catch (error) {
+    console.error('회사 정보 조회 중 오류 발생:', error);
+    return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
+  }
+}
+
 export async function DELETE(
   req: Request,
   context: RouteContext
