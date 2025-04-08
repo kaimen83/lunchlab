@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "installCommand": "npm install --no-audit --no-fund --legacy-peer-deps",
+  "framework": "nextjs",
+  "github": {
+    "silent": true
+  }
+} 
