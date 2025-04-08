@@ -121,24 +121,26 @@ export default async function InventoryPage({ params, searchParams }: InventoryP
   
   return (
     <div className="flex flex-col h-full">
-      <header className="border-b border-gray-200 bg-white p-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold">식자재/메뉴 관리</h1>
+      <header className="border-b border-gray-200 bg-white p-2 sm:p-3 flex items-center justify-between">
+        <h1 className="text-lg sm:text-xl font-bold">식자재/메뉴 관리</h1>
       </header>
       
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4">
         <Tabs defaultValue={initialTab} className="w-full">
-          <TabsList className="mb-4">
+          <TabsList className="mb-2 sm:mb-4 w-full sm:w-auto">
             {hasIngredientsFeature && (
-              <TabsTrigger value="ingredients" className="flex items-center">
-                <ClipboardList className="h-4 w-4 mr-2" />
-                식재료
+              <TabsTrigger value="ingredients" className="flex-1 sm:flex-initial items-center">
+                <ClipboardList className="h-4 w-4 mr-2 hidden sm:inline" />
+                <ClipboardList className="h-4 w-4 sm:hidden mb-1" />
+                <span className="text-xs sm:text-sm">식재료</span>
               </TabsTrigger>
             )}
             
             {hasMenusFeature && (
-              <TabsTrigger value="menus" className="flex items-center">
-                <BookOpen className="h-4 w-4 mr-2" />
-                메뉴
+              <TabsTrigger value="menus" className="flex-1 sm:flex-initial items-center">
+                <BookOpen className="h-4 w-4 mr-2 hidden sm:inline" />
+                <BookOpen className="h-4 w-4 sm:hidden mb-1" />
+                <span className="text-xs sm:text-sm">메뉴</span>
               </TabsTrigger>
             )}
           </TabsList>

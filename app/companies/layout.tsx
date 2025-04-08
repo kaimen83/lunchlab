@@ -23,9 +23,17 @@ export default async function CompaniesLayout({
   }
 
   return (
-    <div className="flex h-screen">
-      {/* 왼쪽 사이드바 - 회사 목록 */}
-      <div className="w-60 bg-[#19171D] border-r border-gray-700 flex-shrink-0 overflow-y-auto">
+    <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden">
+      {/* 모바일용 사이드바 - 모바일에서만 표시 */}
+      <div className="md:hidden w-full bg-[#19171D] flex-shrink-0">
+        <CompanySidebar 
+          companies={companies}
+          isMobile={true}
+        />
+      </div>
+      
+      {/* 데스크톱용 사이드바 - 태블릿/데스크톱에서만 표시 */}
+      <div className="hidden md:block w-60 bg-[#19171D] border-r border-gray-700 flex-shrink-0 overflow-y-auto">
         <CompanySidebar companies={companies} />
       </div>
       

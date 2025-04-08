@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Plus, FilePen, Trash2, Search, FileText, 
-  ChevronDown, ChevronUp, LineChart, CookingPot, PackageOpen 
+  ChevronDown, ChevronUp, LineChart, CookingPot, PackageOpen, MoreVertical 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,13 @@ import { useToast } from '@/hooks/use-toast';
 import MenuForm from './MenuForm';
 import MenuIngredientsView from './MenuIngredientsView';
 import MenuPriceHistory from './MenuPriceHistory';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
 
 interface Menu {
   id: string;
@@ -197,10 +204,66 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
     return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(amount);
   };
 
+  // 모바일 카드 아이템 렌더링
+  const renderMobileCard = (menu: Menu) => (
+    <div className="p-3 border-b border-gray-200 last:border-0">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="font-semibold text-base">{menu.name}</h3>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleViewIngredients(menu)}>
+              <PackageOpen className="h-4 w-4 mr-2" />
+              <span>식재료 보기</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleViewPriceHistory(menu)}>
+              <LineChart className="h-4 w-4 mr-2" />
+              <span>가격 이력</span>
+            </DropdownMenuItem>
+            {isOwnerOrAdmin && (
+              <>
+                <DropdownMenuItem onClick={() => handleEditMenu(menu)}>
+                  <FilePen className="h-4 w-4 mr-2" />
+                  <span>수정</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  className="text-red-500" 
+                  onClick={() => handleDeleteConfirm(menu)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  <span>삭제</span>
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="flex items-center">
+          <Badge variant="outline" className="mr-2 px-1.5">원가</Badge>
+          <span>{formatCurrency(menu.cost_price)}</span>
+        </div>
+        <div className="flex items-center">
+          <Badge variant="outline" className="mr-2 px-1.5">판매가</Badge>
+          <span>{formatCurrency(menu.selling_price)}</span>
+        </div>
+        {menu.description && (
+          <div className="col-span-2 mt-1 text-gray-600">
+            {menu.description}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-2 w-[320px]">
+    <div className="p-2 sm:p-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 mb-4 sm:mb-6">
+        <div className="flex items-center gap-2 w-full sm:w-[320px]">
           <Search className="w-4 h-4 text-gray-500" />
           <Input
             placeholder="메뉴 검색"
@@ -209,13 +272,29 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
             className="w-full"
           />
         </div>
-        <Button onClick={handleAddMenu}>
+        <Button onClick={handleAddMenu} className="w-full sm:w-auto mt-2 sm:mt-0">
           <Plus className="mr-2 h-4 w-4" /> 메뉴 추가
         </Button>
       </div>
 
       <Card>
-        <div className="overflow-x-auto">
+        {/* 모바일 뷰 - 카드 형태로 표시 */}
+        <div className="block sm:hidden">
+          {isLoading ? (
+            <div className="p-4 text-center text-gray-500">로딩 중...</div>
+          ) : filteredMenus.length === 0 ? (
+            <div className="p-4 text-center text-gray-500">
+              {searchQuery ? '검색 결과가 없습니다.' : '등록된 메뉴가 없습니다.'}
+            </div>
+          ) : (
+            <div>
+              {filteredMenus.map(menu => renderMobileCard(menu))}
+            </div>
+          )}
+        </div>
+
+        {/* 데스크톱 뷰 - 테이블 형태로 표시 */}
+        <div className="hidden sm:block overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -258,86 +337,53 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                     )}
                   </div>
                 </TableHead>
-                <TableHead>마진율</TableHead>
                 <TableHead>설명</TableHead>
-                <TableHead className="w-[180px] text-right">작업</TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
-                    로딩 중...
-                  </TableCell>
+                  <TableCell colSpan={5} className="text-center">로딩 중...</TableCell>
                 </TableRow>
               ) : filteredMenus.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
+                  <TableCell colSpan={5} className="text-center">
                     {searchQuery ? '검색 결과가 없습니다.' : '등록된 메뉴가 없습니다.'}
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredMenus.map((menu) => {
-                  // 마진율 계산 (마진 / 판매가) * 100
-                  const margin = menu.selling_price - menu.cost_price;
-                  const marginPercent = menu.selling_price > 0 
-                    ? ((margin / menu.selling_price) * 100).toFixed(1) 
-                    : '0.0';
-                  
-                  return (
-                    <TableRow key={menu.id}>
-                      <TableCell className="font-medium">{menu.name}</TableCell>
-                      <TableCell>{formatCurrency(menu.cost_price)}</TableCell>
-                      <TableCell>{formatCurrency(menu.selling_price)}</TableCell>
-                      <TableCell>{marginPercent}%</TableCell>
-                      <TableCell>
-                        {menu.description ? (
-                          <div className="max-w-[200px] truncate">
-                            {menu.description}
-                          </div>
-                        ) : '-'}
-                      </TableCell>
-                      <TableCell className="flex justify-end gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="icon" 
-                          onClick={() => handleViewPriceHistory(menu)}
-                          title="가격 이력 보기"
-                        >
-                          <LineChart className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="icon" 
-                          onClick={() => handleViewIngredients(menu)}
-                          title="재료 보기"
-                        >
+                filteredMenus.map(menu => (
+                  <TableRow key={menu.id}>
+                    <TableCell className="font-medium">{menu.name}</TableCell>
+                    <TableCell>{formatCurrency(menu.cost_price)}</TableCell>
+                    <TableCell>{formatCurrency(menu.selling_price)}</TableCell>
+                    <TableCell>
+                      {menu.description || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1 justify-end">
+                        <Button variant="ghost" size="icon" onClick={() => handleViewIngredients(menu)}>
                           <PackageOpen className="h-4 w-4" />
                         </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleViewPriceHistory(menu)}>
+                          <LineChart className="h-4 w-4" />
+                        </Button>
+                        
                         {isOwnerOrAdmin && (
                           <>
-                            <Button 
-                              variant="outline" 
-                              size="icon" 
-                              onClick={() => handleEditMenu(menu)}
-                              title="수정하기"
-                            >
+                            <Button variant="ghost" size="icon" onClick={() => handleEditMenu(menu)}>
                               <FilePen className="h-4 w-4" />
                             </Button>
-                            <Button 
-                              variant="outline" 
-                              size="icon"
-                              onClick={() => handleDeleteConfirm(menu)}
-                              title="삭제하기"
-                            >
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteConfirm(menu)}>
                               <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
                           </>
                         )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
@@ -346,11 +392,9 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
 
       {/* 메뉴 추가/수정 모달 */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {modalMode === 'create' ? '메뉴 추가' : '메뉴 수정'}
-            </DialogTitle>
+            <DialogTitle>{modalMode === 'create' ? '메뉴 추가' : '메뉴 수정'}</DialogTitle>
           </DialogHeader>
           <MenuForm
             companyId={companyId}
@@ -362,44 +406,11 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
         </DialogContent>
       </Dialog>
 
-      {/* 메뉴 삭제 확인 모달 */}
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>메뉴 삭제 확인</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <p>
-              <span className="font-bold">{menuToDelete?.name}</span> 메뉴를 정말 삭제하시겠습니까?
-            </p>
-            <p className="text-sm text-gray-500 mt-2">
-              이 작업은 되돌릴 수 없으며, 관련된 모든 데이터가 영구적으로 삭제됩니다.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteConfirmOpen(false)}
-            >
-              취소
-            </Button>
-            <Button 
-              variant="destructive"
-              onClick={handleDeleteMenu}
-            >
-              삭제
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 식재료 보기 모달 */}
+      {/* 재료 보기 모달 */}
       <Dialog open={ingredientsModalOpen} onOpenChange={setIngredientsModalOpen}>
-        <DialogContent className="sm:max-w-[700px]">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              식재료 구성: {selectedMenu?.name}
-            </DialogTitle>
+            <DialogTitle>메뉴 식재료 - {selectedMenu?.name}</DialogTitle>
           </DialogHeader>
           {selectedMenu && (
             <MenuIngredientsView
@@ -410,20 +421,35 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
         </DialogContent>
       </Dialog>
 
-      {/* 메뉴 가격 이력 모달 */}
+      {/* 가격 이력 모달 */}
       <Dialog open={historyModalOpen} onOpenChange={setHistoryModalOpen}>
-        <DialogContent className="sm:max-w-[700px]">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              가격 이력: {selectedMenu?.name}
-            </DialogTitle>
+            <DialogTitle>가격 이력 - {selectedMenu?.name}</DialogTitle>
           </DialogHeader>
           {selectedMenu && (
-            <MenuPriceHistory 
+            <MenuPriceHistory
               companyId={companyId}
               menuId={selectedMenu.id}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>메뉴 삭제</DialogTitle>
+          </DialogHeader>
+          <p className="py-4">
+            정말로 <span className="font-semibold">{menuToDelete?.name}</span> 메뉴를 삭제하시겠습니까?<br />
+            이 작업은 되돌릴 수 없습니다.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>취소</Button>
+            <Button variant="destructive" onClick={handleDeleteMenu}>삭제</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

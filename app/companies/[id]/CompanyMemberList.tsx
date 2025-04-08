@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { CompanyMembership, CompanyMemberRole, UserProfile } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
-import { UserRoundIcon, ShieldCheck, Crown, UserPlus, X, LogOut } from 'lucide-react';
+import { UserRoundIcon, ShieldCheck, Crown, UserPlus, X, LogOut, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -15,6 +15,12 @@ import {
   DialogFooter 
 } from '@/components/ui/dialog';
 import Image from 'next/image';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 
 interface CompanyMemberListProps {
   companyId: string;
@@ -224,18 +230,20 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
   };
   
   return (
-    <div className="bg-white shadow rounded-lg p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-bold">회사 멤버</h2>
-        <div className="flex gap-2">
+    <div className="bg-white shadow-sm rounded-lg">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 p-3 sm:p-4">
+        <h2 className="text-lg sm:text-xl font-bold mb-2 sm:mb-0">회사 멤버</h2>
+        
+        {/* 모바일용 액션 버튼 */}
+        <div className="flex flex-wrap gap-2">
           {currentUserMembership && currentUser && (
             <Button
               variant="outline"
               size="sm"
               onClick={openLeaveConfirm}
-              className="flex items-center text-red-500 border-red-200 hover:bg-red-50"
+              className="flex items-center text-red-500 border-red-200 hover:bg-red-50 text-xs sm:text-sm"
             >
-              <LogOut className="w-4 h-4 mr-2" />
+              <LogOut className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               회사 탈퇴
             </Button>
           )}
@@ -244,9 +252,9 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
               variant="outline"
               size="sm"
               onClick={() => window.location.href = `/companies/${companyId}/invite`}
-              className="flex items-center"
+              className="flex items-center text-xs sm:text-sm"
             >
-              <UserPlus className="w-4 h-4 mr-2" />
+              <UserPlus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               멤버 초대
             </Button>
           )}
@@ -254,92 +262,157 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
       </div>
       
       {isLoading ? (
-        <div className="text-center py-4">멤버 정보를 불러오는 중...</div>
+        <div className="flex justify-center items-center p-8">
+          <p className="text-gray-500">멤버 정보를 불러오는 중...</p>
+        </div>
       ) : error ? (
-        <div className="text-center py-4 text-red-500">{error}</div>
+        <div className="p-4 text-red-500 text-center">
+          {error}
+        </div>
+      ) : membersWithUsers.length === 0 ? (
+        <div className="p-4 text-gray-500 text-center">
+          멤버가 없습니다.
+        </div>
       ) : (
-        <div className="divide-y">
-          {membersWithUsers.length === 0 ? (
-            <div className="text-center py-4 text-gray-500">멤버가 없습니다.</div>
-          ) : (
-            membersWithUsers.map((member) => (
-              <div 
-                key={member.membership.id} 
-                className="py-4 flex items-center justify-between"
-              >
-                <div className="flex items-center">
-                  <div className="bg-gray-100 p-2 rounded-full mr-3">
-                    {member.imageUrl ? (
-                      <Image 
-                        src={member.imageUrl} 
-                        alt={member.displayName} 
-                        width={32}
-                        height={32}
-                        className="rounded-full"
-                      />
-                    ) : (
-                      <UserRoundIcon className="w-8 h-8 text-gray-500" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-medium">{member.displayName}</div>
-                    <div className="text-sm text-gray-500">{member.email}</div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center">
-                  <div className="bg-gray-100 px-3 py-1 rounded-full flex items-center mr-2">
-                    {getRoleIcon(member.membership.role)}
-                    <span className="ml-1 text-sm">{getRoleName(member.membership.role)}</span>
-                  </div>
-                  
-                  {isOwner && member.membership.user_id !== currentUser?.id && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-red-500"
-                      onClick={() => openDeleteConfirm(member)}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  멤버
+                </th>
+                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                  이메일
+                </th>
+                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  역할
+                </th>
+                {isAdmin && (
+                  <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <span className="sr-only">액션</span>
+                  </th>
+                )}
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {membersWithUsers.map((member) => (
+                <tr key={member.membership.id} className="hover:bg-gray-50">
+                  <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10 relative rounded-full overflow-hidden bg-gray-100">
+                        {member.imageUrl ? (
+                          <Image
+                            src={member.imageUrl}
+                            alt={member.displayName}
+                            fill
+                            className="rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center bg-gray-200">
+                            <UserRoundIcon className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="ml-2 sm:ml-4">
+                        <div className="text-xs sm:text-sm font-medium text-gray-900">
+                          {member.displayName}
+                        </div>
+                        <div className="text-xs text-gray-500 sm:hidden">
+                          {member.email}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap hidden sm:table-cell">
+                    <div className="text-xs sm:text-sm text-gray-500">{member.email}</div>
+                  </td>
+                  <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <span className="mr-1">{getRoleIcon(member.membership.role)}</span>
+                      <span className="text-xs sm:text-sm text-gray-700">
+                        {getRoleName(member.membership.role)}
+                      </span>
+                    </div>
+                  </td>
+                  {isAdmin && (
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
+                      {/* 데스크톱 버전 - 삭제 버튼 표시 */}
+                      <div className="hidden sm:block">
+                        {(isOwner || (isAdmin && member.membership.role !== 'owner')) && 
+                          member.membership.user_id !== currentUser?.id && (
+                          <button
+                            onClick={() => openDeleteConfirm(member)}
+                            className="text-red-500 hover:text-red-700"
+                            disabled={isProcessing}
+                          >
+                            삭제
+                          </button>
+                        )}
+                      </div>
+                      
+                      {/* 모바일 버전 - 드롭다운 메뉴 */}
+                      <div className="sm:hidden">
+                        {(isOwner || (isAdmin && member.membership.role !== 'owner')) && 
+                          member.membership.user_id !== currentUser?.id && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem 
+                                className="text-red-500 cursor-pointer"
+                                onClick={() => openDeleteConfirm(member)}
+                              >
+                                삭제
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                    </td>
                   )}
-                </div>
-              </div>
-            ))
-          )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
       
-      {/* 확인 다이얼로그 */}
+      {/* 회원 삭제 확인 다이얼로그 */}
       <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {isLeaving ? '회사 탈퇴' : '멤버 삭제'}
+              {isLeaving ? '회사 탈퇴 확인' : '멤버 삭제 확인'}
             </DialogTitle>
             <DialogDescription>
-              {isLeaving ? 
-                '정말 이 회사에서 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.' : 
-                `정말 ${memberToDelete?.displayName} 멤버를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`
-              }
+              {isLeaving 
+                ? '정말로 이 회사에서 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.'
+                : `정말로 ${memberToDelete?.displayName} 멤버를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button 
-              variant="outline" 
+          
+          <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
+            <Button
+              type="button"
+              variant="outline"
               onClick={() => setIsConfirmDialogOpen(false)}
               disabled={isProcessing}
+              className="mt-2 sm:mt-0"
             >
               취소
             </Button>
-            <Button 
+            <Button
+              type="button"
               variant="destructive"
-              onClick={() => 
-                isLeaving ? 
-                  deleteMember(currentUser?.id || '') : 
-                  memberToDelete ? deleteMember(memberToDelete.membership.user_id) : null
+              onClick={() => isLeaving 
+                ? deleteMember(currentUser!.id) 
+                : deleteMember(memberToDelete!.membership.user_id)
               }
               disabled={isProcessing}
+              className="mt-2 sm:mt-0"
             >
               {isProcessing ? '처리 중...' : isLeaving ? '탈퇴하기' : '삭제하기'}
             </Button>

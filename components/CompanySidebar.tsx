@@ -4,18 +4,20 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Building, Plus, Users, Settings, ChevronDown, ChevronRight, BookOpen, ClipboardList, Search, Mail, LogOut } from 'lucide-react';
+import { Building, Plus, Users, Settings, ChevronDown, ChevronRight, BookOpen, ClipboardList, Search, Mail, LogOut, Menu, X } from 'lucide-react';
 import { Company } from '@/lib/types';
 import { useUser, UserButton } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 interface CompanySidebarProps {
   companies: Array<Company & { role: string }>;
+  isMobile?: boolean;
 }
 
-export function CompanySidebar({ companies }: CompanySidebarProps) {
+export function CompanySidebar({ companies, isMobile = false }: CompanySidebarProps) {
   const pathname = usePathname();
   const { user } = useUser();
   const [expandedCompanyId, setExpandedCompanyId] = useState<string | null>(
@@ -24,6 +26,7 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
   );
   const [joinRequestCounts, setJoinRequestCounts] = useState<Record<string, number>>({});
   const [companyFeatures, setCompanyFeatures] = useState<Record<string, string[]>>({});
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   // 사용자 권한 확인 (회사 생성 권한 체크)
   const userRole = user?.publicMetadata?.role as string;
@@ -147,13 +150,29 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
     return companyFeatures[companyId]?.includes(featureName) || false;
   };
 
-  return (
+  // 모바일 사이드바 닫기 (링크 클릭 시)
+  const handleLinkClick = () => {
+    if (isMobile) {
+      setIsSheetOpen(false);
+    }
+  };
+
+  // 사이드바 내용
+  const renderSidebarContent = () => (
     <div className="py-2 text-gray-300 h-full flex flex-col">
       {/* 앱 로고 및 사용자 프로필 */}
-      <div className="px-4 py-3">
+      <div className="px-4 py-3 flex justify-between items-center">
         <Link href="/" className="text-white font-bold text-xl flex items-center">
           LunchLab
         </Link>
+        {isMobile && (
+          <button 
+            onClick={() => setIsSheetOpen(false)}
+            className="text-gray-400 hover:text-white"
+          >
+            <X size={24} />
+          </button>
+        )}
       </div>
       
       {/* 사용자 프로필 */}
@@ -227,6 +246,7 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
                             ? "bg-[#1164A3] text-white" 
                             : "hover:bg-gray-700"
                         )}
+                        onClick={handleLinkClick}
                       >
                         <span className="text-gray-400 mr-2">#</span>
                         일반
@@ -243,6 +263,7 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
                             ? "bg-[#1164A3] text-white" 
                             : "hover:bg-gray-700"
                         )}
+                        onClick={handleLinkClick}
                       >
                         <Users className="h-3.5 w-3.5 mr-2 text-gray-400" />
                         <span>멤버</span>
@@ -265,6 +286,7 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
                               ? "bg-[#1164A3] text-white" 
                               : "hover:bg-gray-700"
                           )}
+                          onClick={handleLinkClick}
                         >
                           <ClipboardList className="h-3.5 w-3.5 mr-2 text-gray-400" />
                           <span>식자재/메뉴</span>
@@ -281,6 +303,7 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
                               ? "bg-[#1164A3] text-white" 
                               : "hover:bg-gray-700"
                           )}
+                          onClick={handleLinkClick}
                         >
                           <Settings className="h-3.5 w-3.5 mr-2 text-gray-400" />
                           <span>설정</span>
@@ -304,6 +327,7 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
           <Link 
             href="/companies/new" 
             className="flex items-center px-3 py-2 text-sm rounded hover:bg-gray-700 text-gray-300 transition-colors duration-150 mb-2"
+            onClick={handleLinkClick}
           >
             <Plus className="h-4 w-4 mr-2" />
             새 회사 추가
@@ -314,6 +338,7 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
         <Link 
           href="/invitations" 
           className="flex items-center px-3 py-2 text-sm rounded hover:bg-gray-700 text-gray-300 transition-colors duration-150 mb-2"
+          onClick={handleLinkClick}
         >
           <Mail className="h-4 w-4 mr-2" />
           초대 관리
@@ -323,6 +348,7 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
         <Link 
           href="/companies/search" 
           className="flex items-center px-3 py-2 text-sm rounded hover:bg-gray-700 text-gray-300 transition-colors duration-150"
+          onClick={handleLinkClick}
         >
           <Search className="h-4 w-4 mr-2" />
           회사 검색
@@ -332,6 +358,7 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
         <Link 
           href="/" 
           className="flex items-center px-3 py-2 text-sm rounded hover:bg-gray-700 text-gray-300 transition-colors duration-150 mt-2"
+          onClick={handleLinkClick}
         >
           <LogOut className="h-4 w-4 mr-2" />
           홈으로 돌아가기
@@ -339,4 +366,32 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
       </div>
     </div>
   );
+
+  // 모바일 뷰
+  if (isMobile) {
+    // 모바일 헤더 (축소된 메뉴 표시)
+    return (
+      <div className="bg-[#19171D] text-white p-2">
+        <div className="flex items-center justify-between">
+          <Link href="/" className="text-white font-bold text-xl">
+            LunchLab
+          </Link>
+          
+          <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+            <SheetTrigger asChild>
+              <button className="p-2 hover:bg-gray-700 rounded">
+                <Menu size={24} />
+              </button>
+            </SheetTrigger>
+            <SheetContent side="left" className="p-0 bg-[#19171D] border-r border-gray-700 w-[280px] sm:w-[320px]">
+              {renderSidebarContent()}
+            </SheetContent>
+          </Sheet>
+        </div>
+      </div>
+    );
+  }
+
+  // 데스크톱 뷰
+  return renderSidebarContent();
 } 

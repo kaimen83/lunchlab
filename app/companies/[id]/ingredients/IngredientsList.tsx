@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Plus, FilePen, Trash2, Search, PackageOpen, 
-  ChevronDown, ChevronUp, LineChart 
+  ChevronDown, ChevronUp, LineChart, MoreVertical, Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { useToast } from '@/hooks/use-toast';
 import IngredientForm from './IngredientForm';
 import IngredientPriceHistory from './IngredientPriceHistory';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
 
 interface Ingredient {
   id: string;
@@ -195,10 +202,62 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
     return new Intl.NumberFormat('ko-KR').format(number);
   };
 
+  // 모바일 카드 아이템 렌더링
+  const renderMobileCard = (ingredient: Ingredient) => (
+    <div className="p-3 border-b border-gray-200 last:border-0">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="font-semibold text-base">{ingredient.name}</h3>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleViewPriceHistory(ingredient)}>
+              <LineChart className="h-4 w-4 mr-2" />
+              <span>가격 이력</span>
+            </DropdownMenuItem>
+            {isOwnerOrAdmin && (
+              <>
+                <DropdownMenuItem onClick={() => handleEditIngredient(ingredient)}>
+                  <FilePen className="h-4 w-4 mr-2" />
+                  <span>수정</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  className="text-red-500" 
+                  onClick={() => handleDeleteConfirm(ingredient)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  <span>삭제</span>
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="flex items-center">
+          <Badge variant="outline" className="mr-2 px-1.5">포장량</Badge>
+          <span>{formatNumber(ingredient.package_amount)} {ingredient.unit}</span>
+        </div>
+        <div className="flex items-center">
+          <Badge variant="outline" className="mr-2 px-1.5">가격</Badge>
+          <span>{formatCurrency(ingredient.price)}</span>
+        </div>
+        {ingredient.memo1 && (
+          <div className="col-span-2 mt-1 text-gray-600">
+            {ingredient.memo1}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-2 w-[320px]">
+    <div className="p-2 sm:p-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 mb-4 sm:mb-6">
+        <div className="flex items-center gap-2 w-full sm:w-[320px]">
           <Search className="w-4 h-4 text-gray-500" />
           <Input
             placeholder="식재료 검색"
@@ -207,13 +266,29 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
             className="w-full"
           />
         </div>
-        <Button onClick={handleAddIngredient}>
+        <Button onClick={handleAddIngredient} className="w-full sm:w-auto mt-2 sm:mt-0">
           <Plus className="mr-2 h-4 w-4" /> 식재료 추가
         </Button>
       </div>
 
       <Card>
-        <div className="overflow-x-auto">
+        {/* 모바일 뷰 - 카드 형태로 표시 */}
+        <div className="block sm:hidden">
+          {isLoading ? (
+            <div className="p-4 text-center text-gray-500">로딩 중...</div>
+          ) : filteredIngredients.length === 0 ? (
+            <div className="p-4 text-center text-gray-500">
+              {searchQuery ? '검색 결과가 없습니다.' : '등록된 식재료가 없습니다.'}
+            </div>
+          ) : (
+            <div>
+              {filteredIngredients.map(ingredient => renderMobileCard(ingredient))}
+            </div>
+          )}
+        </div>
+
+        {/* 데스크톱 뷰 - 테이블 형태로 표시 */}
+        <div className="hidden sm:block overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -258,67 +333,47 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
                   </div>
                 </TableHead>
                 <TableHead>메모</TableHead>
-                <TableHead className="w-[160px] text-right">작업</TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
-                    로딩 중...
-                  </TableCell>
+                  <TableCell colSpan={6} className="text-center">로딩 중...</TableCell>
                 </TableRow>
               ) : filteredIngredients.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
+                  <TableCell colSpan={6} className="text-center">
                     {searchQuery ? '검색 결과가 없습니다.' : '등록된 식재료가 없습니다.'}
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredIngredients.map((ingredient) => (
+                filteredIngredients.map(ingredient => (
                   <TableRow key={ingredient.id}>
                     <TableCell className="font-medium">{ingredient.name}</TableCell>
                     <TableCell>{formatNumber(ingredient.package_amount)}</TableCell>
                     <TableCell>{ingredient.unit}</TableCell>
                     <TableCell>{formatCurrency(ingredient.price)}</TableCell>
                     <TableCell>
-                      {ingredient.memo1 || ingredient.memo2 ? (
-                        <div className="max-w-[200px] truncate">
-                          {ingredient.memo1}
-                          {ingredient.memo1 && ingredient.memo2 && ', '}
-                          {ingredient.memo2}
-                        </div>
-                      ) : '-'}
+                      {ingredient.memo1 || '-'}
                     </TableCell>
-                    <TableCell className="flex justify-end gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        onClick={() => handleViewPriceHistory(ingredient)}
-                        title="가격 이력 보기"
-                      >
-                        <LineChart className="h-4 w-4" />
-                      </Button>
-                      {isOwnerOrAdmin && (
-                        <>
-                          <Button 
-                            variant="outline" 
-                            size="icon" 
-                            onClick={() => handleEditIngredient(ingredient)}
-                            title="수정하기"
-                          >
-                            <FilePen className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="icon"
-                            onClick={() => handleDeleteConfirm(ingredient)}
-                            title="삭제하기"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </>
-                      )}
+                    <TableCell>
+                      <div className="flex gap-1 justify-end">
+                        <Button variant="ghost" size="icon" onClick={() => handleViewPriceHistory(ingredient)}>
+                          <LineChart className="h-4 w-4" />
+                        </Button>
+                        
+                        {isOwnerOrAdmin && (
+                          <>
+                            <Button variant="ghost" size="icon" onClick={() => handleEditIngredient(ingredient)}>
+                              <FilePen className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteConfirm(ingredient)}>
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -330,11 +385,9 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
 
       {/* 식재료 추가/수정 모달 */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-[550px]">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {modalMode === 'create' ? '식재료 추가' : '식재료 수정'}
-            </DialogTitle>
+            <DialogTitle>{modalMode === 'create' ? '식재료 추가' : '식재료 수정'}</DialogTitle>
           </DialogHeader>
           <IngredientForm
             companyId={companyId}
@@ -346,51 +399,35 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
         </DialogContent>
       </Dialog>
 
-      {/* 식재료 삭제 확인 모달 */}
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>식재료 삭제 확인</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <p>
-              <span className="font-bold">{ingredientToDelete?.name}</span> 식재료를 정말 삭제하시겠습니까?
-            </p>
-            <p className="text-sm text-gray-500 mt-2">
-              이 작업은 되돌릴 수 없으며, 관련된 모든 데이터가 영구적으로 삭제됩니다.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteConfirmOpen(false)}
-            >
-              취소
-            </Button>
-            <Button 
-              variant="destructive"
-              onClick={handleDeleteIngredient}
-            >
-              삭제
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 식재료 가격 이력 모달 */}
+      {/* 가격 이력 모달 */}
       <Dialog open={historyModalOpen} onOpenChange={setHistoryModalOpen}>
-        <DialogContent className="sm:max-w-[700px]">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              가격 이력: {selectedIngredient?.name}
-            </DialogTitle>
+            <DialogTitle>가격 이력 - {selectedIngredient?.name}</DialogTitle>
           </DialogHeader>
           {selectedIngredient && (
-            <IngredientPriceHistory 
+            <IngredientPriceHistory
               companyId={companyId}
               ingredientId={selectedIngredient.id}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>식재료 삭제</DialogTitle>
+          </DialogHeader>
+          <p className="py-4">
+            정말로 <span className="font-semibold">{ingredientToDelete?.name}</span> 식재료를 삭제하시겠습니까?<br />
+            이 작업은 되돌릴 수 없습니다.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>취소</Button>
+            <Button variant="destructive" onClick={handleDeleteIngredient}>삭제</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
