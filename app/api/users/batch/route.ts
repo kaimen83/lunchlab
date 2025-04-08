@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { clerkClient } from '@clerk/nextjs/server';
+import { UserProfile } from '@/lib/types';
 
 export async function POST(req: Request) {
   try {
@@ -34,7 +35,9 @@ export async function POST(req: Request) {
       firstName: user.firstName,
       lastName: user.lastName,
       imageUrl: user.imageUrl,
-      email: user.emailAddresses[0]?.emailAddress
+      email: user.emailAddresses[0]?.emailAddress,
+      profileCompleted: !!user.publicMetadata.profileCompleted,
+      profile: user.publicMetadata.profile as UserProfile || null
     }));
     
     return NextResponse.json({ users: simplifiedUsers });

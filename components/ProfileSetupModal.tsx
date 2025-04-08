@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@clerk/nextjs';
+import { UserProfile } from '@/lib/types';
 
 export function ProfileSetupModal() {
   const { user } = useUser();
@@ -13,10 +14,32 @@ export function ProfileSetupModal() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    name: user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : '',
+    name: '',
     phoneNumber: '',
     affiliation: ''
   });
+
+  // 사용자 프로필 정보 불러오기
+  useEffect(() => {
+    if (user) {
+      // 기존 사용자 프로필 정보가 있으면 사용
+      const userProfile = user.publicMetadata.profile as UserProfile | undefined;
+      if (userProfile?.name) {
+        setFormData(prev => ({
+          ...prev,
+          name: userProfile.name,
+          phoneNumber: userProfile.phoneNumber || prev.phoneNumber,
+          affiliation: userProfile.affiliation || prev.affiliation
+        }));
+      } else {
+        // 프로필 정보가 없으면 Clerk 이름으로 초기화
+        setFormData(prev => ({
+          ...prev,
+          name: user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : '',
+        }));
+      }
+    }
+  }, [user]);
 
   // 모달이 닫히지 않도록 함
   const handleOpenChange = (open: boolean) => {

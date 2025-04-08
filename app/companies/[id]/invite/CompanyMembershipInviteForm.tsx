@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CompanyMembership, CompanyMemberRole } from '@/lib/types';
+import { CompanyMembership, CompanyMemberRole, UserProfile } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +22,8 @@ interface User {
   lastName: string | null;
   email: string;
   imageUrl: string;
+  profile?: UserProfile | null;
+  profileCompleted?: boolean;
 }
 
 interface CompanyMembershipInviteFormProps {
@@ -72,6 +74,22 @@ export function CompanyMembershipInviteForm({
     } finally {
       setIsSearching(false);
     }
+  };
+  
+  // 사용자 표시 이름 가져오기
+  const getUserDisplayName = (user: User) => {
+    // 프로젝트 사용자 프로필이 있는 경우 우선 사용
+    if (user.profileCompleted && user.profile?.name) {
+      return user.profile.name;
+    }
+    
+    // 없으면 Clerk 이름 사용
+    if (user.firstName || user.lastName) {
+      return `${user.firstName || ''} ${user.lastName || ''}`.trim();
+    }
+    
+    // 이름이 없는 경우
+    return '이름 없음';
   };
   
   // 폼 제출 처리
@@ -189,7 +207,7 @@ export function CompanyMembershipInviteForm({
                     {user.imageUrl ? (
                       <Image
                         src={user.imageUrl}
-                        alt={`${user.firstName || ''} ${user.lastName || ''}`}
+                        alt={getUserDisplayName(user)}
                         width={32}
                         height={32}
                         className="rounded-full"
@@ -200,7 +218,7 @@ export function CompanyMembershipInviteForm({
                   </div>
                   <div>
                     <div className="font-medium">
-                      {`${user.firstName || ''} ${user.lastName || ''}`.trim() || '이름 없음'}
+                      {getUserDisplayName(user)}
                     </div>
                     <div className="text-sm text-gray-500">{user.email}</div>
                   </div>

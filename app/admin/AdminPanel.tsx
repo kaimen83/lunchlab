@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { UserRole } from '@/lib/types';
+import { UserRole, UserProfile } from '@/lib/types';
 import { 
   Table, 
   TableBody, 
@@ -12,7 +12,6 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { updateUserRole } from '@/lib/clerk';
 import { useRouter } from 'next/navigation';
 import { 
   Dialog,
@@ -22,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { toast } from "@/hooks/use-toast";
 
 interface User {
   id: string;
@@ -32,6 +32,8 @@ interface User {
   imageUrl: string;
   role: UserRole;
   createdAt: string;
+  profileCompleted?: boolean;
+  profile?: UserProfile;
 }
 
 interface AdminPanelProps {
@@ -49,13 +51,31 @@ export default function AdminPanel({ users }: AdminPanelProps) {
     if (!selectedUser) return;
     
     setIsUpdating(true);
+    
     try {
-      await updateUserRole(selectedUser.id, selectedRole);
+      const response = await fetch(`/api/admin/users/${selectedUser.id}/role`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ role: selectedRole }),
+      });
+      
+      if (!response.ok) throw new Error('역할 변경에 실패했습니다.');
+      
+      toast({
+        title: "권한 변경 완료",
+        description: "사용자 권한이 성공적으로 변경되었습니다."
+      });
       setDialogOpen(false);
-      router.refresh(); // 페이지 데이터 새로고침
+      router.refresh();
     } catch (error) {
-      console.error('Error updating user role:', error);
-      alert('권한 변경 중 오류가 발생했습니다.');
+      console.error(error);
+      toast({
+        title: "오류 발생",
+        description: "권한 변경 중 오류가 발생했습니다.",
+        variant: "destructive"
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -68,16 +88,34 @@ export default function AdminPanel({ users }: AdminPanelProps) {
   };
 
   const getRoleName = (role: UserRole): string => {
-    const roleMap: Record<UserRole, string> = {
-      headAdmin: '최고 관리자',
-      user: '일반사용자',
-      tester: '테스터'
-    };
-    return roleMap[role] || '일반사용자';
+    switch (role) {
+      case 'headAdmin': return '최고 관리자';
+      case 'user': return '일반 사용자';
+      case 'tester': return '테스터';
+      default: return '알 수 없음';
+    }
+  };
+
+  const getUserDisplayName = (user: User): string => {
+    if (user.profileCompleted && user.profile?.name) {
+      return user.profile.name;
+    }
+    
+    if (user.firstName || user.lastName) {
+      return `${user.firstName || ''} ${user.lastName || ''}`.trim();
+    }
+    
+    if (user.email) {
+      return user.email.split('@')[0];
+    }
+    
+    return '이름 없음';
   };
 
   return (
-    <div>
+    <div className="container mx-auto py-10">
+      <h1 className="text-2xl font-bold mb-6">관리자 페이지</h1>
+      
       <Table>
         <TableCaption>전체 사용자 목록</TableCaption>
         <TableHeader>
@@ -93,7 +131,7 @@ export default function AdminPanel({ users }: AdminPanelProps) {
           {users.map((user) => (
             <TableRow key={user.id}>
               <TableCell className="font-medium">
-                {user.firstName} {user.lastName}
+                {getUserDisplayName(user)}
               </TableCell>
               <TableCell>{user.email}</TableCell>
               <TableCell>{getRoleName(user.role)}</TableCell>

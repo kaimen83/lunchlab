@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CompanyMembership, CompanyMemberRole } from '@/lib/types';
+import { CompanyMembership, CompanyMemberRole, UserProfile } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
 import { UserRoundIcon, ShieldCheck, Crown, UserPlus, X, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,8 @@ interface UserInfo {
   lastName: string | null;
   email: string;
   imageUrl: string | null;
+  profileCompleted?: boolean;
+  profile?: UserProfile;
 }
 
 export function CompanyMemberList({ companyId, members, currentUserMembership }: CompanyMemberListProps) {
@@ -51,6 +53,27 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
   
   const isOwner = currentUserMembership?.role === 'owner';
   const isAdmin = currentUserMembership?.role === 'admin' || isOwner;
+  
+  // 사용자 표시 이름을 가져오는 함수
+  const getUserDisplayName = (userInfo: UserInfo): string => {
+    // 프로젝트 사용자 프로필이 있는 경우 우선 사용
+    if (userInfo.profileCompleted && userInfo.profile?.name) {
+      return userInfo.profile.name;
+    }
+    
+    // 없으면 Clerk 이름 사용
+    if (userInfo.firstName || userInfo.lastName) {
+      return `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim();
+    }
+    
+    // 이름이 없으면 이메일 또는 사용자명
+    if (userInfo.email) {
+      return userInfo.email.split('@')[0];
+    }
+    
+    // 아무것도 없는 경우
+    return '이름 없음';
+  };
   
   // 멤버 목록에 대한 사용자 정보 가져오기
   useEffect(() => {
@@ -86,11 +109,21 @@ export function CompanyMemberList({ companyId, members, currentUserMembership }:
         // 멤버십과 사용자 정보 결합
         const membersWithUserInfo = members.map((membership) => {
           const userInfo = data.users.find((u: UserInfo) => u.id === membership.user_id);
+          
+          if (!userInfo) {
+            return {
+              membership,
+              displayName: '알 수 없음',
+              email: '',
+              imageUrl: undefined,
+            };
+          }
+          
           return {
             membership,
-            displayName: userInfo ? `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim() : '알 수 없음',
-            email: userInfo?.email || '',
-            imageUrl: userInfo?.imageUrl,
+            displayName: getUserDisplayName(userInfo),
+            email: userInfo.email || '',
+            imageUrl: userInfo.imageUrl,
           };
         });
         

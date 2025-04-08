@@ -1,17 +1,28 @@
 'use client';
 
 import Link from 'next/link';
-import { UserButton, useUser } from '@clerk/nextjs';
+import { useUser, useClerk } from '@clerk/nextjs';
 import { useEffect, useState } from 'react';
-import { UserRole } from '@/lib/types';
+import { UserRole, UserProfile } from '@/lib/types';
 import { usePathname, useRouter } from 'next/navigation';
-import { Mail, Shield } from 'lucide-react';
+import { Mail, Shield, LogOut, User, Settings } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 
 export function Navbar() {
   const { user, isLoaded, isSignedIn } = useUser();
   const [role, setRole] = useState<UserRole | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const pathname = usePathname();
   const router = useRouter();
+  const { signOut } = useClerk();
   
   // companies 경로에서는 렌더링하지 않음
   const isCompaniesRoute = pathname?.startsWith('/companies');
@@ -21,6 +32,11 @@ export function Navbar() {
     if (isLoaded && user) {
       // 초기 역할 설정
       setRole(user.publicMetadata.role as UserRole || null);
+      
+      // 프로필 정보 설정
+      if (user.publicMetadata.profileCompleted && user.publicMetadata.profile) {
+        setUserProfile(user.publicMetadata.profile as UserProfile);
+      }
       
       // 메타데이터 변경 주기적 확인 (5초마다)
       const intervalId = setInterval(() => {
@@ -32,6 +48,11 @@ export function Navbar() {
             router.refresh();
           }
         }
+        
+        // 프로필 정보 업데이트
+        if (user.publicMetadata.profileCompleted && user.publicMetadata.profile) {
+          setUserProfile(user.publicMetadata.profile as UserProfile);
+        }
       }, 5000);
       
       return () => clearInterval(intervalId);
@@ -42,6 +63,11 @@ export function Navbar() {
   useEffect(() => {
     if (isLoaded && user) {
       setRole(user.publicMetadata.role as UserRole || null);
+      
+      // 프로필 정보 설정
+      if (user.publicMetadata.profileCompleted && user.publicMetadata.profile) {
+        setUserProfile(user.publicMetadata.profile as UserProfile);
+      }
     }
   }, [isLoaded, user, isSignedIn]);
 
@@ -54,6 +80,57 @@ export function Navbar() {
     return null;
   }
 
+  // 사용자 이니셜 생성
+  const getUserInitials = () => {
+    if (userProfile?.name) {
+      const nameParts = userProfile.name.split(' ');
+      if (nameParts.length >= 2) {
+        return (nameParts[0][0] + nameParts[1][0]).toUpperCase();
+      }
+      return userProfile.name.substring(0, 2).toUpperCase();
+    }
+    
+    if (user.firstName && user.lastName) {
+      return (user.firstName[0] + user.lastName[0]).toUpperCase();
+    }
+    
+    if (user.firstName) {
+      return user.firstName.substring(0, 2).toUpperCase();
+    }
+    
+    if (user.emailAddresses && user.emailAddresses.length > 0) {
+      return user.emailAddresses[0].emailAddress.substring(0, 2).toUpperCase();
+    }
+    
+    return 'UN';
+  };
+
+  // 사용자 표시 이름
+  const getDisplayName = () => {
+    if (userProfile?.name) {
+      return userProfile.name;
+    }
+    
+    if (user.firstName && user.lastName) {
+      return `${user.firstName} ${user.lastName}`;
+    }
+    
+    if (user.firstName) {
+      return user.firstName;
+    }
+    
+    if (user.emailAddresses && user.emailAddresses.length > 0) {
+      return user.emailAddresses[0].emailAddress.split('@')[0];
+    }
+    
+    return '사용자';
+  };
+
+  // 로그아웃 처리
+  const handleSignOut = async () => {
+    await signOut(() => router.push('/sign-in'));
+  };
+
   return (
     <header className="bg-white shadow">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -65,24 +142,62 @@ export function Navbar() {
               </Link>
             </div>
             <nav className="ml-6 flex items-center space-x-4">
-              <Link href="/" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">
-                홈
-              </Link>
               {role === 'headAdmin' && (
-                <Link href="/admin" className="px-3 py-2 rounded-md text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 flex items-center">
-                  <Shield className="w-4 h-4 mr-1" />
-                  관리자
+                <Link 
+                  href="/admin" 
+                  className="px-3 py-2 rounded-md text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 flex items-center"
+                >
+                  <Shield className="w-4 h-4 sm:mr-1" />
+                  <span className="hidden sm:inline">관리자</span>
                 </Link>
               )}
-              <Link href="/invitations" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 flex items-center">
-                <Mail className="w-4 h-4 mr-1" />
-                초대 관리
+              
+              <Link 
+                href="/invitations" 
+                className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 flex items-center"
+              >
+                <Mail className="w-4 h-4 sm:mr-1" />
+                <span className="hidden sm:inline">초대 관리</span>
               </Link>
             </nav>
           </div>
           <div className="flex items-center">
             <div className="ml-3 relative">
-              <UserButton afterSignOutUrl="/sign-in" />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center space-x-2 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <Avatar className="h-8 w-8 rounded-full">
+                      <AvatarImage src={user.imageUrl} alt={getDisplayName()} />
+                      <AvatarFallback className="bg-blue-600 text-white">{getUserInitials()}</AvatarFallback>
+                    </Avatar>
+                    <span className="hidden md:inline text-sm font-medium text-gray-800">{getDisplayName()}</span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{getDisplayName()}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {userProfile?.affiliation || user.emailAddresses[0]?.emailAddress}
+                      </span>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => router.push("/profile")}>
+                    <User className="mr-2 h-4 w-4" />
+                    <span>내 프로필</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push("/settings")}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>설정</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>로그아웃</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>

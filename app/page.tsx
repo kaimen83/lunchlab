@@ -5,6 +5,11 @@ import { getUserCompanies } from "@/lib/supabase-queries";
 import Link from "next/link";
 import { ProfileSetupModal } from "@/components/ProfileSetupModal";
 import { Building, Plus, ArrowRight, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 
 export default async function Home() {
   const { userId } = await auth();
@@ -30,16 +35,16 @@ export default async function Home() {
   // 프로필이 완료되지 않은 경우에만 모달 표시
   const showProfileModal = !profileCompleted;
 
-  // 역할에 따른 배지 스타일
-  const getRoleBadgeStyle = (role: string) => {
+  // 역할에 따른 배지 스타일과 색상
+  const getRoleBadgeVariant = (role: string) => {
     switch (role) {
       case 'owner':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'yellow';
       case 'admin':
-        return 'bg-blue-100 text-blue-800';
+        return 'blue';
       case 'member':
       default:
-        return 'bg-green-100 text-green-800';
+        return 'green';
     }
   };
 
@@ -57,97 +62,127 @@ export default async function Home() {
     }
   };
 
+  // 아바타 배경색 및 아바타 색상
+  const getAvatarColors = (companyName: string) => {
+    const colors = [
+      { bg: 'bg-blue-600', text: 'text-white' },
+      { bg: 'bg-indigo-600', text: 'text-white' },
+      { bg: 'bg-violet-600', text: 'text-white' },
+      { bg: 'bg-purple-600', text: 'text-white' },
+      { bg: 'bg-emerald-600', text: 'text-white' },
+      { bg: 'bg-rose-600', text: 'text-white' },
+      { bg: 'bg-amber-600', text: 'text-white' },
+      { bg: 'bg-cyan-600', text: 'text-white' }
+    ];
+    
+    // 회사 이름을 기반으로 일관된 색상 선택
+    const hash = companyName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return colors[hash % colors.length];
+  };
+
   return (
     <>
       {showProfileModal && <ProfileSetupModal />}
       
-      <div className="flex flex-col items-center justify-center pt-20 pb-10 px-4">
-        <h1 className="text-3xl font-bold mb-8">내 회사</h1>
+      <div className="container max-w-4xl mx-auto px-4 py-12 md:py-16">
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold mb-2">내 회사</h1>
+          <p className="text-muted-foreground">내가 속한 회사와 관리하는 회사 목록</p>
+        </div>
         
-        <div className="w-full max-w-xl">
-          {/* 회사 생성 및 검색 버튼 */}
-          <div className="mb-6 flex justify-end items-center space-x-2">
-            <Link 
-              href="/companies/search" 
-              className="bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded inline-flex items-center"
-            >
+        <div className="flex justify-end items-center gap-2 mb-6">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/companies/search">
               <Search className="w-4 h-4 mr-2" />
               회사 검색
             </Link>
-            
-            {userCanCreateCompany && (
-              <Link 
-                href="/companies/new" 
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center"
-              >
+          </Button>
+          
+          {userCanCreateCompany && (
+            <Button size="sm" asChild>
+              <Link href="/companies/new">
                 <Plus className="w-4 h-4 mr-2" />
                 새 회사 생성
               </Link>
-            )}
-          </div>
-          
-          {/* 내 회사 목록 - Slack 스타일 */}
-          {companies.length === 0 ? (
-            <div className="bg-white shadow-lg rounded-lg p-8 text-center">
-              <Building className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-medium text-gray-900 mb-2">아직 회사가 없습니다</h3>
-              <p className="text-gray-500 mb-6">
-                새 회사를 생성하거나 기존 회사에 참여하세요.
-              </p>
-              <div className="flex justify-center space-x-3">
-                <Link 
-                  href="/companies/search" 
-                  className="bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-2 px-4 rounded inline-flex items-center"
-                >
-                  <Search className="w-4 h-4 mr-2" />
-                  회사 검색
-                </Link>
-                
-                {userCanCreateCompany && (
-                  <Link 
-                    href="/companies/new" 
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded inline-flex items-center"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    새 회사 생성
-                  </Link>
-                )}
+            </Button>
+          )}
+        </div>
+
+        <Separator className="my-4" />
+        
+        {companies.length === 0 ? (
+          <Card className="text-center bg-muted/30">
+            <CardContent className="pt-10 pb-10">
+              <div className="flex flex-col items-center">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <Building className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <CardTitle className="text-xl mb-2">아직 회사가 없습니다</CardTitle>
+                <CardDescription className="mb-6 max-w-sm mx-auto">
+                  새 회사를 생성하거나 기존 회사에 참여하세요.
+                </CardDescription>
+                <div className="flex flex-wrap justify-center gap-3">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/companies/search">
+                      <Search className="w-4 h-4 mr-2" />
+                      회사 검색
+                    </Link>
+                  </Button>
+                  
+                  {userCanCreateCompany && (
+                    <Button size="sm" asChild>
+                      <Link href="/companies/new">
+                        <Plus className="w-4 h-4 mr-2" />
+                        새 회사 생성
+                      </Link>
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {companies.map((company) => (
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-4">
+            {companies.map((company) => {
+              const avatarColors = getAvatarColors(company.name);
+              return (
                 <Link 
                   key={company.id} 
                   href={`/companies/${company.id}`}
-                  className="bg-white hover:bg-gray-50 shadow-md rounded-lg p-4 transition-all duration-200 border border-gray-200"
+                  className="block group"
                 >
-                  <div className="flex items-center">
-                    <div className="h-12 w-12 rounded-md bg-blue-600 flex items-center justify-center text-white font-bold text-lg mr-4 flex-shrink-0">
-                      {company.name.charAt(0).toUpperCase()}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-semibold text-gray-900 truncate">
-                          {company.name}
-                        </h3>
-                        <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeStyle(company.role)}`}>
-                          {getRoleLabel(company.role)}
-                        </span>
+                  <Card className="group-hover:border-primary/50 transition-all duration-200 overflow-hidden">
+                    <CardContent className="p-0">
+                      <div className="flex items-center p-4">
+                        <Avatar className="h-12 w-12 mr-4">
+                          <AvatarFallback className={`${avatarColors.bg}`}>
+                            {company.name.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between flex-wrap gap-1">
+                            <h3 className="text-lg font-semibold text-foreground truncate">
+                              {company.name}
+                            </h3>
+                            <Badge variant={getRoleBadgeVariant(company.role) as any}>
+                              {getRoleLabel(company.role)}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 text-sm text-muted-foreground line-clamp-1">
+                            {company.description || '설명이 없습니다.'}
+                          </p>
+                        </div>
+                        
+                        <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
                       </div>
-                      <p className="mt-1 text-sm text-gray-500 line-clamp-1">
-                        {company.description || '설명이 없습니다.'}
-                      </p>
-                    </div>
-                    
-                    <ArrowRight className="h-5 w-5 text-gray-400 ml-4 flex-shrink-0" />
-                  </div>
+                    </CardContent>
+                  </Card>
                 </Link>
-              ))}
-            </div>
-          )}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </>
   );
