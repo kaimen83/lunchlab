@@ -61,6 +61,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: '회사 멤버십 생성에 실패했습니다.' }, { status: 500 });
     }
     
+    // 기본 기능 설정 추가
+    const defaultFeatures = [
+      {
+        company_id: company.id,
+        feature_name: 'ingredients',
+        is_enabled: true,
+      },
+      {
+        company_id: company.id,
+        feature_name: 'menus',
+        is_enabled: true,
+      },
+      {
+        company_id: company.id,
+        feature_name: 'settings',
+        is_enabled: true,
+      }
+    ];
+    
+    const { error: featuresError } = await supabase
+      .from('company_features')
+      .insert(defaultFeatures);
+    
+    if (featuresError) {
+      console.error('기본 기능 설정 추가 오류:', featuresError);
+      // 기능 추가 실패는 치명적 오류가 아니므로 경고만 출력하고 계속 진행
+    }
+    
     return NextResponse.json({ company }, { status: 201 });
   } catch (error) {
     console.error('회사 생성 중 오류 발생:', error);
