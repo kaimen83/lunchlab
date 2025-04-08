@@ -1,9 +1,8 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient } from '@/lib/supabase';
 import { getServerCompany } from '@/actions/companies-actions';
 import { getUserMembership } from '@/actions/membership-actions';
-import { Database } from '@/types/supabase';
 import { isFeatureEnabled } from '@/lib/feature-flags';
 import { z } from 'zod';
 
@@ -45,11 +44,13 @@ interface RouteContext {
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { id: companyId } = await context.params;
-    const { userId } = auth();
-
-    if (!userId) {
+    const session = await auth();
+    
+    if (!session || !session.userId) {
       return Response.json({ error: '인증되지 않은 요청입니다.' }, { status: 401 });
     }
+    
+    const userId = session.userId;
 
     // 회사 정보 조회
     const company = await getServerCompany(companyId);
@@ -95,11 +96,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { id: companyId } = await context.params;
-    const { userId } = auth();
-
-    if (!userId) {
+    const session = await auth();
+    
+    if (!session || !session.userId) {
       return Response.json({ error: '인증되지 않은 요청입니다.' }, { status: 401 });
     }
+    
+    const userId = session.userId;
 
     // 회사 정보 조회
     const company = await getServerCompany(companyId);

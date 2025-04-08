@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Building, Plus, Users, Settings, ChevronDown, ChevronRight } from 'lucide-react';
+import { Building, Plus, Users, Settings, ChevronDown, ChevronRight, BookOpen, ClipboardList } from 'lucide-react';
 import { Company } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
@@ -22,6 +22,7 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
     pathname.startsWith('/companies/') ? pathname.split('/')[2] : null
   );
   const [joinRequestCounts, setJoinRequestCounts] = useState<Record<string, number>>({});
+  const [companyFeatures, setCompanyFeatures] = useState<Record<string, string[]>>({});
 
   // 사용자 권한 확인 (회사 생성 권한 체크)
   const userRole = user?.publicMetadata?.role as string;
@@ -62,8 +63,43 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
     }
   }, [expandedCompanyId, companies]);
 
+  // 회사의 활성화된 기능 가져오기
+  useEffect(() => {
+    const fetchCompanyFeatures = async () => {
+      if (!expandedCompanyId) return;
+      
+      try {
+        const response = await fetch(`/api/companies/${expandedCompanyId}/features`);
+        if (response.ok) {
+          const data = await response.json();
+          
+          // 활성화된 기능들만 필터링
+          const enabledFeatures = data
+            .filter((feature: any) => feature.is_enabled)
+            .map((feature: any) => feature.feature_name);
+          
+          setCompanyFeatures(prev => ({
+            ...prev,
+            [expandedCompanyId]: enabledFeatures
+          }));
+        }
+      } catch (error) {
+        console.error('회사 기능 조회 중 오류:', error);
+      }
+    };
+    
+    if (expandedCompanyId) {
+      fetchCompanyFeatures();
+    }
+  }, [expandedCompanyId]);
+
   const toggleCompany = (companyId: string) => {
     setExpandedCompanyId(expandedCompanyId === companyId ? null : companyId);
+  };
+
+  // 회사에 특정 기능이 활성화되어 있는지 확인
+  const isFeatureEnabled = (companyId: string, featureName: string) => {
+    return companyFeatures[companyId]?.includes(featureName) || false;
   };
 
   return (
@@ -95,6 +131,8 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
               const isExpanded = company.id === expandedCompanyId;
               const requestCount = joinRequestCounts[company.id] || 0;
               const isAdmin = company.role === 'owner' || company.role === 'admin';
+              const hasIngredientsFeature = isFeatureEnabled(company.id, 'ingredients');
+              const hasMenusFeature = isFeatureEnabled(company.id, 'menus');
               
               return (
                 <li key={company.id} className="px-2">
@@ -157,6 +195,38 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
                           </Badge>
                         )}
                       </Link>
+                      
+                      {/* 식재료 관리 메뉴 - 기능이 활성화된 경우만 표시 */}
+                      {hasIngredientsFeature && (
+                        <Link 
+                          href={`/companies/${company.id}/ingredients`} 
+                          className={cn(
+                            "flex items-center px-2 py-1.5 text-sm rounded",
+                            pathname === `/companies/${company.id}/ingredients` 
+                              ? "bg-[#1164A3] text-white" 
+                              : "hover:bg-gray-700"
+                          )}
+                        >
+                          <ClipboardList className="h-3.5 w-3.5 mr-2 text-gray-400" />
+                          식재료 관리
+                        </Link>
+                      )}
+                      
+                      {/* 메뉴 관리 메뉴 - 기능이 활성화된 경우만 표시 */}
+                      {hasMenusFeature && (
+                        <Link 
+                          href={`/companies/${company.id}/menus`} 
+                          className={cn(
+                            "flex items-center px-2 py-1.5 text-sm rounded",
+                            pathname === `/companies/${company.id}/menus` 
+                              ? "bg-[#1164A3] text-white" 
+                              : "hover:bg-gray-700"
+                          )}
+                        >
+                          <BookOpen className="h-3.5 w-3.5 mr-2 text-gray-400" />
+                          메뉴 관리
+                        </Link>
+                      )}
                       
                       {(company.role === 'owner' || company.role === 'admin') && (
                         <Link 

@@ -1,6 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { getServerCompany } from '@/actions/companies-actions';
+import { isUserCompanyAdmin } from '@/actions/membership-actions';
+import { z } from 'zod';
 
 interface RouteContext {
   params: Promise<{
@@ -8,145 +11,166 @@ interface RouteContext {
   }>;
 }
 
-// 회사 기능 목록 조회
-export async function GET(request: Request, context: RouteContext) {
+// 유효성 검사 스키마
+const featureSchema = z.object({
+  featureName: z
+    .string()
+    .min(1, { message: '기능 이름은 필수입니다.' }),
+  isEnabled: z
+    .boolean(),
+  config: z
+    .record(z.unknown())
+    .optional()
+    .nullable()
+});
+
+// 회사 기능 조회
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const { userId } = await auth();
     const { id: companyId } = await context.params;
+    const session = await auth();
     
-    if (!userId) {
-      return NextResponse.json({ error: '인증되지 않은 요청입니다.' }, { status: 401 });
+    if (!session || !session.userId) {
+      return Response.json({ error: '인증되지 않은 요청입니다.' }, { status: 401 });
     }
     
+    const userId = session.userId;
+
+    // 회사 정보 조회
+    const company = await getServerCompany(companyId);
+    if (!company) {
+      return Response.json({ error: '회사를 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    // 관리자 권한 확인
+    const isAdmin = await isUserCompanyAdmin({ userId, companyId });
+    if (!isAdmin) {
+      return Response.json({ error: '이 작업을 수행할 권한이 없습니다.' }, { status: 403 });
+    }
+
+    // Supabase 클라이언트 생성
     const supabase = createServerSupabaseClient();
-    
-    // 사용자가 해당 회사의 관리자급 이상인지 확인
-    const { data: membershipData, error: membershipError } = await supabase
-      .from('company_memberships')
-      .select('role')
-      .eq('company_id', companyId)
-      .eq('user_id', userId)
-      .single();
-    
-    if (membershipError) {
-      console.error('멤버십 조회 오류:', membershipError);
-      return NextResponse.json({ error: '회사 정보 조회 중 오류가 발생했습니다.' }, { status: 500 });
-    }
-    
-    if (!membershipData || !['owner', 'admin'].includes(membershipData.role)) {
-      return NextResponse.json({ error: '해당 회사의 기능을 관리할 권한이 없습니다.' }, { status: 403 });
-    }
-    
-    // 회사의 기능 목록 조회
-    const { data: features, error: featuresError } = await supabase
+
+    // 회사 기능 조회
+    const { data: features, error } = await supabase
       .from('company_features')
       .select('*')
       .eq('company_id', companyId);
-    
-    if (featuresError) {
-      console.error('회사 기능 조회 오류:', featuresError);
-      return NextResponse.json({ error: '회사 기능 조회 중 오류가 발생했습니다.' }, { status: 500 });
+
+    if (error) {
+      console.error('기능 목록 조회 오류:', error);
+      return Response.json({ error: '기능 목록을 불러오는 중 오류가 발생했습니다.' }, { status: 500 });
     }
-    
-    return NextResponse.json(features || []);
+
+    return Response.json(features || []);
   } catch (error) {
-    console.error('회사 기능 조회 중 오류 발생:', error);
-    return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
+    console.error('기능 목록 API 오류:', error);
+    return Response.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }
 
-// 회사 기능 토글(활성화/비활성화)
-export async function POST(request: Request, context: RouteContext) {
+// 회사 기능 설정
+export async function POST(request: NextRequest, context: RouteContext) {
   try {
-    const { userId } = await auth();
     const { id: companyId } = await context.params;
+    const session = await auth();
     
-    if (!userId) {
-      return NextResponse.json({ error: '인증되지 않은 요청입니다.' }, { status: 401 });
+    if (!session || !session.userId) {
+      return Response.json({ error: '인증되지 않은 요청입니다.' }, { status: 401 });
     }
     
-    const body = await request.json();
-    const { featureName, isEnabled, config } = body;
+    const userId = session.userId;
+
+    // 회사 정보 조회
+    const company = await getServerCompany(companyId);
+    if (!company) {
+      return Response.json({ error: '회사를 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    // 관리자 권한 확인
+    const isAdmin = await isUserCompanyAdmin({ userId, companyId });
+    if (!isAdmin) {
+      return Response.json({ error: '이 작업을 수행할 권한이 없습니다.' }, { status: 403 });
+    }
+
+    // 요청 데이터 파싱
+    const requestData = await request.json();
     
-    if (!featureName || typeof isEnabled !== 'boolean') {
-      return NextResponse.json(
-        { error: '기능 이름과 활성화 상태는 필수 입력 항목입니다.' }, 
-        { status: 400 }
-      );
+    // 데이터 유효성 검사
+    const validationResult = featureSchema.safeParse(requestData);
+    
+    if (!validationResult.success) {
+      const errors = validationResult.error.errors.map(err => ({
+        path: err.path.join('.'),
+        message: err.message,
+      }));
+      
+      return Response.json({ error: '입력 데이터가 유효하지 않습니다.', details: errors }, { status: 400 });
     }
     
+    const featureData = validationResult.data;
+
+    // Supabase 클라이언트 생성
     const supabase = createServerSupabaseClient();
-    
-    // 사용자가 해당 회사의 관리자급 이상인지 확인
-    const { data: membershipData, error: membershipError } = await supabase
-      .from('company_memberships')
-      .select('role')
-      .eq('company_id', companyId)
-      .eq('user_id', userId)
-      .single();
-    
-    if (membershipError) {
-      console.error('멤버십 조회 오류:', membershipError);
-      return NextResponse.json({ error: '회사 정보 조회 중 오류가 발생했습니다.' }, { status: 500 });
-    }
-    
-    if (!membershipData || !['owner', 'admin'].includes(membershipData.role)) {
-      return NextResponse.json({ error: '해당 회사의 기능을 관리할 권한이 없습니다.' }, { status: 403 });
-    }
-    
-    // 기존 기능 설정 확인
-    const { data: existingFeature, error: featureCheckError } = await supabase
+
+    // 기존 설정 확인
+    const { data: existingFeature, error: fetchError } = await supabase
       .from('company_features')
       .select('id')
       .eq('company_id', companyId)
-      .eq('feature_name', featureName)
+      .eq('feature_name', featureData.featureName)
       .maybeSingle();
     
-    if (featureCheckError) {
-      console.error('기능 확인 오류:', featureCheckError);
-      return NextResponse.json({ error: '기능 확인 중 오류가 발생했습니다.' }, { status: 500 });
+    if (fetchError) {
+      console.error('기능 확인 오류:', fetchError);
+      return Response.json({ error: '기능 확인 중 오류가 발생했습니다.' }, { status: 500 });
     }
-    
+
     let result;
     
     if (existingFeature) {
-      // 기존 기능 업데이트
+      // 기존 설정 업데이트
       const { data, error } = await supabase
         .from('company_features')
-        .update({ 
-          is_enabled: isEnabled,
-          config: config || null,
-          updated_at: new Date().toISOString()
+        .update({
+          is_enabled: featureData.isEnabled,
+          config: featureData.config || null,
+          updated_at: new Date().toISOString(),
         })
         .eq('id', existingFeature.id)
-        .select()
+        .select('*')
         .single();
       
-      result = { data, error };
+      if (error) {
+        console.error('기능 업데이트 오류:', error);
+        return Response.json({ error: '기능 설정 업데이트에 실패했습니다.' }, { status: 500 });
+      }
+      
+      result = data;
     } else {
-      // 새 기능 추가
+      // 새 설정 추가
       const { data, error } = await supabase
         .from('company_features')
         .insert({
           company_id: companyId,
-          feature_name: featureName,
-          is_enabled: isEnabled,
-          config: config || null
+          feature_name: featureData.featureName,
+          is_enabled: featureData.isEnabled,
+          config: featureData.config || null,
         })
-        .select()
+        .select('*')
         .single();
       
-      result = { data, error };
+      if (error) {
+        console.error('기능 추가 오류:', error);
+        return Response.json({ error: '기능 설정 추가에 실패했습니다.' }, { status: 500 });
+      }
+      
+      result = data;
     }
-    
-    if (result.error) {
-      console.error('기능 저장 오류:', result.error);
-      return NextResponse.json({ error: '기능 설정 저장 중 오류가 발생했습니다.' }, { status: 500 });
-    }
-    
-    return NextResponse.json(result.data);
+
+    return Response.json(result);
   } catch (error) {
-    console.error('회사 기능 설정 중 오류 발생:', error);
-    return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
+    console.error('기능 설정 API 오류:', error);
+    return Response.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 } 

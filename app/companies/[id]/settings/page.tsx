@@ -1,10 +1,16 @@
-import { auth } from '@clerk/nextjs/server';
+import { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
+import { auth } from '@clerk/nextjs/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { Settings, AlertTriangle } from 'lucide-react';
 import { CompanySettingsForm } from './CompanySettingsForm';
 import { DangerZone } from './DangerZone';
-import { CompanyFeaturesSection } from './CompanyFeaturesSection';
+import FeaturesManager from './FeaturesManager';
+
+export const metadata: Metadata = {
+  title: '회사 설정 - LunchLab',
+  description: '회사 설정 관리 페이지'
+};
 
 // Next.js 15에서 페이지 컴포넌트 Props에 대한 타입 정의
 interface CompanySettingsPageProps {
@@ -22,20 +28,20 @@ export default async function CompanySettingsPage({ params }: CompanySettingsPag
   if (!userId) {
     redirect('/sign-in');
   }
-  
+
   const supabase = createServerSupabaseClient();
-  
+
   // 회사 정보 조회
   const { data: company, error: companyError } = await supabase
     .from('companies')
     .select('*')
     .eq('id', id)
     .single();
-  
+
   if (companyError || !company) {
     notFound();
   }
-  
+
   // 현재 사용자가 회사의 멤버인지 확인 (소유자나 관리자만 접근 가능)
   const { data: membership, error: membershipError } = await supabase
     .from('company_memberships')
@@ -50,13 +56,7 @@ export default async function CompanySettingsPage({ params }: CompanySettingsPag
     // 접근 권한이 없는 경우 회사 메인 페이지로 리다이렉트
     redirect(`/companies/${id}`);
   }
-  
-  // 회사 기능 목록 조회
-  const { data: features, error: featuresError } = await supabase
-    .from('company_features')
-    .select('*')
-    .eq('company_id', id);
-  
+
   return (
     <div className="flex flex-col h-full">
       {/* 채널 헤더 */}
@@ -82,10 +82,8 @@ export default async function CompanySettingsPage({ params }: CompanySettingsPag
           
           {/* 기능 관리 섹션 */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-            <CompanyFeaturesSection 
-              companyId={id}
-              initialFeatures={features || []}
-            />
+            <h2 className="text-xl font-bold mb-4">기능 관리</h2>
+            <FeaturesManager companyId={id} />
           </div>
           
           {/* 위험 영역 - 삭제 등 */}
