@@ -12,7 +12,10 @@ export function Navbar() {
   const [role, setRole] = useState<UserRole | null>(null);
   const pathname = usePathname();
   const router = useRouter();
-
+  
+  // companies 경로에서는 렌더링하지 않음
+  const isCompaniesRoute = pathname?.startsWith('/companies');
+  
   // 메타데이터 변경 실시간 감지를 위한 폴링 효과
   useEffect(() => {
     if (isLoaded && user) {
@@ -41,6 +44,11 @@ export function Navbar() {
       setRole(user.publicMetadata.role as UserRole || null);
     }
   }, [isLoaded, user, isSignedIn]);
+
+  // 모든 훅을 호출한 후에 조건부 반환
+  if (isCompaniesRoute) {
+    return null;
+  }
 
   if (!isLoaded || !user) {
     return null;

@@ -7,15 +7,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ClipboardList, BookOpen } from 'lucide-react';
 
 interface InventoryPageProps {
-  params: Promise<{
+  params: {
     id: string;
-  }>;
-  searchParams: Promise<{ tab?: string }>;
+  };
+  searchParams: { tab?: string };
 }
 
 export default async function InventoryPage({ params, searchParams }: InventoryPageProps) {
-  const { id: companyId } = await params;
-  const { tab } = await searchParams;
+  const { id: companyId } = params;
+  const { tab } = searchParams;
   const { userId } = await auth();
   
   if (!userId) {

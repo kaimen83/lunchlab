@@ -23,7 +23,7 @@ export default async function CompaniesLayout({
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)]">
+    <div className="flex h-screen">
       {/* 왼쪽 사이드바 - 회사 목록 */}
       <div className="w-60 bg-[#19171D] border-r border-gray-700 flex-shrink-0 overflow-y-auto">
         <CompanySidebar companies={companies} />

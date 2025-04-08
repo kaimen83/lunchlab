@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Building, Plus, Users, Settings, ChevronDown, ChevronRight, BookOpen, ClipboardList } from 'lucide-react';
+import { Building, Plus, Users, Settings, ChevronDown, ChevronRight, BookOpen, ClipboardList, Search, Mail, LogOut } from 'lucide-react';
 import { Company } from '@/lib/types';
-import { useUser } from '@clerk/nextjs';
+import { useUser, UserButton } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 interface CompanySidebarProps {
   companies: Array<Company & { role: string }>;
@@ -147,20 +148,32 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
   };
 
   return (
-    <div className="py-4 text-gray-300 h-full flex flex-col">
-      <div className="px-4 mb-6">
+    <div className="py-2 text-gray-300 h-full flex flex-col">
+      {/* 앱 로고 및 사용자 프로필 */}
+      <div className="px-4 py-3">
+        <Link href="/" className="text-white font-bold text-xl flex items-center">
+          LunchLab
+        </Link>
+      </div>
+      
+      {/* 사용자 프로필 */}
+      <div className="px-4 py-2 flex items-center">
+        <UserButton afterSignOutUrl="/sign-in" />
+        <div className="ml-2 overflow-hidden">
+          <p className="text-white text-sm truncate">
+            {user?.fullName || '사용자'}
+          </p>
+          <p className="text-gray-400 text-xs truncate">
+            {user?.primaryEmailAddress?.emailAddress || ''}
+          </p>
+        </div>
+      </div>
+      
+      <Separator className="my-2 bg-gray-700"/>
+      
+      {/* 회사 목록 */}
+      <div className="px-4 mb-3 mt-3">
         <h2 className="text-white font-semibold text-lg mb-2">내 회사</h2>
-        
-        {/* 회사 생성 버튼 */}
-        {userCanCreateCompany && (
-          <Link 
-            href="/companies/new" 
-            className="flex items-center px-2 py-1.5 text-sm rounded hover:bg-gray-700 text-gray-300 transition-colors duration-150"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            새 회사 추가
-          </Link>
-        )}
       </div>
       
       <div className="overflow-y-auto flex-1">
@@ -254,22 +267,23 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
                           )}
                         >
                           <ClipboardList className="h-3.5 w-3.5 mr-2 text-gray-400" />
-                          식자재/메뉴 관리
+                          <span>식자재/메뉴</span>
                         </Link>
                       )}
                       
-                      {(company.role === 'owner' || company.role === 'admin') && (
+                      {/* 회사 설정 메뉴 */}
+                      {isAdmin && (
                         <Link 
                           href={`/companies/${company.id}/settings`} 
                           className={cn(
                             "flex items-center px-2 py-1.5 text-sm rounded",
-                            pathname === `/companies/${company.id}/settings` 
+                            pathname.startsWith(`/companies/${company.id}/settings`) 
                               ? "bg-[#1164A3] text-white" 
                               : "hover:bg-gray-700"
                           )}
                         >
                           <Settings className="h-3.5 w-3.5 mr-2 text-gray-400" />
-                          설정
+                          <span>설정</span>
                         </Link>
                       )}
                     </div>
@@ -281,23 +295,47 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
         )}
       </div>
       
-      <div className="mt-auto px-4 py-3 border-t border-gray-700">
-        <div className="flex items-center text-sm">
-          <div className="bg-white w-7 h-7 rounded-sm flex items-center justify-center mr-2 overflow-hidden">
-            {user?.imageUrl ? (
-              <Image 
-                src={user.imageUrl} 
-                alt={user?.username || '사용자'} 
-                width={28}
-                height={28}
-                className="w-full h-full object-cover" 
-              />
-            ) : (
-              <span className="text-gray-800 font-bold">{user?.username?.charAt(0) || '?'}</span>
-            )}
-          </div>
-          <span className="truncate">{user?.username || user?.firstName || '사용자'}</span>
-        </div>
+      {/* 하단 액션 메뉴 */}
+      <div className="mt-auto px-2 pb-4">
+        <Separator className="my-3 bg-gray-700"/>
+        
+        {/* 회사 생성 버튼 */}
+        {userCanCreateCompany && (
+          <Link 
+            href="/companies/new" 
+            className="flex items-center px-3 py-2 text-sm rounded hover:bg-gray-700 text-gray-300 transition-colors duration-150 mb-2"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            새 회사 추가
+          </Link>
+        )}
+        
+        {/* 초대 관리 버튼 */}
+        <Link 
+          href="/invitations" 
+          className="flex items-center px-3 py-2 text-sm rounded hover:bg-gray-700 text-gray-300 transition-colors duration-150 mb-2"
+        >
+          <Mail className="h-4 w-4 mr-2" />
+          초대 관리
+        </Link>
+        
+        {/* 회사 검색 버튼 */}
+        <Link 
+          href="/companies/search" 
+          className="flex items-center px-3 py-2 text-sm rounded hover:bg-gray-700 text-gray-300 transition-colors duration-150"
+        >
+          <Search className="h-4 w-4 mr-2" />
+          회사 검색
+        </Link>
+        
+        {/* 홈으로 돌아가기 */}
+        <Link 
+          href="/" 
+          className="flex items-center px-3 py-2 text-sm rounded hover:bg-gray-700 text-gray-300 transition-colors duration-150 mt-2"
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          홈으로 돌아가기
+        </Link>
       </div>
     </div>
   );
