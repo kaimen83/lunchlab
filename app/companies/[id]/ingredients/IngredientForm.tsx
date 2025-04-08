@@ -26,39 +26,15 @@ const ingredientSchema = z.object({
     .min(1, { message: '식재료 이름은 필수입니다.' })
     .max(100, { message: '식재료 이름은 100자 이하여야 합니다.' }),
   package_amount: z
-    .union([
-      z.number().min(0.1, { message: '포장량은 0.1 이상이어야 합니다.' }),
-      z.string().transform((val, ctx) => {
-        const parsed = parseFloat(val.replace(/,/g, ''));
-        if (isNaN(parsed) || parsed < 0.1) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: '유효한 포장량을 입력해주세요.',
-          });
-          return z.NEVER;
-        }
-        return parsed;
-      }),
-    ]),
+    .number()
+    .min(0.1, { message: '포장량은 0.1 이상이어야 합니다.' }),
   unit: z
     .string()
     .min(1, { message: '단위는 필수입니다.' })
     .max(20, { message: '단위는 20자 이하여야 합니다.' }),
   price: z
-    .union([
-      z.number().min(0, { message: '가격은 0 이상이어야 합니다.' }),
-      z.string().transform((val, ctx) => {
-        const parsed = parseInt(val.replace(/[^\d]/g, ''));
-        if (isNaN(parsed) || parsed < 0) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: '유효한 가격을 입력해주세요.',
-          });
-          return z.NEVER;
-        }
-        return parsed;
-      }),
-    ]),
+    .number()
+    .min(0, { message: '가격은 0 이상이어야 합니다.' }),
   memo1: z
     .string()
     .max(200, { message: '메모는 200자 이하여야 합니다.' })
@@ -221,7 +197,8 @@ export default function IngredientForm({
                     step="0.1"
                     min="0.1"
                     placeholder="포장량을 입력하세요"
-                    onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                    value={field.value}
                   />
                 </FormControl>
                 <FormMessage />
@@ -253,10 +230,10 @@ export default function IngredientForm({
               <FormControl>
                 <Input
                   {...field}
-                  value={typeof value === 'number' ? formatPrice(value.toString()) : formatPrice(value || '')}
+                  value={formatPrice(value?.toString() || '0')}
                   onChange={(e) => {
                     const formatted = e.target.value.replace(/[^\d]/g, '');
-                    onChange(formatted ? parseInt(formatted) : '');
+                    onChange(formatted ? parseInt(formatted) : 0);
                   }}
                   placeholder="가격을 입력하세요"
                 />
