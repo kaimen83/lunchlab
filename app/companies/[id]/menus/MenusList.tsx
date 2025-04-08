@@ -19,8 +19,8 @@ import MenuPriceHistory from './MenuPriceHistory';
 interface Menu {
   id: string;
   name: string;
-  cost: number;
-  price: number;
+  cost_price: number;
+  selling_price: number;
   description?: string;
   recipe?: string;
   serving_size?: number;
@@ -233,12 +233,12 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                   </div>
                 </TableHead>
                 <TableHead 
-                  onClick={() => toggleSort('cost')}
+                  onClick={() => toggleSort('cost_price')}
                   className="cursor-pointer hover:bg-gray-50"
                 >
                   <div className="flex items-center">
                     원가
-                    {sortField === 'cost' && (
+                    {sortField === 'cost_price' && (
                       sortDirection === 'asc' ? 
                       <ChevronUp className="ml-1 h-4 w-4" /> : 
                       <ChevronDown className="ml-1 h-4 w-4" />
@@ -246,12 +246,12 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                   </div>
                 </TableHead>
                 <TableHead 
-                  onClick={() => toggleSort('price')}
+                  onClick={() => toggleSort('selling_price')}
                   className="cursor-pointer hover:bg-gray-50"
                 >
                   <div className="flex items-center">
                     판매가
-                    {sortField === 'price' && (
+                    {sortField === 'selling_price' && (
                       sortDirection === 'asc' ? 
                       <ChevronUp className="ml-1 h-4 w-4" /> : 
                       <ChevronDown className="ml-1 h-4 w-4" />
@@ -279,16 +279,16 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
               ) : (
                 filteredMenus.map((menu) => {
                   // 마진율 계산 (마진 / 판매가) * 100
-                  const margin = menu.price - menu.cost;
-                  const marginPercent = menu.price > 0 
-                    ? ((margin / menu.price) * 100).toFixed(1) 
+                  const margin = menu.selling_price - menu.cost_price;
+                  const marginPercent = menu.selling_price > 0 
+                    ? ((margin / menu.selling_price) * 100).toFixed(1) 
                     : '0.0';
                   
                   return (
                     <TableRow key={menu.id}>
                       <TableCell className="font-medium">{menu.name}</TableCell>
-                      <TableCell>{formatCurrency(menu.cost)}</TableCell>
-                      <TableCell>{formatCurrency(menu.price)}</TableCell>
+                      <TableCell>{formatCurrency(menu.cost_price)}</TableCell>
+                      <TableCell>{formatCurrency(menu.selling_price)}</TableCell>
                       <TableCell>{marginPercent}%</TableCell>
                       <TableCell>
                         {menu.description ? (

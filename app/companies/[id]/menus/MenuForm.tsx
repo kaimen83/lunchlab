@@ -17,62 +17,46 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+// 타입 오류를 피하기 위해 바로 import 선언
 import MenuIngredientsSelector from './MenuIngredientsSelector';
 
-// 유효성 검사 스키마
+// 식재료 타입 정의
+interface Ingredient {
+  id: string;
+  name: string;
+  package_amount: number;
+  unit: string;
+  price: number;
+  memo1?: string;
+  memo2?: string;
+}
+
+// 선택된 식재료 타입 정의
+interface SelectedIngredient {
+  id?: string;
+  menu_id?: string;
+  ingredient: Ingredient;
+  ingredient_id: string;
+  amount: number;
+}
+
+// 변환 로직을 분리한 단순화된 zod 스키마
 const menuSchema = z.object({
-  name: z
-    .string()
-    .min(1, { message: '메뉴 이름은 필수입니다.' })
-    .max(100, { message: '메뉴 이름은 100자 이하여야 합니다.' }),
-  price: z
-    .union([
-      z.number().min(0, { message: '판매가는 0 이상이어야 합니다.' }),
-      z.string().transform((val, ctx) => {
-        const parsed = parseInt(val.replace(/[^\d]/g, ''));
-        if (isNaN(parsed) || parsed < 0) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: '유효한 판매가를 입력해주세요.',
-          });
-          return z.NEVER;
-        }
-        return parsed;
-      }),
-    ]),
-  serving_size: z
-    .union([
-      z.number().min(1, { message: '제공량은 1 이상이어야 합니다.' }),
-      z.string().transform((val, ctx) => {
-        const parsed = parseInt(val.replace(/[^\d]/g, ''));
-        if (isNaN(parsed) || parsed < 1) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: '유효한 제공량을 입력해주세요.',
-          });
-          return z.NEVER;
-        }
-        return parsed;
-      }),
-    ])
-    .optional(),
-  description: z
-    .string()
-    .max(500, { message: '설명은 500자 이하여야 합니다.' })
-    .optional(),
-  recipe: z
-    .string()
-    .max(2000, { message: '조리법은 2000자 이하여야 합니다.' })
-    .optional(),
+  name: z.string().min(1, { message: '메뉴 이름은 필수입니다.' }),
+  price: z.number().min(0, { message: '판매가는 0 이상이어야 합니다.' }),
+  serving_size: z.number().min(1, { message: '제공량은 1 이상이어야 합니다.' }).optional(),
+  description: z.string().max(500, { message: '설명은 500자 이하여야 합니다.' }).optional(),
+  recipe: z.string().max(2000, { message: '조리법은 2000자 이하여야 합니다.' }).optional(),
 });
 
+// 스키마에서 자동으로 타입 추론
 type MenuFormValues = z.infer<typeof menuSchema>;
 
 interface Menu {
   id: string;
   name: string;
-  cost: number;
-  price: number;
+  cost_price: number;
+  selling_price: number;
   description?: string;
   recipe?: string;
   serving_size?: number;
@@ -97,7 +81,7 @@ export default function MenuForm({
 }: MenuFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedIngredients, setSelectedIngredients] = useState<any[]>([]);
+  const [selectedIngredients, setSelectedIngredients] = useState<SelectedIngredient[]>([]);
   const [cost, setCost] = useState(0);
 
   // 폼 초기화
@@ -117,7 +101,7 @@ export default function MenuForm({
     if (mode === 'edit' && menu) {
       form.reset({
         name: menu.name,
-        price: menu.price,
+        price: menu.selling_price,
         serving_size: menu.serving_size || 1,
         description: menu.description || '',
         recipe: menu.recipe || '',
@@ -151,7 +135,8 @@ export default function MenuForm({
       setSelectedIngredients(data);
       
       // 원가 계산
-      const totalCost = data.reduce((acc: number, item: any) => acc + (item.amount * item.ingredient.price / item.ingredient.package_amount), 0);
+      const totalCost = data.reduce((acc: number, item: SelectedIngredient) => 
+        acc + (item.amount * item.ingredient.price / item.ingredient.package_amount), 0);
       setCost(totalCost);
     } catch (error) {
       console.error('메뉴 식재료 로드 오류:', error);
@@ -164,19 +149,38 @@ export default function MenuForm({
   };
 
   // 원가 업데이트
-  const updateCost = (ingredients: any[]) => {
-    const totalCost = ingredients.reduce((acc, item) => acc + (item.amount * item.ingredient.price / item.ingredient.package_amount), 0);
+  const updateCost = (ingredients: SelectedIngredient[]) => {
+    const totalCost = ingredients.reduce(
+      (acc, item) => acc + (item.amount * item.ingredient.price / item.ingredient.package_amount), 
+      0
+    );
     setCost(totalCost);
   };
 
   // 식재료 목록 변경 핸들러
-  const handleIngredientsChange = (ingredients: any[]) => {
+  const handleIngredientsChange = (ingredients: SelectedIngredient[]) => {
     setSelectedIngredients(ingredients);
     updateCost(ingredients);
   };
 
+  // 숫자 포맷팅 유틸리티 함수
+  const formatPrice = (value: number | string): string => {
+    const numberValue = typeof value === 'string' 
+      ? value.replace(/[^\d]/g, '') 
+      : value.toString();
+    
+    if (!numberValue) return '';
+    return new Intl.NumberFormat('ko-KR').format(parseInt(numberValue));
+  };
+
+  // 문자열에서 숫자로 변환하는 유틸리티 함수
+  const parsePrice = (value: string): number => {
+    const cleaned = value.replace(/[^\d]/g, '');
+    return cleaned ? parseInt(cleaned) : 0;
+  };
+
   // 폼 제출 처리
-  const onSubmit = async (data: MenuFormValues) => {
+  const onSubmit = (data: MenuFormValues) => {
     if (selectedIngredients.length === 0) {
       toast({
         title: '식재료 필요',
@@ -188,64 +192,63 @@ export default function MenuForm({
     
     setIsSubmitting(true);
     
-    try {
-      const ingredientsData = selectedIngredients.map(item => ({
-        ingredient_id: item.ingredient.id,
-        amount: item.amount,
-      }));
-      
-      const menuData = {
-        ...data,
-        cost: Math.round(cost),
-        ingredients: ingredientsData,
-      };
-      
-      const url = mode === 'create'
-        ? `/api/companies/${companyId}/menus`
-        : `/api/companies/${companyId}/menus/${menu?.id}`;
-      
-      const method = mode === 'create' ? 'POST' : 'PATCH';
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(menuData),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || '요청 처리 중 오류가 발생했습니다.');
+    // API 호출 비동기 함수
+    const submitForm = async () => {
+      try {
+        const ingredientsData = selectedIngredients.map(item => ({
+          id: item.ingredient.id,
+          amountPerPerson: item.amount,
+        }));
+        
+        const menuData = {
+          ...data,
+          cost: Math.round(cost),
+          ingredients: ingredientsData,
+          sellingPrice: data.price, // API에서 사용하는 필드명
+        };
+        
+        const url = mode === 'create'
+          ? `/api/companies/${companyId}/menus`
+          : `/api/companies/${companyId}/menus/${menu?.id}`;
+        
+        const method = mode === 'create' ? 'POST' : 'PATCH';
+        
+        const response = await fetch(url, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(menuData),
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || '요청 처리 중 오류가 발생했습니다.');
+        }
+        
+        const savedMenu = await response.json();
+        
+        toast({
+          title: mode === 'create' ? '메뉴 추가 완료' : '메뉴 수정 완료',
+          description: `${savedMenu.name} 메뉴가 ${mode === 'create' ? '추가' : '수정'}되었습니다.`,
+          variant: 'default',
+        });
+        
+        onSave(savedMenu);
+      } catch (error) {
+        console.error('메뉴 저장 오류:', error);
+        toast({
+          title: '오류 발생',
+          description: error instanceof Error ? error.message : '메뉴 저장 중 오류가 발생했습니다.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsSubmitting(false);
       }
-      
-      const savedMenu = await response.json();
-      
-      toast({
-        title: mode === 'create' ? '메뉴 추가 완료' : '메뉴 수정 완료',
-        description: `${savedMenu.name} 메뉴가 ${mode === 'create' ? '추가' : '수정'}되었습니다.`,
-        variant: 'default',
-      });
-      
-      onSave(savedMenu);
-    } catch (error) {
-      console.error('메뉴 저장 오류:', error);
-      toast({
-        title: '오류 발생',
-        description: error instanceof Error ? error.message : '메뉴 저장 중 오류가 발생했습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // 금액 입력 시 자동 포맷팅
-  const formatPrice = (value: string) => {
-    const numberValue = value.replace(/[^\d]/g, '');
-    if (!numberValue) return '';
+    };
     
-    return new Intl.NumberFormat('ko-KR').format(parseInt(numberValue));
+    // 비동기 함수 실행
+    submitForm();
   };
 
   return (
@@ -269,16 +272,14 @@ export default function MenuForm({
           <FormField
             control={form.control}
             name="price"
-            render={({ field: { value, onChange, ...field } }) => (
+            render={({ field }) => (
               <FormItem>
                 <FormLabel>판매가 (원)</FormLabel>
                 <FormControl>
                   <Input
-                    {...field}
-                    value={typeof value === 'number' ? formatPrice(value.toString()) : formatPrice(value || '')}
+                    value={formatPrice(field.value)}
                     onChange={(e) => {
-                      const formatted = e.target.value.replace(/[^\d]/g, '');
-                      onChange(formatted ? parseInt(formatted) : '');
+                      field.onChange(parsePrice(e.target.value));
                     }}
                     placeholder="판매가를 입력하세요"
                   />
@@ -291,17 +292,16 @@ export default function MenuForm({
           <FormField
             control={form.control}
             name="serving_size"
-            render={({ field: { value, onChange, ...field } }) => (
+            render={({ field }) => (
               <FormItem>
                 <FormLabel>제공량 (인분)</FormLabel>
                 <FormControl>
                   <Input
-                    {...field}
                     type="number"
                     min="1"
                     step="1"
-                    value={value || 1}
-                    onChange={(e) => onChange(parseInt(e.target.value) || 1)}
+                    value={field.value || 1}
+                    onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
                     placeholder="제공량을 입력하세요"
                   />
                 </FormControl>
