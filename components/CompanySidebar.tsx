@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Building, Plus, Users, Settings, ChevronDown, ChevronRight, BookOpen, ClipboardList, Search, Mail, LogOut, Menu, X } from 'lucide-react';
+import { Building, Plus, Users, Settings, ChevronDown, ChevronRight, BookOpen, ClipboardList, Search, Mail, LogOut, Menu, X, CalendarDays } from 'lucide-react';
 import { Company } from '@/lib/types';
 import { useUser, UserButton } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
@@ -82,6 +82,7 @@ export function CompanySidebar({ companies, isMobile = false }: CompanySidebarPr
           // 중요 기능 누락 여부 확인
           const hasIngredientsFeature = data.some((feature: any) => feature.feature_name === 'ingredients');
           const hasMenusFeature = data.some((feature: any) => feature.feature_name === 'menus');
+          const hasMealPlanningFeature = data.some((feature: any) => feature.feature_name === 'mealPlanning');
           
           if (!hasIngredientsFeature) {
             console.warn(`회사 ID ${expandedCompanyId}에 ingredients 기능이 누락되어 있습니다.`);
@@ -89,6 +90,10 @@ export function CompanySidebar({ companies, isMobile = false }: CompanySidebarPr
           
           if (!hasMenusFeature) {
             console.warn(`회사 ID ${expandedCompanyId}에 menus 기능이 누락되어 있습니다.`);
+          }
+          
+          if (!hasMealPlanningFeature) {
+            console.warn(`회사 ID ${expandedCompanyId}에 mealPlanning 기능이 누락되어 있습니다.`);
           }
           
           // 활성화된 기능들만 필터링
@@ -209,6 +214,7 @@ export function CompanySidebar({ companies, isMobile = false }: CompanySidebarPr
               const isAdmin = company.role === 'owner' || company.role === 'admin';
               const hasIngredientsFeature = isFeatureEnabled(company.id, 'ingredients');
               const hasMenusFeature = isFeatureEnabled(company.id, 'menus');
+              const hasMealPlanningFeature = isFeatureEnabled(company.id, 'mealPlanning');
               
               return (
                 <li key={company.id} className="px-2">
@@ -290,6 +296,24 @@ export function CompanySidebar({ companies, isMobile = false }: CompanySidebarPr
                         >
                           <ClipboardList className="h-3.5 w-3.5 mr-2 text-gray-400" />
                           <span>식자재/메뉴</span>
+                        </Link>
+                      )}
+                      
+                      {/* 식단 관리 메뉴 - 모든 회원에게 표시 */}
+                      {hasMealPlanningFeature && (
+                        <Link 
+                          href={`/companies/${company.id}/meal-planning`} 
+                          className={cn(
+                            "flex items-center px-2 py-1.5 text-sm rounded",
+                            pathname === `/companies/${company.id}/meal-planning` ||
+                            pathname.startsWith(`/companies/${company.id}/meal-planning`)
+                              ? "bg-[#1164A3] text-white" 
+                              : "hover:bg-gray-700"
+                          )}
+                          onClick={handleLinkClick}
+                        >
+                          <CalendarDays className="h-3.5 w-3.5 mr-2 text-gray-400" />
+                          <span>식단 관리</span>
                         </Link>
                       )}
                       
