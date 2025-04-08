@@ -100,6 +100,15 @@ export default function FeaturesManager({ companyId }: { companyId: string }) {
           : feature
       ));
 
+      // 네비게이션 메뉴 업데이트를 위한 이벤트 발생
+      window.localStorage.setItem('feature-change', JSON.stringify({
+        companyId,
+        featureName, 
+        isEnabled: newState,
+        timestamp: new Date().getTime()
+      }));
+      window.dispatchEvent(new Event('storage'));
+
       toast({
         title: '설정 변경 완료',
         description: `${featureDefinitions[featureName].display_name} 기능이 ${newState ? '활성화' : '비활성화'}되었습니다.`,

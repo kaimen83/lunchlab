@@ -91,6 +91,29 @@ export function CompanySidebar({ companies }: CompanySidebarProps) {
     if (expandedCompanyId) {
       fetchCompanyFeatures();
     }
+
+    // 기능 변경 이벤트 감지
+    const handleFeatureChange = () => {
+      const featureChangeStr = localStorage.getItem('feature-change');
+      if (!featureChangeStr) return;
+      
+      try {
+        const featureChange = JSON.parse(featureChangeStr);
+        // 현재 확장된 회사의 기능이 변경된 경우에만 업데이트
+        if (featureChange.companyId === expandedCompanyId) {
+          fetchCompanyFeatures();
+        }
+      } catch (error) {
+        console.error('기능 변경 이벤트 처리 중 오류:', error);
+      }
+    };
+
+    // storage 이벤트 리스너 등록
+    window.addEventListener('storage', handleFeatureChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleFeatureChange);
+    };
   }, [expandedCompanyId]);
 
   const toggleCompany = (companyId: string) => {
