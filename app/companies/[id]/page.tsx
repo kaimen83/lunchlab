@@ -3,8 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { CompanyMembership } from '@/lib/types';
 import { CompanyMemberList } from './CompanyMemberList';
-import { Building, Info, Package, Users, Building2 } from 'lucide-react';
-import { DashboardCard } from '@/components/DashboardCard';
+import { Building, Info } from 'lucide-react';
 
 // Next.js 15에서 페이지 컴포넌트 Props에 대한 타입 정의
 interface CompanyPageProps {
@@ -115,39 +114,6 @@ export default async function CompanyPage({ params }: CompanyPageProps) {
             members={members || []} 
             currentUserMembership={membership as CompanyMembership}
           />
-        </div>
-
-        {/* 카드 영역 */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-6">
-          {membership.role === 'owner' || membership.role === 'admin' ? (
-            <>
-              <DashboardCard
-                title="회사 정보 관리"
-                description="회사 정보를 수정합니다"
-                icon={<Building2 className="h-5 w-5" />}
-                href={`/companies/${company.id}/edit`}
-              />
-              <DashboardCard
-                title="멤버 관리"
-                description="회사 멤버를 관리합니다"
-                icon={<Users className="h-5 w-5" />}
-                href={`/companies/${company.id}/members`}
-              />
-              <DashboardCard
-                title="모듈 관리"
-                description="마켓플레이스 모듈을 관리합니다"
-                icon={<Package className="h-5 w-5" />}
-                href={`/companies/${company.id}/modules`}
-              />
-            </>
-          ) : (
-            <DashboardCard
-              title="회사 정보"
-              description="회사 정보를 확인합니다"
-              icon={<Info className="h-5 w-5" />}
-              href={`/companies/${company.id}/info`}
-            />
-          )}
         </div>
       </div>
     </div>
