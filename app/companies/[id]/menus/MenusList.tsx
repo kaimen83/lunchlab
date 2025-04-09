@@ -150,6 +150,12 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
       
       if (!response.ok) {
         const data = await response.json();
+        
+        // 식단 계획에서 사용 중인 경우 특별 처리
+        if (response.status === 409) {
+          throw new Error(data.error || '해당 메뉴가 식단 계획에서 사용 중입니다.');
+        }
+        
         throw new Error(data.error || '메뉴 삭제에 실패했습니다.');
       }
       
@@ -171,6 +177,7 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
         description: error instanceof Error ? error.message : '메뉴 삭제 중 오류가 발생했습니다.',
         variant: 'destructive',
       });
+      setDeleteConfirmOpen(false);
     }
   };
 

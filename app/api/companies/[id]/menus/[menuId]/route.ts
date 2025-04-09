@@ -313,6 +313,25 @@ export async function DELETE(request: Request, context: RouteContext) {
       }, { status: 403 });
     }
     
+    // 메뉴가 식단 계획에서 사용 중인지 확인
+    const { data: mealPlans, error: mealPlansError } = await supabase
+      .from('meal_plans')
+      .select('id')
+      .eq('menu_id', menuId)
+      .limit(1);
+    
+    if (mealPlansError) {
+      console.error('식단 계획 확인 오류:', mealPlansError);
+      return NextResponse.json({ error: '식단 계획 확인 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+    
+    // 식단 계획에서 사용 중인 경우 삭제 불가
+    if (mealPlans && mealPlans.length > 0) {
+      return NextResponse.json({ 
+        error: '해당 메뉴가 식단 계획에서 사용 중입니다. 먼저 관련 식단 계획을 삭제해주세요.' 
+      }, { status: 409 });
+    }
+    
     // 메뉴 삭제 (관계된 식재료 연결과 가격 이력은 CASCADE로 자동 삭제됨)
     const { error: deleteError } = await supabase
       .from('menus')
