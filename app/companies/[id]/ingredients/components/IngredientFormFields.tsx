@@ -1,4 +1,5 @@
 import { Plus } from 'lucide-react';
+import { useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,6 +36,11 @@ export function IngredientFormFields({
   handleSupplierSelect,
   addNewSupplier
 }: IngredientFormFieldsProps) {
+  // 폼에 설정된 현재 값을 로깅하여 디버깅
+  useEffect(() => {
+    console.log('현재 form 값:', form.getValues());
+  }, [form]);
+
   return (
     <>
       <FormField
@@ -73,14 +79,17 @@ export function IngredientFormFields({
       <FormField
         control={form.control}
         name="supplier_id"
-        render={({ field: { value, onChange, ...fieldProps } }) => (
+        render={({ field }) => (
           <FormItem>
             <FormLabel>식재료 업체</FormLabel>
             <FormControl>
               <div className="space-y-2">
                 <Select
-                  onValueChange={handleSupplierSelect}
-                  value={value || ""}
+                  onValueChange={(val) => {
+                    field.onChange(val);
+                    handleSupplierSelect(val);
+                  }}
+                  value={field.value || ""}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="업체를 선택하세요" />
@@ -158,7 +167,6 @@ export function IngredientFormFields({
               <FormLabel>단위</FormLabel>
               <Select
                 onValueChange={field.onChange}
-                defaultValue={field.value}
                 value={field.value}
               >
                 <FormControl>
@@ -225,13 +233,12 @@ export function IngredientFormFields({
       <FormField
         control={form.control}
         name="stock_grade"
-        render={({ field: { value, onChange, ...fieldProps } }) => (
+        render={({ field }) => (
           <FormItem>
             <FormLabel>재고관리 등급</FormLabel>
             <Select
-              onValueChange={onChange}
-              defaultValue={value || undefined}
-              value={value || ""}
+              onValueChange={field.onChange}
+              value={field.value || ""}
             >
               <FormControl>
                 <SelectTrigger>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Plus, FilePen, Trash2, Search, PackageOpen, 
@@ -61,8 +61,8 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
 
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin';
 
-  // 식재료 목록 로드
-  const loadIngredients = async () => {
+  // 식재료 목록 로드 - useCallback으로 메모이제이션
+  const loadIngredients = useCallback(async () => {
     setIsLoading(true);
     try {
       // 모든 공급업체 목록을 먼저 가져옵니다
@@ -107,11 +107,11 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [companyId, toast]);
 
   useEffect(() => {
     loadIngredients();
-  }, [companyId]);
+  }, [loadIngredients]);
 
   // 정렬 처리
   const toggleSort = (field: keyof Ingredient) => {
@@ -210,13 +210,8 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
 
   // 식재료 저장 후 처리
   const handleSaveIngredient = (savedIngredient: Ingredient) => {
-    if (modalMode === 'create') {
-      setIngredients(prev => [...prev, savedIngredient]);
-    } else {
-      setIngredients(prev => 
-        prev.map(i => i.id === savedIngredient.id ? savedIngredient : i)
-      );
-    }
+    // 목록 업데이트하는 대신, 전체 목록을 다시 로드하여 최신 상태 반영
+    loadIngredients();
     
     setModalOpen(false);
     setSelectedIngredient(null);
@@ -457,7 +452,20 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
       </Card>
 
       {/* 식재료 추가/수정 모달 */}
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+      <Dialog 
+        open={modalOpen} 
+        onOpenChange={(open) => {
+          if (!open) {
+            // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
+            setTimeout(() => {
+              setModalOpen(false);
+              setSelectedIngredient(null);
+            }, 0);
+          } else {
+            setModalOpen(open);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{modalMode === 'create' ? '식재료 추가' : '식재료 수정'}</DialogTitle>
@@ -473,7 +481,20 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
       </Dialog>
 
       {/* 가격 이력 모달 */}
-      <Dialog open={historyModalOpen} onOpenChange={setHistoryModalOpen}>
+      <Dialog 
+        open={historyModalOpen} 
+        onOpenChange={(open) => {
+          if (!open) {
+            // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
+            setTimeout(() => {
+              setHistoryModalOpen(false);
+              if (!modalOpen) setSelectedIngredient(null);
+            }, 0);
+          } else {
+            setHistoryModalOpen(open);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>가격 이력 - {selectedIngredient?.name}</DialogTitle>
@@ -488,7 +509,20 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
       </Dialog>
 
       {/* 삭제 확인 다이얼로그 */}
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+      <Dialog 
+        open={deleteConfirmOpen} 
+        onOpenChange={(open) => {
+          if (!open) {
+            // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
+            setTimeout(() => {
+              setDeleteConfirmOpen(false);
+              setIngredientToDelete(null);
+            }, 0);
+          } else {
+            setDeleteConfirmOpen(open);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>식재료 삭제</DialogTitle>

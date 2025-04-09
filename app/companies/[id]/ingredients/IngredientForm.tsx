@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { PackageOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
@@ -23,6 +24,16 @@ export default function IngredientForm({
   onSave,
   onCancel,
 }: IngredientFormProps) {
+  // 디버깅 로그 추가
+  useEffect(() => {
+    console.log("IngredientForm 렌더링:", { 
+      mode, 
+      ingredientId: ingredient?.id,
+      supplier_id: ingredient?.supplier_id,
+      stock_grade: ingredient?.stock_grade
+    });
+  }, [mode, ingredient]);
+
   // 공급업체 관련 로직
   const { suppliers, isLoadingSuppliers, addNewSupplier } = useSuppliers(companyId);
 
@@ -33,6 +44,31 @@ export default function IngredientForm({
     mode,
     onSave
   });
+
+  // 모바일에서 터치 이벤트 문제 해결을 위한 effect
+  useEffect(() => {
+    // 모달이 열릴 때 body에 overscroll-behavior 속성 추가
+    document.body.style.overscrollBehavior = 'contain';
+    
+    // 컴포넌트 언마운트 시 스타일 속성 제거
+    return () => {
+      document.body.style.overscrollBehavior = '';
+      
+      // 추가 정리 작업: 모든 이벤트 리스너가 제대로 정리되도록 함
+      document.body.style.touchAction = 'auto';
+      document.documentElement.style.touchAction = 'auto';
+    };
+  }, []);
+
+  // 안전한 취소 처리
+  const handleCancel = () => {
+    // form 상태 리셋
+    form.reset();
+    // 부모 컴포넌트의 onCancel 호출 전 약간의 지연 추가
+    setTimeout(() => {
+      onCancel();
+    }, 10);
+  };
 
   return (
     <Form {...form}>
@@ -46,7 +82,12 @@ export default function IngredientForm({
         />
 
         <div className="flex justify-end space-x-2 pt-4">
-          <Button variant="outline" type="button" onClick={onCancel} disabled={isSubmitting}>
+          <Button 
+            variant="outline" 
+            type="button" 
+            onClick={handleCancel} 
+            disabled={isSubmitting}
+          >
             취소
           </Button>
           <Button type="submit" disabled={isSubmitting}>

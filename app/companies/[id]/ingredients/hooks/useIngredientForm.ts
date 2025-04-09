@@ -20,27 +20,11 @@ export const useIngredientForm = ({
 }: UseIngredientFormProps) => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formInitialized, setFormInitialized] = useState(false);
 
-  // 폼 초기화
-  const form = useForm<IngredientFormValues>({
-    resolver: zodResolver(ingredientSchema),
-    defaultValues: {
-      name: '',
-      code_name: '',
-      supplier_id: '',
-      package_amount: 0,
-      unit: 'g',
-      price: 0,
-      items_per_box: 0,
-      stock_grade: '',
-      memo1: '',
-    },
-  });
-
-  // 수정 모드일 경우 초기값 설정
-  useEffect(() => {
-    if (mode === 'edit' && ingredient) {
-      form.reset({
+  // 폼 초기화 - defaultValues를 모드에 따라 설정
+  const defaultValues = mode === 'edit' && ingredient 
+    ? {
         name: ingredient.name,
         code_name: ingredient.code_name || '',
         supplier_id: ingredient.supplier_id || '',
@@ -50,9 +34,8 @@ export const useIngredientForm = ({
         items_per_box: ingredient.items_per_box || 0,
         stock_grade: ingredient.stock_grade || '',
         memo1: ingredient.memo1 || '',
-      });
-    } else {
-      form.reset({
+      }
+    : {
         name: '',
         code_name: '',
         supplier_id: '',
@@ -62,9 +45,40 @@ export const useIngredientForm = ({
         items_per_box: 0,
         stock_grade: '',
         memo1: '',
-      });
+      };
+
+  // 폼 생성
+  const form = useForm<IngredientFormValues>({
+    resolver: zodResolver(ingredientSchema),
+    defaultValues,
+  });
+
+  // 수정 모드일 경우 초기값 설정 - 컴포넌트 마운트 시 한번만 실행
+  useEffect(() => {
+    if (!formInitialized) {
+      if (mode === 'edit' && ingredient) {
+        console.log("수정 모드 폼 초기화:", {
+          name: ingredient.name,
+          supplier_id: ingredient.supplier_id,
+          stock_grade: ingredient.stock_grade
+        });
+
+        // 모든 필드를 명시적으로 설정
+        form.reset({
+          name: ingredient.name,
+          code_name: ingredient.code_name || '',
+          supplier_id: ingredient.supplier_id || '',
+          package_amount: ingredient.package_amount,
+          unit: ingredient.unit,
+          price: ingredient.price,
+          items_per_box: ingredient.items_per_box || 0,
+          stock_grade: ingredient.stock_grade || '',
+          memo1: ingredient.memo1 || '',
+        });
+      }
+      setFormInitialized(true);
     }
-  }, [mode, ingredient, form]);
+  }, [mode, ingredient, form, formInitialized]);
 
   // 공급업체 선택 핸들러
   const handleSupplierSelect = (value: string) => {
