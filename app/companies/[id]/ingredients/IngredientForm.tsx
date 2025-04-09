@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PackageOpen, Plus } from 'lucide-react';
+import { PackageOpen, Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,6 +26,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Combobox } from '@/components/ui/combobox';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 // 유효성 검사 스키마
 const ingredientSchema = z.object({
@@ -121,6 +124,8 @@ export default function IngredientForm({
   // 식재료 업체 목록 상태
   const [suppliers, setSuppliers] = useState<{label: string, value: string}[]>([]);
   const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false);
+  const [filteredSuppliers, setFilteredSuppliers] = useState<{label: string, value: string}[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // 식재료 업체 목록 로드
   useEffect(() => {
@@ -135,10 +140,12 @@ export default function IngredientForm({
         }
         
         const data = await response.json();
-        setSuppliers(data.map((supplier: {id: string, name: string}) => ({
+        const suppliersList = data.map((supplier: {id: string, name: string}) => ({
           label: supplier.name,
           value: supplier.id
-        })));
+        }));
+        setSuppliers(suppliersList);
+        setFilteredSuppliers(suppliersList);
       } catch (error) {
         console.error('공급업체 로드 오류:', error);
       } finally {
@@ -148,6 +155,18 @@ export default function IngredientForm({
 
     loadSuppliers();
   }, [companyId]);
+
+  // 검색어 변경 시 필터링
+  useEffect(() => {
+    if (searchTerm === '') {
+      setFilteredSuppliers(suppliers);
+    } else {
+      const filtered = suppliers.filter(supplier => 
+        supplier.label.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredSuppliers(filtered);
+    }
+  }, [searchTerm, suppliers]);
 
   // 새 공급업체 추가 함수
   const addNewSupplier = async (supplierName: string) => {
@@ -168,10 +187,15 @@ export default function IngredientForm({
       }
 
       const newSupplier = await response.json();
-      setSuppliers(prev => [...prev, {
+      const newSupplierItem = {
         label: newSupplier.name,
         value: newSupplier.id
-      }]);
+      };
+      
+      setSuppliers(prev => [...prev, newSupplierItem]);
+      setFilteredSuppliers(prev => [...prev, newSupplierItem]);
+      // 검색어 초기화
+      setSearchTerm('');
 
       toast({
         title: '공급업체 추가 완료',
@@ -220,15 +244,35 @@ export default function IngredientForm({
 
   // 동기 방식의 공급업체 선택 핸들러
   const handleSupplierSelect = (value: string) => {
-    // 동기 방식으로 supplier_id 설정
-    if (value) {
-      const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-      if (isValidUUID) {
-        form.setValue('supplier_id', value);
+    console.log('선택된 공급업체 ID:', value);
+    // 클릭 이벤트 발생 확인을 위한 로그
+    console.log('suppliers:', suppliers);
+    
+    try {
+      if (value && value.trim() !== '') {
+        // UUID 형식 검증
+        const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+        if (isValidUUID) {
+          console.log('유효한 UUID 형식이 감지되었습니다:', value);
+          form.setValue('supplier_id', value);
+        } else {
+          // 혹시 ID가 아닌 이름이 전달된 경우 이름으로 ID 찾기 시도
+          console.log('UUID가 아닌 값이 감지되었습니다. 공급업체 찾기 시도:', value);
+          const supplier = suppliers.find(s => s.label === value || s.value === value);
+          if (supplier) {
+            console.log('매칭된 공급업체 찾음:', supplier);
+            form.setValue('supplier_id', supplier.value);
+          } else {
+            console.log('매칭된 공급업체 없음');
+            form.setValue('supplier_id', null);
+          }
+        }
       } else {
+        console.log('빈 값이 전달되었습니다');
         form.setValue('supplier_id', null);
       }
-    } else {
+    } catch (error) {
+      console.error('공급업체 선택 중 오류 발생:', error);
       form.setValue('supplier_id', null);
     }
   };
@@ -365,24 +409,75 @@ export default function IngredientForm({
           control={form.control}
           name="supplier_id"
           render={({ field: { value, onChange, ...fieldProps } }) => (
-            <FormItem>
-              <FormLabel>식재료 업체</FormLabel>
+            <FormItem className="space-y-4">
+              <div className="flex justify-between items-center">
+                <FormLabel className="text-base">식재료 업체</FormLabel>
+                <div className="text-sm text-muted-foreground">
+                  {value && suppliers.find(s => s.value === value)?.label && (
+                    <span>선택: {suppliers.find(s => s.value === value)?.label}</span>
+                  )}
+                </div>
+              </div>
               <FormControl>
-                <div>
-                  <Combobox
-                    items={suppliers}
-                    placeholder="식재료 업체를 선택하세요"
-                    value={value || ""}
-                    onChange={handleSupplierSelect}
-                    freeInput={false}
-                    emptyMessage="검색 결과가 없습니다."
-                  />
-                  {isLoadingSuppliers && <div className="mt-2 text-sm text-muted-foreground">로딩 중...</div>}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 relative">
+                    <div className="absolute left-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                      <Search className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <Input 
+                      placeholder="업체 검색..."
+                      className="h-9 pl-8"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  
+                  {suppliers.length > 0 ? (
+                    <ScrollArea className="h-[200px] rounded-md border">
+                      <RadioGroup 
+                        value={value || ""}
+                        onValueChange={handleSupplierSelect}
+                        className="space-y-1 p-1"
+                      >
+                        {filteredSuppliers.length > 0 ? (
+                          filteredSuppliers.map((supplier) => (
+                            <div 
+                              key={supplier.value} 
+                              className={cn(
+                                "flex items-center space-x-2 rounded-md p-2 transition-colors",
+                                value === supplier.value ? "bg-accent" : "hover:bg-accent/50"
+                              )}
+                            >
+                              <RadioGroupItem value={supplier.value} id={supplier.value} />
+                              <Label 
+                                htmlFor={supplier.value} 
+                                className={cn(
+                                  "flex-grow cursor-pointer",
+                                  value === supplier.value && "font-medium"
+                                )}
+                              >
+                                {supplier.label}
+                              </Label>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-4 text-muted-foreground">
+                            검색 결과가 없습니다.
+                          </div>
+                        )}
+                      </RadioGroup>
+                    </ScrollArea>
+                  ) : (
+                    <div className="text-center py-4 text-muted-foreground">
+                      {isLoadingSuppliers ? "로딩 중..." : "등록된 공급업체가 없습니다."}
+                    </div>
+                  )}
+                  
                   <Button 
                     type="button" 
-                    variant="outline" 
+                    variant="secondary" 
                     size="sm" 
-                    className="mt-2"
+                    className="w-full"
                     onClick={async () => {
                       // 새 공급업체 추가를 위한 모달 또는 입력창 표시
                       const name = prompt("새 공급업체 이름을 입력하세요");

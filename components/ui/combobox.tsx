@@ -86,9 +86,16 @@ export function Combobox({
                   <CommandItem
                     key={item.value}
                     value={item.value}
-                    onSelect={(value) => {
-                      onChange(value)
-                      setInputValue(value)
+                    onSelect={() => {
+                      onChange(item.value)
+                      setInputValue(item.value)
+                      setOpen(false)
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      onChange(item.value)
+                      setInputValue(item.value)
                       setOpen(false)
                     }}
                   >
@@ -131,8 +138,16 @@ export function Combobox({
                 <CommandItem
                   key={item.value}
                   value={item.value}
-                  onSelect={(value) => {
-                    onChange(value)
+                  onSelect={() => {
+                    onChange(item.value)
+                    setInputValue(item.value)
+                    setOpen(false)
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onChange(item.value)
+                    setInputValue(item.value)
                     setOpen(false)
                   }}
                 >
