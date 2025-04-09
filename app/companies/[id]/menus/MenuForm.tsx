@@ -43,8 +43,6 @@ interface SelectedIngredient {
 // 변환 로직을 분리한 단순화된 zod 스키마
 const menuSchema = z.object({
   name: z.string().min(1, { message: '메뉴 이름은 필수입니다.' }),
-  price: z.number().min(0, { message: '판매가는 0 이상이어야 합니다.' }),
-  serving_size: z.number().min(1, { message: '제공량은 1 이상이어야 합니다.' }).optional(),
   description: z.string().max(500, { message: '설명은 500자 이하여야 합니다.' }).optional(),
   recipe: z.string().max(2000, { message: '조리법은 2000자 이하여야 합니다.' }).optional(),
 });
@@ -56,10 +54,8 @@ interface Menu {
   id: string;
   name: string;
   cost_price: number;
-  selling_price: number;
   description?: string;
   recipe?: string;
-  serving_size?: number;
   created_at: string;
   updated_at?: string;
 }
@@ -89,8 +85,6 @@ export default function MenuForm({
     resolver: zodResolver(menuSchema),
     defaultValues: {
       name: '',
-      price: 0,
-      serving_size: 1,
       description: '',
       recipe: '',
     },
@@ -101,8 +95,6 @@ export default function MenuForm({
     if (mode === 'edit' && menu) {
       form.reset({
         name: menu.name,
-        price: menu.selling_price,
-        serving_size: menu.serving_size || 1,
         description: menu.description || '',
         recipe: menu.recipe || '',
       });
@@ -112,8 +104,6 @@ export default function MenuForm({
     } else {
       form.reset({
         name: '',
-        price: 0,
-        serving_size: 1,
         description: '',
         recipe: '',
       });
@@ -204,7 +194,6 @@ export default function MenuForm({
           ...data,
           cost: Math.round(cost),
           ingredients: ingredientsData,
-          sellingPrice: data.price, // API에서 사용하는 필드명
         };
         
         const url = mode === 'create'
@@ -268,65 +257,6 @@ export default function MenuForm({
           )}
         />
 
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="price"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>판매가 (원)</FormLabel>
-                <FormControl>
-                  <Input
-                    value={formatPrice(field.value)}
-                    onChange={(e) => {
-                      field.onChange(parsePrice(e.target.value));
-                    }}
-                    placeholder="판매가를 입력하세요"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="serving_size"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>제공량 (인분)</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={field.value || 1}
-                    onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                    placeholder="제공량을 입력하세요"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-        
-        <div className="p-3 bg-blue-50 rounded-md border border-blue-100">
-          <div className="flex justify-between items-center mb-2">
-            <Label className="text-blue-800">원가 계산</Label>
-            <div className="text-lg font-semibold text-blue-800">
-              {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(cost)}
-            </div>
-          </div>
-          <p className="text-xs text-blue-600 mb-2">선택한 식재료의 양에 따라 자동으로 계산됩니다.</p>
-          
-          <MenuIngredientsSelector
-            companyId={companyId}
-            selectedIngredients={selectedIngredients}
-            onChange={handleIngredientsChange}
-          />
-        </div>
-
         <FormField
           control={form.control}
           name="description"
@@ -364,6 +294,22 @@ export default function MenuForm({
             </FormItem>
           )}
         />
+
+        <div className="p-3 bg-blue-50 rounded-md border border-blue-100">
+          <div className="flex justify-between items-center mb-2">
+            <Label className="text-blue-800">원가 계산</Label>
+            <div className="text-lg font-semibold text-blue-800">
+              {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(cost)}
+            </div>
+          </div>
+          <p className="text-xs text-blue-600 mb-2">선택한 식재료의 양에 따라 자동으로 계산됩니다.</p>
+          
+          <MenuIngredientsSelector
+            companyId={companyId}
+            selectedIngredients={selectedIngredients}
+            onChange={handleIngredientsChange}
+          />
+        </div>
 
         <div className="flex justify-end gap-2 pt-2">
           <Button 

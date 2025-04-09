@@ -11,7 +11,6 @@ import { useToast } from '@/hooks/use-toast';
 interface PriceHistory {
   id: string;
   menu_id: string;
-  price: number;
   cost: number;
   updated_at: string;
   created_at: string;
@@ -59,9 +58,7 @@ export default function MenuPriceHistory({ companyId, menuId }: MenuPriceHistory
   // 차트 데이터 형식으로 변환
   const chartData = priceHistory.map(item => ({
     date: format(new Date(item.created_at), 'yyyy-MM-dd'),
-    price: item.price,
     cost: item.cost,
-    margin: item.price - item.cost,
   }));
 
   const formatCurrency = (amount: number) => {
@@ -96,22 +93,9 @@ export default function MenuPriceHistory({ companyId, menuId }: MenuPriceHistory
                 <Legend />
                 <Line 
                   type="monotone" 
-                  dataKey="price" 
-                  name="판매가" 
-                  stroke="#8884d8" 
-                  activeDot={{ r: 8 }} 
-                />
-                <Line 
-                  type="monotone" 
                   dataKey="cost" 
                   name="원가" 
                   stroke="#82ca9d" 
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="margin" 
-                  name="마진" 
-                  stroke="#ff7300" 
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -123,29 +107,16 @@ export default function MenuPriceHistory({ companyId, menuId }: MenuPriceHistory
                 <TableHeader>
                   <TableRow>
                     <TableHead>날짜</TableHead>
-                    <TableHead>판매가</TableHead>
                     <TableHead>원가</TableHead>
-                    <TableHead>마진</TableHead>
-                    <TableHead>마진율</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {priceHistory.map((item) => {
-                    const margin = item.price - item.cost;
-                    const marginPercent = item.price > 0 
-                      ? ((margin / item.price) * 100).toFixed(1) 
-                      : '0.0';
-                    
-                    return (
-                      <TableRow key={item.id}>
-                        <TableCell>{formatDate(item.created_at)}</TableCell>
-                        <TableCell>{formatCurrency(item.price)}</TableCell>
-                        <TableCell>{formatCurrency(item.cost)}</TableCell>
-                        <TableCell>{formatCurrency(margin)}</TableCell>
-                        <TableCell>{marginPercent}%</TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {priceHistory.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>{formatDate(item.created_at)}</TableCell>
+                      <TableCell>{formatCurrency(item.cost)}</TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>

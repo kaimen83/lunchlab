@@ -87,7 +87,7 @@ export async function POST(request: Request, context: RouteContext) {
     }
     
     const body = await request.json();
-    const { name, description, sellingPrice, ingredients } = body;
+    const { name, description, ingredients } = body;
     
     // 필수 입력값 검증
     if (!name) {
@@ -150,8 +150,7 @@ export async function POST(request: Request, context: RouteContext) {
       .insert({
         company_id: companyId,
         name,
-        description,
-        selling_price: sellingPrice
+        description
       })
       .select()
       .single();
@@ -201,8 +200,7 @@ export async function POST(request: Request, context: RouteContext) {
       .from('menu_price_history')
       .insert({
         menu_id: menu.id,
-        cost_price: updatedMenu.cost_price,
-        selling_price: updatedMenu.selling_price
+        cost_price: updatedMenu.cost_price
       });
     
     if (priceHistoryError) {

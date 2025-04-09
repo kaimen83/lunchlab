@@ -129,7 +129,7 @@ export async function PUT(request: Request, context: RouteContext) {
     }
     
     const body = await request.json();
-    const { name, description, sellingPrice, ingredients } = body;
+    const { name, description, ingredients } = body;
     
     // 필수 입력값 검증
     if (!name) {
@@ -188,7 +188,7 @@ export async function PUT(request: Request, context: RouteContext) {
     // 메뉴 업데이트 전 현재 데이터 조회 (가격 변동 확인용)
     const { data: currentMenu, error: currentError } = await supabase
       .from('menus')
-      .select('cost_price, selling_price')
+      .select('cost_price')
       .eq('id', menuId)
       .eq('company_id', companyId)
       .single();
@@ -205,7 +205,6 @@ export async function PUT(request: Request, context: RouteContext) {
       .update({
         name,
         description,
-        selling_price: sellingPrice,
         updated_at: new Date().toISOString()
       })
       .eq('id', menuId)
@@ -255,6 +254,21 @@ export async function PUT(request: Request, context: RouteContext) {
     if (finalMenuError) {
       console.error('최종 메뉴 조회 오류:', finalMenuError);
       return NextResponse.json({ error: '메뉴 정보 조회 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+    
+    // 4. 가격 이력 기록 (원가가 변경된 경우에만)
+    if (finalMenu.cost_price !== currentMenu.cost_price) {
+      const { error: priceHistoryError } = await supabase
+        .from('menu_price_history')
+        .insert({
+          menu_id: menuId,
+          cost_price: finalMenu.cost_price
+        });
+      
+      if (priceHistoryError) {
+        console.error('메뉴 가격 이력 기록 오류:', priceHistoryError);
+        // 이력 추가 실패는 치명적이지 않으므로 무시하고 진행
+      }
     }
     
     return NextResponse.json(finalMenu);

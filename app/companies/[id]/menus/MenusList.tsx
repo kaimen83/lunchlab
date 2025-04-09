@@ -27,10 +27,8 @@ interface Menu {
   id: string;
   name: string;
   cost_price: number;
-  selling_price: number;
   description?: string;
   recipe?: string;
-  serving_size?: number;
   created_at: string;
   updated_at?: string;
 }
@@ -181,13 +179,13 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
     }
   };
 
-  // 식재료 보기 모달 열기
+  // 식재료 보기 모달
   const handleViewIngredients = (menu: Menu) => {
     setSelectedMenu(menu);
     setIngredientsModalOpen(true);
   };
 
-  // 가격 이력 모달 열기
+  // 가격 이력 모달
   const handleViewPriceHistory = (menu: Menu) => {
     setSelectedMenu(menu);
     setHistoryModalOpen(true);
@@ -254,15 +252,6 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
           <Badge variant="outline" className="mr-2 px-1.5">원가</Badge>
           <span>{formatCurrency(menu.cost_price)}</span>
         </div>
-        <div className="flex items-center">
-          <Badge variant="outline" className="mr-2 px-1.5">판매가</Badge>
-          <span>{formatCurrency(menu.selling_price)}</span>
-        </div>
-        {menu.description && (
-          <div className="col-span-2 mt-1 text-gray-600">
-            {menu.description}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -331,19 +320,6 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                     )}
                   </div>
                 </TableHead>
-                <TableHead 
-                  onClick={() => toggleSort('selling_price')}
-                  className="cursor-pointer hover:bg-gray-50"
-                >
-                  <div className="flex items-center">
-                    판매가
-                    {sortField === 'selling_price' && (
-                      sortDirection === 'asc' ? 
-                      <ChevronUp className="ml-1 h-4 w-4" /> : 
-                      <ChevronDown className="ml-1 h-4 w-4" />
-                    )}
-                  </div>
-                </TableHead>
                 <TableHead>설명</TableHead>
                 <TableHead></TableHead>
               </TableRow>
@@ -364,7 +340,6 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                   <TableRow key={menu.id}>
                     <TableCell className="font-medium">{menu.name}</TableCell>
                     <TableCell>{formatCurrency(menu.cost_price)}</TableCell>
-                    <TableCell>{formatCurrency(menu.selling_price)}</TableCell>
                     <TableCell>
                       {menu.description || '-'}
                     </TableCell>
@@ -414,34 +389,38 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
       </Dialog>
 
       {/* 재료 보기 모달 */}
-      <Dialog open={ingredientsModalOpen} onOpenChange={setIngredientsModalOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>메뉴 식재료 - {selectedMenu?.name}</DialogTitle>
-          </DialogHeader>
-          {selectedMenu && (
-            <MenuIngredientsView
-              companyId={companyId}
-              menuId={selectedMenu.id}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {ingredientsModalOpen && selectedMenu && (
+        <Dialog open={ingredientsModalOpen} onOpenChange={setIngredientsModalOpen}>
+          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>메뉴 식재료 - {selectedMenu?.name}</DialogTitle>
+            </DialogHeader>
+            {selectedMenu && (
+              <MenuIngredientsView 
+                companyId={companyId} 
+                menuId={selectedMenu.id}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* 가격 이력 모달 */}
-      <Dialog open={historyModalOpen} onOpenChange={setHistoryModalOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>가격 이력 - {selectedMenu?.name}</DialogTitle>
-          </DialogHeader>
-          {selectedMenu && (
-            <MenuPriceHistory
-              companyId={companyId}
-              menuId={selectedMenu.id}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {historyModalOpen && selectedMenu && (
+        <Dialog open={historyModalOpen} onOpenChange={setHistoryModalOpen}>
+          <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>가격 이력 - {selectedMenu?.name}</DialogTitle>
+            </DialogHeader>
+            {selectedMenu && (
+              <MenuPriceHistory 
+                companyId={companyId} 
+                menuId={selectedMenu.id}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* 삭제 확인 다이얼로그 */}
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
