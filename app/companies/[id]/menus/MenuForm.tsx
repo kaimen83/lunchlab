@@ -333,7 +333,7 @@ export default function MenuForm({
         </div>
 
         {/* 수정 모드이고 메뉴 ID가 있을 때만 용기 사이즈 폼 표시 */}
-        {mode === 'edit' && menu?.id && (
+        {mode === 'edit' && menu?.id ? (
           <div className="mt-6">
             <MenuContainersForm 
               companyId={companyId}
@@ -341,6 +341,15 @@ export default function MenuForm({
               baseCostPrice={cost}
               onSave={handleContainersChange}
             />
+          </div>
+        ) : (
+          <div className="mt-6 p-4 border border-dashed border-gray-300 rounded-md bg-gray-50">
+            <div className="text-center">
+              <h3 className="text-lg font-medium mb-2">용기 사이즈 설정</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                메뉴를 먼저 생성한 후 용기 사이즈를 설정할 수 있습니다.
+              </p>
+            </div>
           </div>
         )}
 

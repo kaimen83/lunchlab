@@ -281,13 +281,15 @@ export default function ContainerSizeModal({
                   }
                   placeholder="용기 사이즈 검색 또는 직접 입력"
                   value={searchQuery}
-                  onChange={setSearchQuery}
-                  onSelect={(value) => {
+                  onChange={(value: string) => {
+                    setSearchQuery(value);
+                    // ID인 경우 해당 컨테이너 사이즈 선택
                     const selected = containerSizes.find(size => size.id === value);
                     if (selected) {
                       handleSelectContainerSize(selected);
                     }
                   }}
+                  freeInput={true}
                 />
               </div>
               <Button onClick={handleAddContainerSize}>
