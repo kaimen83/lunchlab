@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PackageOpen } from 'lucide-react';
+import { PackageOpen, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,9 +38,8 @@ const ingredientSchema = z.object({
     .max(100, { message: '코드명은 100자 이하여야 합니다.' })
     .optional()
     .nullable(),
-  supplier: z
+  supplier_id: z
     .string()
-    .max(100, { message: '식재료 업체는 100자 이하여야 합니다.' })
     .optional()
     .nullable(),
   package_amount: z
@@ -74,7 +73,7 @@ interface Ingredient {
   id: string;
   name: string;
   code_name?: string;
-  supplier?: string;
+  supplier_id?: string;
   package_amount: number;
   unit: string;
   price: number;
@@ -109,7 +108,7 @@ export default function IngredientForm({
     defaultValues: {
       name: '',
       code_name: '',
-      supplier: '',
+      supplier_id: '',
       package_amount: 0,
       unit: 'g',
       price: 0,
@@ -128,20 +127,20 @@ export default function IngredientForm({
     const loadSuppliers = async () => {
       setIsLoadingSuppliers(true);
       try {
-        // 이미 저장된 식재료 업체 정보를 불러옵니다
-        const response = await fetch(`/api/companies/${companyId}/ingredients/customers`);
+        // 새로운 API를 호출하여 공급업체 정보를 불러옵니다
+        const response = await fetch(`/api/companies/${companyId}/ingredients/suppliers`);
         
         if (!response.ok) {
-          throw new Error('식재료 업체 목록을 불러오는데 실패했습니다.');
+          throw new Error('공급업체 목록을 불러오는데 실패했습니다.');
         }
         
         const data = await response.json();
-        setSuppliers(data.map((supplier: string) => ({
-          label: supplier,
-          value: supplier
+        setSuppliers(data.map((supplier: {id: string, name: string}) => ({
+          label: supplier.name,
+          value: supplier.id
         })));
       } catch (error) {
-        console.error('식재료 업체 로드 오류:', error);
+        console.error('공급업체 로드 오류:', error);
       } finally {
         setIsLoadingSuppliers(false);
       }
@@ -150,13 +149,97 @@ export default function IngredientForm({
     loadSuppliers();
   }, [companyId]);
 
+  // 새 공급업체 추가 함수
+  const addNewSupplier = async (supplierName: string) => {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/ingredients/suppliers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: supplierName,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '공급업체 추가에 실패했습니다.');
+      }
+
+      const newSupplier = await response.json();
+      setSuppliers(prev => [...prev, {
+        label: newSupplier.name,
+        value: newSupplier.id
+      }]);
+
+      toast({
+        title: '공급업체 추가 완료',
+        description: `${newSupplier.name} 공급업체가 추가되었습니다.`,
+        variant: 'default',
+      });
+
+      return newSupplier.id;
+    } catch (error) {
+      console.error('공급업체 추가 오류:', error);
+      toast({
+        title: '오류 발생',
+        description: error instanceof Error ? error.message : '공급업체 추가 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+      return null;
+    }
+  };
+
+  // 공급업체 선택 또는 추가 처리
+  const handleSupplierChange = async (value: string, inputValue?: string) => {
+    // 입력값이 있지만 선택된 값이 없는 경우 (새 업체 추가)
+    if (!value && inputValue) {
+      const newSupplierId = await addNewSupplier(inputValue);
+      if (newSupplierId) {
+        form.setValue('supplier_id', newSupplierId);
+      } else {
+        // 새 공급업체 추가 실패 시 supplier_id를 null로 설정
+        form.setValue('supplier_id', null);
+      }
+    } else if (value) {
+      // 기존 업체 선택: value가 실제 UUID인 경우에만 설정
+      const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+      
+      if (isValidUUID) {
+        form.setValue('supplier_id', value);
+      } else {
+        // UUID가 아닌 경우 null로 설정
+        form.setValue('supplier_id', null);
+      }
+    } else {
+      // 값이 없는 경우 null로 설정
+      form.setValue('supplier_id', null);
+    }
+  };
+
+  // 동기 방식의 공급업체 선택 핸들러
+  const handleSupplierSelect = (value: string) => {
+    // 동기 방식으로 supplier_id 설정
+    if (value) {
+      const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+      if (isValidUUID) {
+        form.setValue('supplier_id', value);
+      } else {
+        form.setValue('supplier_id', null);
+      }
+    } else {
+      form.setValue('supplier_id', null);
+    }
+  };
+
   // 수정 모드일 경우 초기값 설정
   useEffect(() => {
     if (mode === 'edit' && ingredient) {
       form.reset({
         name: ingredient.name,
         code_name: ingredient.code_name || '',
-        supplier: ingredient.supplier || '',
+        supplier_id: ingredient.supplier_id || '',
         package_amount: ingredient.package_amount,
         unit: ingredient.unit,
         price: ingredient.price,
@@ -168,7 +251,7 @@ export default function IngredientForm({
       form.reset({
         name: '',
         code_name: '',
-        supplier: '',
+        supplier_id: '',
         package_amount: 0,
         unit: 'g',
         price: 0,
@@ -184,6 +267,16 @@ export default function IngredientForm({
     setIsSubmitting(true);
     
     try {
+      // supplier_id가 빈 문자열이면 null로 변환
+      const formData = {
+        ...data,
+        supplier_id: data.supplier_id && data.supplier_id.trim() !== '' ? data.supplier_id : null,
+        code_name: data.code_name || null,
+        stock_grade: data.stock_grade || null,
+        memo1: data.memo1 || null,
+        items_per_box: data.items_per_box === 0 ? null : data.items_per_box,
+      };
+      
       const url = mode === 'create'
         ? `/api/companies/${companyId}/ingredients`
         : `/api/companies/${companyId}/ingredients/${ingredient?.id}`;
@@ -195,7 +288,7 @@ export default function IngredientForm({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(formData),
       });
       
       if (!response.ok) {
@@ -252,11 +345,16 @@ export default function IngredientForm({
         <FormField
           control={form.control}
           name="code_name"
-          render={({ field }) => (
+          render={({ field: { value, onChange, ...fieldProps } }) => (
             <FormItem>
               <FormLabel>코드명</FormLabel>
               <FormControl>
-                <Input {...field} placeholder="코드명을 입력하세요" />
+                <Input 
+                  {...fieldProps} 
+                  value={value || ""} 
+                  onChange={(e) => onChange(e.target.value)}
+                  placeholder="코드명을 입력하세요" 
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -265,19 +363,40 @@ export default function IngredientForm({
 
         <FormField
           control={form.control}
-          name="supplier"
-          render={({ field }) => (
+          name="supplier_id"
+          render={({ field: { value, onChange, ...fieldProps } }) => (
             <FormItem>
               <FormLabel>식재료 업체</FormLabel>
               <FormControl>
-                <Combobox
-                  items={suppliers}
-                  placeholder="식재료 업체를 선택하거나 입력하세요"
-                  value={field.value || ""}
-                  onChange={field.onChange}
-                  freeInput={true}
-                  emptyMessage="검색 결과가 없습니다. 직접 입력할 수 있습니다."
-                />
+                <div>
+                  <Combobox
+                    items={suppliers}
+                    placeholder="식재료 업체를 선택하세요"
+                    value={value || ""}
+                    onChange={handleSupplierSelect}
+                    freeInput={false}
+                    emptyMessage="검색 결과가 없습니다."
+                  />
+                  {isLoadingSuppliers && <div className="mt-2 text-sm text-muted-foreground">로딩 중...</div>}
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-2"
+                    onClick={async () => {
+                      // 새 공급업체 추가를 위한 모달 또는 입력창 표시
+                      const name = prompt("새 공급업체 이름을 입력하세요");
+                      if (name && name.trim()) {
+                        const newSupplierId = await addNewSupplier(name.trim());
+                        if (newSupplierId) {
+                          form.setValue('supplier_id', newSupplierId);
+                        }
+                      }
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" /> 새 공급업체 추가
+                  </Button>
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -382,13 +501,13 @@ export default function IngredientForm({
         <FormField
           control={form.control}
           name="stock_grade"
-          render={({ field }) => (
+          render={({ field: { value, onChange, ...fieldProps } }) => (
             <FormItem>
               <FormLabel>재고관리 등급</FormLabel>
               <Select
-                onValueChange={field.onChange}
-                defaultValue={field.value}
-                value={field.value || ""}
+                onValueChange={onChange}
+                defaultValue={value || undefined}
+                value={value || ""}
               >
                 <FormControl>
                   <SelectTrigger>

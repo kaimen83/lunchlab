@@ -27,6 +27,7 @@ interface Ingredient {
   name: string;
   code_name?: string;
   supplier?: string;
+  supplier_id?: string;
   package_amount: number;
   unit: string;
   price: number;
@@ -64,6 +65,15 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
   const loadIngredients = async () => {
     setIsLoading(true);
     try {
+      // 모든 공급업체 목록을 먼저 가져옵니다
+      const suppliersResponse = await fetch(`/api/companies/${companyId}/ingredients/suppliers`);
+      let suppliersList: {id: string, name: string}[] = [];
+      
+      if (suppliersResponse.ok) {
+        suppliersList = await suppliersResponse.json();
+      }
+      
+      // 식재료 목록을 가져옵니다
       const response = await fetch(`/api/companies/${companyId}/ingredients`);
       
       if (!response.ok) {
@@ -71,7 +81,22 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
       }
       
       const data = await response.json();
-      setIngredients(data);
+      
+      // supplier_id가 있는 경우 공급업체 정보를 연결합니다
+      const ingredientsWithSuppliers = data.map((ingredient: Ingredient) => {
+        if (ingredient.supplier_id) {
+          const matchedSupplier = suppliersList.find(s => s.id === ingredient.supplier_id);
+          if (matchedSupplier) {
+            return {
+              ...ingredient,
+              supplier: matchedSupplier.name
+            };
+          }
+        }
+        return ingredient;
+      });
+      
+      setIngredients(ingredientsWithSuppliers);
     } catch (error) {
       console.error('식재료 로드 오류:', error);
       toast({

@@ -8,6 +8,7 @@ import { z } from 'zod';
 
 // 유효성 검사 스키마
 const ingredientSchema = z.object({
+  id: z.string().optional(), // PUT 메서드에서 필요
   name: z
     .string()
     .min(1, { message: '식재료 이름은 필수입니다.' })
@@ -20,6 +21,10 @@ const ingredientSchema = z.object({
   supplier: z
     .string()
     .max(100, { message: '식재료 업체는 100자 이하여야 합니다.' })
+    .optional()
+    .nullable(),
+  supplier_id: z
+    .string()
     .optional()
     .nullable(),
   package_amount: z
@@ -163,6 +168,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         name: ingredient.name,
         code_name: ingredient.code_name || null,
         supplier: ingredient.supplier || null,
+        supplier_id: ingredient.supplier_id || null,
         package_amount: ingredient.package_amount,
         unit: ingredient.unit,
         price: ingredient.price,
@@ -194,6 +200,101 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return Response.json(data, { status: 201 });
   } catch (error) {
     console.error('식재료 추가 API 오류:', error);
+    return Response.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
+  }
+}
+
+// 식재료 수정
+export async function PUT(request: NextRequest, context: RouteContext) {
+  try {
+    const { id: companyId } = await context.params;
+    const session = await auth();
+    
+    if (!session || !session.userId) {
+      return Response.json({ error: '인증되지 않은 요청입니다.' }, { status: 401 });
+    }
+    
+    const userId = session.userId;
+
+    // 회사 정보 조회
+    const company = await getServerCompany(companyId);
+    if (!company) {
+      return Response.json({ error: '회사를 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    // 멤버십 확인
+    const membership = await getUserMembership({ userId, companyId });
+    if (!membership) {
+      return Response.json({ error: '이 회사에 접근할 권한이 없습니다.' }, { status: 403 });
+    }
+
+    // 기능 활성화 확인
+    const isEnabled = await isFeatureEnabled('ingredients', companyId);
+    if (!isEnabled) {
+      return Response.json({ error: '식재료 기능이 활성화되지 않았습니다.' }, { status: 403 });
+    }
+
+    // 요청 데이터 파싱
+    const requestData = await request.json();
+    
+    // 데이터 유효성 검사
+    const validationResult = ingredientSchema.safeParse(requestData);
+    
+    if (!validationResult.success) {
+      const errors = validationResult.error.errors.map(err => ({
+        path: err.path.join('.'),
+        message: err.message,
+      }));
+      
+      return Response.json({ error: '입력 데이터가 유효하지 않습니다.', details: errors }, { status: 400 });
+    }
+    
+    const ingredient = validationResult.data;
+
+    // Supabase 클라이언트 생성
+    const supabase = createServerSupabaseClient();
+
+    // 식재료 수정
+    const { data, error } = await supabase
+      .from('ingredients')
+      .update({
+        name: ingredient.name,
+        code_name: ingredient.code_name || null,
+        supplier: ingredient.supplier || null,
+        supplier_id: ingredient.supplier_id || null,
+        package_amount: ingredient.package_amount,
+        unit: ingredient.unit,
+        price: ingredient.price,
+        items_per_box: ingredient.items_per_box || null,
+        stock_grade: ingredient.stock_grade || null,
+        memo1: ingredient.memo1 || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', ingredient.id)
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('식재료 수정 오류:', error);
+      return Response.json({ error: '식재료 수정에 실패했습니다.' }, { status: 500 });
+    }
+
+    // 가격 이력 추가
+    const { error: historyError } = await supabase
+      .from('ingredient_price_history')
+      .insert({
+        ingredient_id: data.id,
+        price: ingredient.price,
+      });
+
+    if (historyError) {
+      console.error('가격 이력 추가 오류:', historyError);
+      // 이력 추가 실패는 심각한 오류가 아니므로 계속 진행
+    }
+
+    return Response.json(data, { status: 200 });
+  } catch (error) {
+    console.error('식재료 수정 API 오류:', error);
     return Response.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 } 
