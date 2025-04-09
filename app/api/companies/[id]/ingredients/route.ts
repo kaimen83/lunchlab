@@ -12,22 +12,40 @@ const ingredientSchema = z.object({
     .string()
     .min(1, { message: '식재료 이름은 필수입니다.' })
     .max(100, { message: '식재료 이름은 100자 이하여야 합니다.' }),
+  code_name: z
+    .string()
+    .max(100, { message: '코드명은 100자 이하여야 합니다.' })
+    .optional()
+    .nullable(),
+  supplier: z
+    .string()
+    .max(100, { message: '식재료 업체는 100자 이하여야 합니다.' })
+    .optional()
+    .nullable(),
   package_amount: z
     .number()
     .min(0.1, { message: '포장량은 0.1 이상이어야 합니다.' }),
   unit: z
     .string()
-    .min(1, { message: '단위는 필수입니다.' })
-    .max(20, { message: '단위는 20자 이하여야 합니다.' }),
+    .min(1, { message: '단위는 필수입니다.' }),
   price: z
     .number()
     .min(0, { message: '가격은 0 이상이어야 합니다.' }),
-  memo1: z
-    .string()
-    .max(200, { message: '메모는 200자 이하여야 합니다.' })
+  items_per_box: z
+    .number()
+    .min(0, { message: '박스당 갯수는 0 이상이어야 합니다.' })
     .optional()
     .nullable(),
-  memo2: z
+  pac_count: z
+    .number()
+    .min(0, { message: '필요 PAC 수는 0 이상이어야 합니다.' })
+    .optional()
+    .nullable(),
+  stock_grade: z
+    .string()
+    .optional()
+    .nullable(),
+  memo1: z
     .string()
     .max(200, { message: '메모는 200자 이하여야 합니다.' })
     .optional()
@@ -148,11 +166,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .insert({
         company_id: companyId,
         name: ingredient.name,
+        code_name: ingredient.code_name || null,
+        supplier: ingredient.supplier || null,
         package_amount: ingredient.package_amount,
         unit: ingredient.unit,
         price: ingredient.price,
+        items_per_box: ingredient.items_per_box || null,
+        pac_count: ingredient.pac_count || null,
+        stock_grade: ingredient.stock_grade || null,
         memo1: ingredient.memo1 || null,
-        memo2: ingredient.memo2 || null,
       })
       .select('*')
       .single();

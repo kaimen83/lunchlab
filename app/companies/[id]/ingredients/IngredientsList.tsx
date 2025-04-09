@@ -25,11 +25,15 @@ import { Badge } from '@/components/ui/badge';
 interface Ingredient {
   id: string;
   name: string;
+  code_name?: string;
+  customer?: string;
   package_amount: number;
   unit: string;
   price: number;
+  items_per_box?: number;
+  pac_count?: number;
+  stock_grade?: string;
   memo1?: string;
-  memo2?: string;
   created_at: string;
   updated_at?: string;
 }
@@ -99,8 +103,7 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
     .filter(ingredient => 
       ingredient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ingredient.unit.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (ingredient.memo1 && ingredient.memo1.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (ingredient.memo2 && ingredient.memo2.toLowerCase().includes(searchQuery.toLowerCase()))
+      (ingredient.memo1 && ingredient.memo1.toLowerCase().includes(searchQuery.toLowerCase()))
     )
     .sort((a, b) => {
       const aValue = a[sortField];
@@ -202,6 +205,127 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
     return new Intl.NumberFormat('ko-KR').format(number);
   };
 
+  // 테이블 헤더 렌더링
+  const renderTableHeader = () => (
+    <TableHeader>
+      <TableRow>
+        <TableHead 
+          className="cursor-pointer"
+          onClick={() => toggleSort('name')}
+        >
+          식재료명
+          {sortField === 'name' && (
+            sortDirection === 'asc' ? 
+              <ChevronUp className="inline ml-1 h-4 w-4" /> : 
+              <ChevronDown className="inline ml-1 h-4 w-4" />
+          )}
+        </TableHead>
+        <TableHead 
+          className="cursor-pointer"
+          onClick={() => toggleSort('code_name')}
+        >
+          코드명
+          {sortField === 'code_name' && (
+            sortDirection === 'asc' ? 
+              <ChevronUp className="inline ml-1 h-4 w-4" /> : 
+              <ChevronDown className="inline ml-1 h-4 w-4" />
+          )}
+        </TableHead>
+        <TableHead 
+          className="cursor-pointer"
+          onClick={() => toggleSort('customer')}
+        >
+          고객사
+          {sortField === 'customer' && (
+            sortDirection === 'asc' ? 
+              <ChevronUp className="inline ml-1 h-4 w-4" /> : 
+              <ChevronDown className="inline ml-1 h-4 w-4" />
+          )}
+        </TableHead>
+        <TableHead>포장량</TableHead>
+        <TableHead>단위</TableHead>
+        <TableHead 
+          className="cursor-pointer text-right"
+          onClick={() => toggleSort('price')}
+        >
+          가격
+          {sortField === 'price' && (
+            sortDirection === 'asc' ? 
+              <ChevronUp className="inline ml-1 h-4 w-4" /> : 
+              <ChevronDown className="inline ml-1 h-4 w-4" />
+          )}
+        </TableHead>
+        <TableHead>박스당 갯수</TableHead>
+        <TableHead>필요 PAC 수</TableHead>
+        <TableHead>재고관리 등급</TableHead>
+        <TableHead className="text-right">작업</TableHead>
+      </TableRow>
+    </TableHeader>
+  );
+
+  // 테이블 행 렌더링
+  const renderTableRows = () => (
+    <TableBody>
+      {isLoading ? (
+        <TableRow>
+          <TableCell colSpan={10} className="text-center">로딩 중...</TableCell>
+        </TableRow>
+      ) : filteredIngredients.length === 0 ? (
+        <TableRow>
+          <TableCell colSpan={10} className="text-center">
+            {searchQuery ? '검색 결과가 없습니다.' : '등록된 식재료가 없습니다.'}
+          </TableCell>
+        </TableRow>
+      ) : (
+        filteredIngredients.map(ingredient => (
+          <TableRow key={ingredient.id}>
+            <TableCell className="font-medium">{ingredient.name}</TableCell>
+            <TableCell>{ingredient.code_name || '-'}</TableCell>
+            <TableCell>{ingredient.customer || '-'}</TableCell>
+            <TableCell>{formatNumber(ingredient.package_amount)}</TableCell>
+            <TableCell>{ingredient.unit}</TableCell>
+            <TableCell className="text-right">{formatCurrency(ingredient.price)}</TableCell>
+            <TableCell>{ingredient.items_per_box ? formatNumber(ingredient.items_per_box) : '-'}</TableCell>
+            <TableCell>{ingredient.pac_count ? formatNumber(ingredient.pac_count) : '-'}</TableCell>
+            <TableCell>{ingredient.stock_grade || '-'}</TableCell>
+            <TableCell className="text-right">
+              <div className="flex justify-end space-x-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleViewPriceHistory(ingredient)}
+                  title="가격 이력 보기"
+                >
+                  <LineChart className="h-4 w-4" />
+                </Button>
+                {isOwnerOrAdmin && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEditIngredient(ingredient)}
+                      title="수정"
+                    >
+                      <FilePen className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteConfirm(ingredient)}
+                      title="삭제"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </TableCell>
+          </TableRow>
+        ))
+      )}
+    </TableBody>
+  );
+
   // 모바일 카드 아이템 렌더링
   const renderMobileCard = (ingredient: Ingredient) => (
     <div className="p-3 border-b border-gray-200 last:border-0">
@@ -238,12 +362,32 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
       </div>
       <div className="grid grid-cols-2 gap-2 text-sm">
         <div className="flex items-center">
+          <Badge variant="outline" className="mr-2 px-1.5">코드명</Badge>
+          <span>{ingredient.code_name || '-'}</span>
+        </div>
+        <div className="flex items-center">
+          <Badge variant="outline" className="mr-2 px-1.5">고객사</Badge>
+          <span>{ingredient.customer || '-'}</span>
+        </div>
+        <div className="flex items-center">
           <Badge variant="outline" className="mr-2 px-1.5">포장량</Badge>
           <span>{formatNumber(ingredient.package_amount)} {ingredient.unit}</span>
         </div>
         <div className="flex items-center">
           <Badge variant="outline" className="mr-2 px-1.5">가격</Badge>
           <span>{formatCurrency(ingredient.price)}</span>
+        </div>
+        <div className="flex items-center">
+          <Badge variant="outline" className="mr-2 px-1.5">박스당 갯수</Badge>
+          <span>{ingredient.items_per_box ? formatNumber(ingredient.items_per_box) : '-'}</span>
+        </div>
+        <div className="flex items-center">
+          <Badge variant="outline" className="mr-2 px-1.5">필요 PAC 수</Badge>
+          <span>{ingredient.pac_count ? formatNumber(ingredient.pac_count) : '-'}</span>
+        </div>
+        <div className="flex items-center">
+          <Badge variant="outline" className="mr-2 px-1.5">재고관리</Badge>
+          <span>{ingredient.stock_grade || '-'}</span>
         </div>
         {ingredient.memo1 && (
           <div className="col-span-2 mt-1 text-gray-600">
@@ -294,95 +438,8 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
         {/* 데스크톱 뷰 - 테이블 형태로 표시 */}
         <div className="hidden sm:block overflow-x-auto">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead 
-                  onClick={() => toggleSort('name')}
-                  className="cursor-pointer hover:bg-gray-50"
-                >
-                  <div className="flex items-center">
-                    이름
-                    {sortField === 'name' && (
-                      sortDirection === 'asc' ? 
-                      <ChevronUp className="ml-1 h-4 w-4" /> : 
-                      <ChevronDown className="ml-1 h-4 w-4" />
-                    )}
-                  </div>
-                </TableHead>
-                <TableHead 
-                  onClick={() => toggleSort('package_amount')}
-                  className="cursor-pointer hover:bg-gray-50"
-                >
-                  <div className="flex items-center">
-                    포장량
-                    {sortField === 'package_amount' && (
-                      sortDirection === 'asc' ? 
-                      <ChevronUp className="ml-1 h-4 w-4" /> : 
-                      <ChevronDown className="ml-1 h-4 w-4" />
-                    )}
-                  </div>
-                </TableHead>
-                <TableHead>단위</TableHead>
-                <TableHead 
-                  onClick={() => toggleSort('price')}
-                  className="cursor-pointer hover:bg-gray-50"
-                >
-                  <div className="flex items-center">
-                    가격
-                    {sortField === 'price' && (
-                      sortDirection === 'asc' ? 
-                      <ChevronUp className="ml-1 h-4 w-4" /> : 
-                      <ChevronDown className="ml-1 h-4 w-4" />
-                    )}
-                  </div>
-                </TableHead>
-                <TableHead>메모</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center">로딩 중...</TableCell>
-                </TableRow>
-              ) : filteredIngredients.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center">
-                    {searchQuery ? '검색 결과가 없습니다.' : '등록된 식재료가 없습니다.'}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredIngredients.map(ingredient => (
-                  <TableRow key={ingredient.id}>
-                    <TableCell className="font-medium">{ingredient.name}</TableCell>
-                    <TableCell>{formatNumber(ingredient.package_amount)}</TableCell>
-                    <TableCell>{ingredient.unit}</TableCell>
-                    <TableCell>{formatCurrency(ingredient.price)}</TableCell>
-                    <TableCell>
-                      {ingredient.memo1 || '-'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1 justify-end">
-                        <Button variant="ghost" size="icon" onClick={() => handleViewPriceHistory(ingredient)}>
-                          <LineChart className="h-4 w-4" />
-                        </Button>
-                        
-                        {isOwnerOrAdmin && (
-                          <>
-                            <Button variant="ghost" size="icon" onClick={() => handleEditIngredient(ingredient)}>
-                              <FilePen className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteConfirm(ingredient)}>
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
+            {renderTableHeader()}
+            {renderTableRows()}
           </Table>
         </div>
       </Card>

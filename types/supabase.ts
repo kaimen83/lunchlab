@@ -124,11 +124,15 @@ export interface Database {
           id: string
           company_id: string
           name: string
+          code_name: string | null
+          customer: string | null
           package_amount: number
           unit: string
           price: number
+          items_per_box: number | null
+          pac_count: number | null
+          stock_grade: string | null
           memo1: string | null
-          memo2: string | null
           created_at: string
           updated_at: string | null
         }
@@ -136,11 +140,15 @@ export interface Database {
           id?: string
           company_id: string
           name: string
+          code_name?: string | null
+          customer?: string | null
           package_amount: number
           unit: string
           price: number
+          items_per_box?: number | null
+          pac_count?: number | null
+          stock_grade?: string | null
           memo1?: string | null
-          memo2?: string | null
           created_at?: string
           updated_at?: string | null
         }
@@ -148,11 +156,15 @@ export interface Database {
           id?: string
           company_id?: string
           name?: string
+          code_name?: string | null
+          customer?: string | null
           package_amount?: number
           unit?: string
           price?: number
+          items_per_box?: number | null
+          pac_count?: number | null
+          stock_grade?: string | null
           memo1?: string | null
-          memo2?: string | null
           created_at?: string
           updated_at?: string | null
         }
