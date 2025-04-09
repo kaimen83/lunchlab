@@ -5,22 +5,20 @@ import { CompanyItem } from './CompanyItem';
 import { SidebarActions } from './SidebarActions';
 import { useSidebarState } from './useSidebarState';
 
-export function SidebarContent({ companies, isMobile = false }: CompanySidebarProps) {
+export function SidebarContent({ companies, isMobile = false, isSheetOpen, setIsSheetOpen }: CompanySidebarProps) {
   const { user } = useUser();
   const {
     expandedCompanyId,
     joinRequestCounts,
     currentCompanyId,
     userCanCreateCompany,
-    isSheetOpen,
-    setIsSheetOpen,
     toggleCompany,
     isFeatureEnabled
   } = useSidebarState(companies);
 
   // 모바일 사이드바 닫기 (링크 클릭 시)
   const handleLinkClick = () => {
-    if (isMobile) {
+    if (isMobile && setIsSheetOpen) {
       setIsSheetOpen(false);
     }
   };
@@ -30,7 +28,7 @@ export function SidebarContent({ companies, isMobile = false }: CompanySidebarPr
       <SidebarHeader 
         user={user} 
         isMobile={isMobile} 
-        onClose={() => setIsSheetOpen(false)}
+        onClose={() => setIsSheetOpen && setIsSheetOpen(false)}
       />
       
       {/* 회사 목록 */}

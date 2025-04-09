@@ -13,7 +13,6 @@ export function useSidebarState(companies: Array<Company & { role: string }>) {
   );
   const [joinRequestCounts, setJoinRequestCounts] = useState<Record<string, number>>({});
   const [companyFeatures, setCompanyFeatures] = useState<Record<string, string[]>>({});
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   // 사용자 권한 확인 (회사 생성 권한 체크)
   const userRole = user?.publicMetadata?.role as string;
@@ -237,8 +236,6 @@ export function useSidebarState(companies: Array<Company & { role: string }>) {
     expandedCompanyId,
     joinRequestCounts,
     companyFeatures,
-    isSheetOpen,
-    setIsSheetOpen,
     currentCompanyId,
     userCanCreateCompany,
     toggleCompany,

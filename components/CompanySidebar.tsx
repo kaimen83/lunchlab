@@ -27,7 +27,12 @@ export function CompanySidebar({ companies, isMobile = false }: CompanySidebarPr
               </button>
             </SheetTrigger>
             <SheetContent side="left" className="p-0 bg-[#19171D] border-r border-gray-700 w-[280px] sm:w-[320px]">
-              <SidebarContent companies={companies} isMobile={true} />
+              <SidebarContent 
+                companies={companies} 
+                isMobile={true} 
+                isSheetOpen={isSheetOpen}
+                setIsSheetOpen={setIsSheetOpen}
+              />
             </SheetContent>
           </Sheet>
         </div>

@@ -1,9 +1,12 @@
 import { Company } from '@/lib/types';
+import { Dispatch, SetStateAction } from 'react';
 
 // 컴포넌트 Props 정의
 export interface CompanySidebarProps {
   companies: Array<Company & { role: string }>;
   isMobile?: boolean;
+  isSheetOpen?: boolean;
+  setIsSheetOpen?: Dispatch<SetStateAction<boolean>>;
 }
 
 // 회사 기능 관련 타입
