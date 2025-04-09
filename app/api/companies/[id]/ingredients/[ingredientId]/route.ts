@@ -107,7 +107,7 @@ export async function PUT(request: Request, context: RouteContext) {
     }
     
     const body = await request.json();
-    const { name, code_name, customer, package_amount, unit, price, items_per_box, pac_count, stock_grade, memo1 } = body;
+    const { name, code_name, customer, package_amount, unit, price, items_per_box, stock_grade, memo1 } = body;
     
     // 필수 입력값 검증
     if (!name || !package_amount || !unit || !price) {
@@ -180,7 +180,6 @@ export async function PUT(request: Request, context: RouteContext) {
         unit,
         price,
         items_per_box: items_per_box || null,
-        pac_count: pac_count || null,
         stock_grade: stock_grade || null,
         memo1: memo1 || null,
         updated_at: new Date().toISOString()

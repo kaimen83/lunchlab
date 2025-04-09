@@ -57,11 +57,6 @@ const ingredientSchema = z.object({
     .min(0, { message: '박스당 갯수는 0 이상이어야 합니다.' })
     .optional()
     .nullable(),
-  pac_count: z
-    .number()
-    .min(0, { message: '필요 PAC 수는 0 이상이어야 합니다.' })
-    .optional()
-    .nullable(),
   stock_grade: z
     .string()
     .optional()
@@ -84,7 +79,6 @@ interface Ingredient {
   unit: string;
   price: number;
   items_per_box?: number;
-  pac_count?: number;
   stock_grade?: string;
   memo1?: string;
   created_at: string;
@@ -120,7 +114,6 @@ export default function IngredientForm({
       unit: 'g',
       price: 0,
       items_per_box: 0,
-      pac_count: 0,
       stock_grade: '',
       memo1: '',
     },
@@ -168,7 +161,6 @@ export default function IngredientForm({
         unit: ingredient.unit,
         price: ingredient.price,
         items_per_box: ingredient.items_per_box || 0,
-        pac_count: ingredient.pac_count || 0,
         stock_grade: ingredient.stock_grade || '',
         memo1: ingredient.memo1 || '',
       });
@@ -181,7 +173,6 @@ export default function IngredientForm({
         unit: 'g',
         price: 0,
         items_per_box: 0,
-        pac_count: 0,
         stock_grade: '',
         memo1: '',
       });
@@ -378,27 +369,6 @@ export default function IngredientForm({
                     type="number"
                     min="0"
                     placeholder="박스당 갯수를 입력하세요"
-                    onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                    value={field.value || 0}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="pac_count"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>필요 PAC 수</FormLabel>
-                <FormControl>
-                  <Input
-                    {...field}
-                    type="number"
-                    min="0"
-                    placeholder="필요 PAC 수를 입력하세요"
                     onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                     value={field.value || 0}
                   />

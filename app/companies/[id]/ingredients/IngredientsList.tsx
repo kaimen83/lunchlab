@@ -26,7 +26,7 @@ interface Ingredient {
   id: string;
   name: string;
   code_name?: string;
-  customer?: string;
+  supplier?: string;
   package_amount: number;
   unit: string;
   price: number;
@@ -232,20 +232,19 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
           )}
         </TableHead>
         <TableHead 
-          className="cursor-pointer"
-          onClick={() => toggleSort('customer')}
+          className="cursor-pointer w-[180px]"
+          onClick={() => toggleSort('supplier')}
         >
-          고객사
-          {sortField === 'customer' && (
+          식재료 업체
+          {sortField === 'supplier' && (
             sortDirection === 'asc' ? 
               <ChevronUp className="inline ml-1 h-4 w-4" /> : 
               <ChevronDown className="inline ml-1 h-4 w-4" />
           )}
         </TableHead>
-        <TableHead>포장량</TableHead>
-        <TableHead>단위</TableHead>
+        <TableHead className="w-[120px]">포장 단위</TableHead>
         <TableHead 
-          className="cursor-pointer text-right"
+          className="cursor-pointer text-right w-[120px]"
           onClick={() => toggleSort('price')}
         >
           가격
@@ -255,9 +254,8 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
               <ChevronDown className="inline ml-1 h-4 w-4" />
           )}
         </TableHead>
-        <TableHead>박스당 갯수</TableHead>
-        <TableHead>필요 PAC 수</TableHead>
-        <TableHead>재고관리 등급</TableHead>
+        <TableHead className="w-[100px]">박스당 갯수</TableHead>
+        <TableHead className="w-[100px]">재고관리 등급</TableHead>
         <TableHead className="text-right">작업</TableHead>
       </TableRow>
     </TableHeader>
@@ -281,12 +279,10 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
           <TableRow key={ingredient.id}>
             <TableCell className="font-medium">{ingredient.name}</TableCell>
             <TableCell>{ingredient.code_name || '-'}</TableCell>
-            <TableCell>{ingredient.customer || '-'}</TableCell>
-            <TableCell>{formatNumber(ingredient.package_amount)}</TableCell>
-            <TableCell>{ingredient.unit}</TableCell>
+            <TableCell>{ingredient.supplier || '-'}</TableCell>
+            <TableCell>{formatNumber(ingredient.package_amount)}{ingredient.unit}</TableCell>
             <TableCell className="text-right">{formatCurrency(ingredient.price)}</TableCell>
             <TableCell>{ingredient.items_per_box ? formatNumber(ingredient.items_per_box) : '-'}</TableCell>
-            <TableCell>{ingredient.pac_count ? formatNumber(ingredient.pac_count) : '-'}</TableCell>
             <TableCell>{ingredient.stock_grade || '-'}</TableCell>
             <TableCell className="text-right">
               <div className="flex justify-end space-x-1">
@@ -360,40 +356,31 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <div className="grid grid-cols-2 gap-2 text-sm">
-        <div className="flex items-center">
-          <Badge variant="outline" className="mr-2 px-1.5">코드명</Badge>
-          <span>{ingredient.code_name || '-'}</span>
+      <div className="grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <span className="text-gray-500">포장 단위:</span>
+          <span className="ml-2">{formatNumber(ingredient.package_amount)}{ingredient.unit}</span>
         </div>
-        <div className="flex items-center">
-          <Badge variant="outline" className="mr-2 px-1.5">고객사</Badge>
-          <span>{ingredient.customer || '-'}</span>
+        <div>
+          <span className="text-gray-500">가격:</span>
+          <span className="ml-2">{formatCurrency(ingredient.price)}</span>
         </div>
-        <div className="flex items-center">
-          <Badge variant="outline" className="mr-2 px-1.5">포장량</Badge>
-          <span>{formatNumber(ingredient.package_amount)} {ingredient.unit}</span>
+        <div>
+          <span className="text-gray-500">코드명:</span>
+          <span className="ml-2">{ingredient.code_name || '-'}</span>
         </div>
-        <div className="flex items-center">
-          <Badge variant="outline" className="mr-2 px-1.5">가격</Badge>
-          <span>{formatCurrency(ingredient.price)}</span>
+        <div>
+          <span className="text-gray-500">식재료 업체:</span>
+          <span className="ml-2">{ingredient.supplier || '-'}</span>
         </div>
-        <div className="flex items-center">
-          <Badge variant="outline" className="mr-2 px-1.5">박스당 갯수</Badge>
-          <span>{ingredient.items_per_box ? formatNumber(ingredient.items_per_box) : '-'}</span>
+        <div>
+          <span className="text-gray-500">박스당 갯수:</span>
+          <span className="ml-2">{ingredient.items_per_box ? formatNumber(ingredient.items_per_box) : '-'}</span>
         </div>
-        <div className="flex items-center">
-          <Badge variant="outline" className="mr-2 px-1.5">필요 PAC 수</Badge>
-          <span>{ingredient.pac_count ? formatNumber(ingredient.pac_count) : '-'}</span>
+        <div>
+          <span className="text-gray-500">재고관리 등급:</span>
+          <span className="ml-2">{ingredient.stock_grade || '-'}</span>
         </div>
-        <div className="flex items-center">
-          <Badge variant="outline" className="mr-2 px-1.5">재고관리</Badge>
-          <span>{ingredient.stock_grade || '-'}</span>
-        </div>
-        {ingredient.memo1 && (
-          <div className="col-span-2 mt-1 text-gray-600">
-            {ingredient.memo1}
-          </div>
-        )}
       </div>
     </div>
   );

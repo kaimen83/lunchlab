@@ -36,11 +36,6 @@ const ingredientSchema = z.object({
     .min(0, { message: '박스당 갯수는 0 이상이어야 합니다.' })
     .optional()
     .nullable(),
-  pac_count: z
-    .number()
-    .min(0, { message: '필요 PAC 수는 0 이상이어야 합니다.' })
-    .optional()
-    .nullable(),
   stock_grade: z
     .string()
     .optional()
@@ -172,7 +167,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
         unit: ingredient.unit,
         price: ingredient.price,
         items_per_box: ingredient.items_per_box || null,
-        pac_count: ingredient.pac_count || null,
         stock_grade: ingredient.stock_grade || null,
         memo1: ingredient.memo1 || null,
       })
