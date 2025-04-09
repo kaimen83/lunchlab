@@ -107,10 +107,10 @@ export async function PUT(request: Request, context: RouteContext) {
     }
     
     const body = await request.json();
-    const { name, packageAmount, unit, price, memo1, memo2 } = body;
+    const { name, package_amount, unit, price, memo1, memo2 } = body;
     
     // 필수 입력값 검증
-    if (!name || !packageAmount || !unit || !price) {
+    if (!name || !package_amount || !unit || !price) {
       return NextResponse.json(
         { error: '이름, 포장량, 단위, 가격은 필수 입력 항목입니다.' }, 
         { status: 400 }
@@ -174,7 +174,7 @@ export async function PUT(request: Request, context: RouteContext) {
       .from('ingredients')
       .update({
         name,
-        package_amount: packageAmount,
+        package_amount,
         unit,
         price,
         memo1,
@@ -282,4 +282,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     console.error('식재료 삭제 중 오류 발생:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
-} 
+}
+
+// PATCH 메서드 지원 추가 - PUT 핸들러를 재사용
+export const PATCH = PUT; 
