@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/form';
 // 타입 오류를 피하기 위해 바로 import 선언
 import MenuIngredientsSelector from './MenuIngredientsSelector';
-import MenuContainersForm from './components/MenuContainersForm';
 
 // 식재료 타입 정의
 interface Ingredient {
@@ -39,20 +38,6 @@ interface SelectedIngredient {
   ingredient: Ingredient;
   ingredient_id: string;
   amount: number;
-}
-
-// 용기 타입 정의
-interface MenuContainer {
-  id?: string;
-  menu_id?: string;
-  container_size_id: string;
-  container?: {
-    id: string;
-    name: string;
-    description?: string;
-  };
-  ingredient_amount_factor: number;
-  cost_price?: number;
 }
 
 // 변환 로직을 분리한 단순화된 zod 스키마
@@ -93,7 +78,6 @@ export default function MenuForm({
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedIngredients, setSelectedIngredients] = useState<SelectedIngredient[]>([]);
-  const [menuContainers, setMenuContainers] = useState<MenuContainer[]>([]);
   const [cost, setCost] = useState(0);
 
   // 폼 초기화
@@ -167,11 +151,6 @@ export default function MenuForm({
   const handleIngredientsChange = (ingredients: SelectedIngredient[]) => {
     setSelectedIngredients(ingredients);
     updateCost(ingredients);
-  };
-
-  // 용기 목록 변경 핸들러
-  const handleContainersChange = (containers: MenuContainer[]) => {
-    setMenuContainers(containers);
   };
 
   // 숫자 포맷팅 유틸리티 함수
@@ -331,18 +310,6 @@ export default function MenuForm({
             onChange={handleIngredientsChange}
           />
         </div>
-
-        {/* 수정 모드이고 메뉴 ID가 있을 때만 용기 사이즈 폼 표시 */}
-        {mode === 'edit' && menu?.id && (
-          <div className="mt-6">
-            <MenuContainersForm 
-              companyId={companyId}
-              menuId={menu.id}
-              baseCostPrice={cost}
-              onSave={handleContainersChange}
-            />
-          </div>
-        )}
 
         <div className="flex justify-end gap-2 pt-4">
           <Button 

@@ -12,8 +12,7 @@ interface PriceHistory {
   id: string;
   ingredient_id: string;
   price: number;
-  updated_at: string;
-  created_at: string;
+  recorded_at: string;
 }
 
 interface IngredientPriceHistoryProps {
@@ -38,7 +37,7 @@ export default function IngredientPriceHistory({ companyId, ingredientId }: Ingr
         
         const data = await response.json();
         setPriceHistory(data.sort((a: PriceHistory, b: PriceHistory) => 
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
         ));
       } catch (error) {
         console.error('가격 이력 로드 오류:', error);
@@ -57,7 +56,7 @@ export default function IngredientPriceHistory({ companyId, ingredientId }: Ingr
 
   // 차트 데이터 형식으로 변환
   const chartData = priceHistory.map(item => ({
-    date: format(new Date(item.created_at), 'yyyy-MM-dd'),
+    date: format(new Date(item.recorded_at), 'yyyy-MM-dd'),
     price: item.price,
   }));
 
@@ -114,7 +113,7 @@ export default function IngredientPriceHistory({ companyId, ingredientId }: Ingr
                 <TableBody>
                   {priceHistory.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell>{formatDate(item.created_at)}</TableCell>
+                      <TableCell>{formatDate(item.recorded_at)}</TableCell>
                       <TableCell className="text-right font-medium">
                         {formatCurrency(item.price)}
                       </TableCell>

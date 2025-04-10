@@ -190,6 +190,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .insert({
         ingredient_id: data.id,
         price: ingredient.price,
+        recorded_at: new Date().toISOString()
       });
 
     if (historyError) {
@@ -285,6 +286,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       .insert({
         ingredient_id: data.id,
         price: ingredient.price,
+        recorded_at: new Date().toISOString()
       });
 
     if (historyError) {

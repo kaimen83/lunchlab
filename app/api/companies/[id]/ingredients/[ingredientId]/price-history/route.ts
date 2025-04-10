@@ -62,7 +62,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       .from('ingredient_price_history')
       .select('*')
       .eq('ingredient_id', ingredientId)
-      .order('created_at', { ascending: false });
+      .order('recorded_at', { ascending: false });
 
     if (historyError) {
       console.error('가격 이력 조회 오류:', historyError);
