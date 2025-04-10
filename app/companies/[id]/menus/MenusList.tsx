@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Plus, FilePen, Trash2, Search, FileText, 
-  ChevronDown, ChevronUp, LineChart, CookingPot, PackageOpen, MoreVertical 
+  ChevronDown, ChevronUp, LineChart, CookingPot, PackageOpen, MoreVertical, Package 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import ContainersList from './components/ContainersList';
 
 interface Menu {
   id: string;
@@ -53,6 +54,7 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [menuToDelete, setMenuToDelete] = useState<Menu | null>(null);
+  const [containerDialogOpen, setContainerDialogOpen] = useState(false);
 
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin';
 
@@ -268,9 +270,20 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
             className="w-full"
           />
         </div>
-        <Button onClick={handleAddMenu} className="w-full sm:w-auto mt-2 sm:mt-0">
-          <Plus className="mr-2 h-4 w-4" /> 메뉴 추가
-        </Button>
+        <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+          <Button onClick={handleAddMenu} className="flex-1 sm:flex-auto">
+            <Plus className="mr-2 h-4 w-4" /> 메뉴 추가
+          </Button>
+          {isOwnerOrAdmin && (
+            <Button 
+              variant="outline" 
+              onClick={() => setContainerDialogOpen(true)} 
+              className="flex-1 sm:flex-auto"
+            >
+              <Package className="mr-2 h-4 w-4" /> 용기 설정
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -371,6 +384,18 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
           </Table>
         </div>
       </Card>
+
+      {/* 용기 설정 모달 */}
+      <Dialog open={containerDialogOpen} onOpenChange={setContainerDialogOpen}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>용기 관리</DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <ContainersList companyId={companyId} />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* 메뉴 추가/수정 모달 */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>

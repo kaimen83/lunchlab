@@ -19,6 +19,9 @@ import {
 } from '@/components/ui/form';
 // 타입 오류를 피하기 위해 바로 import 선언
 import MenuIngredientsSelector from './MenuIngredientsSelector';
+import { Package } from 'lucide-react';
+import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog';
+import ContainersList from './components/ContainersList';
 
 // 식재료 타입 정의
 interface Ingredient {
