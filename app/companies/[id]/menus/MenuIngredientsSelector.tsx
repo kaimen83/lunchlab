@@ -49,12 +49,14 @@ interface MenuIngredientsSelectorProps {
   companyId: string;
   selectedIngredients: SelectedIngredient[];
   onChange: (ingredients: SelectedIngredient[]) => void;
+  amountEditable?: boolean;
 }
 
 export default function MenuIngredientsSelector({
   companyId,
   selectedIngredients,
-  onChange
+  onChange,
+  amountEditable = true
 }: MenuIngredientsSelectorProps) {
   const { toast } = useToast();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
@@ -145,6 +147,9 @@ export default function MenuIngredientsSelector({
   const handleAmountChange = (index: number, newAmount: number) => {
     if (newAmount <= 0) return;
     
+    // 수량 편집이 비활성화된 경우 처리하지 않음
+    if (!amountEditable) return;
+    
     const updatedIngredients = [...selectedIngredients];
     updatedIngredients[index] = {
       ...updatedIngredients[index],
@@ -201,92 +206,101 @@ export default function MenuIngredientsSelector({
             </SelectContent>
           </Select>
           
-          <div className="flex w-40 items-center">
-            <Input 
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
-              min="0.1"
-              step="0.1"
-              className="max-w-20"
-            />
-            <span className="ml-2 text-xs text-gray-500">단위</span>
-          </div>
+          {amountEditable && (
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min="0.1"
+                step="0.1"
+                className="w-24"
+                value={amount}
+                onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
+              />
+              <span className="text-sm">
+                {selectedIngredientId && 
+                  ingredients.find(i => i.id === selectedIngredientId)?.unit}
+              </span>
+            </div>
+          )}
           
           <Button 
-            type="button"
+            type="button" 
             onClick={handleAddIngredient}
-            disabled={isLoading || !selectedIngredientId || amount <= 0}
-            className="min-w-20"
+            className="shrink-0"
+            disabled={!selectedIngredientId}
           >
             <Plus className="h-4 w-4 mr-1" /> 추가
           </Button>
         </div>
       </div>
 
-      <div>
-        <h4 className="font-medium mb-2">선택된 식재료</h4>
-        {selectedIngredients.length === 0 ? (
-          <div className="text-sm text-gray-500 py-4 text-center border rounded-md">
-            선택된 식재료가 없습니다
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>식재료</TableHead>
-                <TableHead>양</TableHead>
-                <TableHead>단가</TableHead>
-                <TableHead>금액</TableHead>
-                <TableHead className="w-[80px]"></TableHead>
+      {selectedIngredients.length > 0 ? (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>식재료명</TableHead>
+              <TableHead>패키지</TableHead>
+              {amountEditable && <TableHead className="text-right">사용량</TableHead>}
+              <TableHead className="text-right">단가</TableHead>
+              <TableHead className="w-[70px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {selectedIngredients.map((item, index) => (
+              <TableRow key={index}>
+                <TableCell>{item.ingredient.name}</TableCell>
+                <TableCell>
+                  <div className="flex items-center">
+                    <PackageOpen className="h-4 w-4 mr-1 text-muted-foreground" />
+                    <span>
+                      {item.ingredient.package_amount} {item.ingredient.unit}
+                    </span>
+                  </div>
+                </TableCell>
+                {amountEditable && (
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Input
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        className="w-16 text-right"
+                        value={formatAmount(item.amount)}
+                        onChange={(e) => 
+                          handleAmountChange(index, parseFloat(e.target.value) || 0)
+                        }
+                      />
+                      <span className="text-sm w-8">
+                        {item.ingredient.unit}
+                      </span>
+                    </div>
+                  </TableCell>
+                )}
+                <TableCell className="text-right">
+                  {new Intl.NumberFormat('ko-KR', { 
+                    style: 'currency', 
+                    currency: 'KRW' 
+                  }).format(item.ingredient.price)}
+                </TableCell>
+                <TableCell>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => handleRemoveIngredient(index)}
+                  >
+                    <Trash2 className="h-4 w-4 text-red-500" />
+                  </Button>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {selectedIngredients.map((item, index) => {
-                // 단위당 가격 계산 (package_amount 당 price의 비율)
-                const unitPrice = item.ingredient.price / item.ingredient.package_amount;
-                // 사용량에 따른 금액 계산
-                const totalPrice = unitPrice * item.amount;
-                
-                return (
-                  <TableRow key={index}>
-                    <TableCell className="font-medium">{item.ingredient.name}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <Input
-                          type="number"
-                          value={item.amount}
-                          onChange={(e) => handleAmountChange(index, parseFloat(e.target.value) || 0)}
-                          min="0.1"
-                          step="0.1"
-                          className="w-20 h-8"
-                        />
-                        <span className="ml-2 text-xs">{item.ingredient.unit}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {formatAmount(item.ingredient.package_amount)} {item.ingredient.unit} / {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(item.ingredient.price)}
-                    </TableCell>
-                    <TableCell>
-                      {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(totalPrice)}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveIngredient(index)}
-                        className="h-8 w-8"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
-      </div>
+            ))}
+          </TableBody>
+        </Table>
+      ) : (
+        <div className="text-center py-4 text-muted-foreground bg-slate-50 rounded-md">
+          추가된 식재료가 없습니다. 위에서 식재료를 선택해 추가해주세요.
+        </div>
+      )}
     </div>
   );
 } 
