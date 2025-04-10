@@ -353,20 +353,48 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
               <MoreVertical className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleViewPriceHistory(ingredient)}>
+          <DropdownMenuContent 
+            align="end"
+            // 메뉴가 닫힐 때 DOM 요소 강제 제거 방지
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              // DropdownMenu가 닫힐 때 이벤트 처리 개선
+              try {
+                // 메뉴 닫기 후 포커스 리셋
+                if (document.activeElement instanceof HTMLElement) {
+                  document.activeElement.blur();
+                }
+              } catch (e) {
+                console.warn("DropdownMenu 닫기 처리 중 오류:", e);
+              }
+            }}
+          >
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation(); // 이벤트 전파 중지
+                handleViewPriceHistory(ingredient);
+              }}
+            >
               <LineChart className="h-4 w-4 mr-2" />
               <span>가격 이력</span>
             </DropdownMenuItem>
             {isOwnerOrAdmin && (
               <>
-                <DropdownMenuItem onClick={() => handleEditIngredient(ingredient)}>
+                <DropdownMenuItem 
+                  onClick={(e) => {
+                    e.stopPropagation(); // 이벤트 전파 중지
+                    handleEditIngredient(ingredient);
+                  }}
+                >
                   <FilePen className="h-4 w-4 mr-2" />
                   <span>수정</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem 
                   className="text-red-500" 
-                  onClick={() => handleDeleteConfirm(ingredient)}
+                  onClick={(e) => {
+                    e.stopPropagation(); // 이벤트 전파 중지
+                    handleDeleteConfirm(ingredient);
+                  }}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   <span>삭제</span>
@@ -456,20 +484,66 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
         open={modalOpen} 
         onOpenChange={(open) => {
           if (!open) {
+            // 이슈 #1241 해결: pointer-events 스타일이 남아있는 문제 해결
             // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
             setTimeout(() => {
               setModalOpen(false);
               setSelectedIngredient(null);
-            }, 0);
+              
+              // 핵심 수정: 모달 닫힌 후 남아있는 스타일 속성 제거 및 DOM 정리
+              document.body.style.pointerEvents = '';
+              document.body.style.touchAction = '';
+              
+              // Note: DOM 요소 직접 제거는 안전하게 처리 - React와의 충돌 방지
+              try {
+                // aria-hidden 속성 제거 - 안전하게 처리
+                document.querySelectorAll('[aria-hidden="true"]').forEach(el => {
+                  try {
+                    if (el instanceof HTMLElement && !el.dataset.permanent && document.body.contains(el)) {
+                      el.removeAttribute('aria-hidden');
+                    }
+                  } catch (e) {
+                    // 속성 제거 중 오류 시 무시
+                  }
+                });
+              } catch (e) {
+                // 오류 발생 시 조용히 처리
+                console.warn("모달 닫기 처리 중 오류:", e);
+              }
+            }, 100); // 시간을 0에서 100으로 증가
           } else {
             setModalOpen(open);
           }
         }}
       >
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent 
+          className="sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+          aria-describedby="ingredient-form-description"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            document.body.focus();
+            
+            // 이슈 #1236 해결: 터치 이벤트 차단 문제
+            document.body.style.pointerEvents = '';
+            document.body.style.touchAction = '';
+            document.documentElement.style.touchAction = '';
+            
+            // 모든 포커스 제거
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur();
+            }
+          }}
+          onPointerDownOutside={(e) => {
+            // 이슈 #1236 해결: 모달 외부 클릭 시 포인터 이벤트 정상화
+            e.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>{modalMode === 'create' ? '식재료 추가' : '식재료 수정'}</DialogTitle>
           </DialogHeader>
+          <div id="ingredient-form-description" className="sr-only">
+            {modalMode === 'create' ? '식재료를 추가합니다' : '식재료 정보를 수정합니다'}
+          </div>
           <IngredientForm
             companyId={companyId}
             ingredient={selectedIngredient}
@@ -485,20 +559,66 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
         open={historyModalOpen} 
         onOpenChange={(open) => {
           if (!open) {
+            // 이슈 #1241 해결: pointer-events 스타일이 남아있는 문제 해결
             // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
             setTimeout(() => {
               setHistoryModalOpen(false);
               if (!modalOpen) setSelectedIngredient(null);
-            }, 0);
+              
+              // 핵심 수정: 모달 닫힌 후 남아있는 스타일 속성 제거 및 DOM 정리
+              document.body.style.pointerEvents = '';
+              document.body.style.touchAction = '';
+              
+              // Note: DOM 요소 직접 제거는 안전하게 처리 - React와의 충돌 방지
+              try {
+                // aria-hidden 속성 제거 - 안전하게 처리
+                document.querySelectorAll('[aria-hidden="true"]').forEach(el => {
+                  try {
+                    if (el instanceof HTMLElement && !el.dataset.permanent && document.body.contains(el)) {
+                      el.removeAttribute('aria-hidden');
+                    }
+                  } catch (e) {
+                    // 속성 제거 중 오류 시 무시
+                  }
+                });
+              } catch (e) {
+                // 오류 발생 시 조용히 처리
+                console.warn("모달 닫기 처리 중 오류:", e);
+              }
+            }, 100); // 시간을 0에서 100으로 증가
           } else {
             setHistoryModalOpen(open);
           }
         }}
       >
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent 
+          className="sm:max-w-4xl max-h-[90vh] overflow-y-auto"
+          aria-describedby="price-history-description"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            document.body.focus();
+            
+            // 이슈 #1236 해결: 터치 이벤트 차단 문제
+            document.body.style.pointerEvents = '';
+            document.body.style.touchAction = '';
+            document.documentElement.style.touchAction = '';
+            
+            // 모든 포커스 제거
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur();
+            }
+          }}
+          onPointerDownOutside={(e) => {
+            // 이슈 #1236 해결: 모달 외부 클릭 시 포인터 이벤트 정상화
+            e.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>가격 이력 - {selectedIngredient?.name}</DialogTitle>
           </DialogHeader>
+          <div id="price-history-description" className="sr-only">
+            {selectedIngredient?.name}의 가격 변동 이력을 확인합니다
+          </div>
           {selectedIngredient && (
             <IngredientPriceHistory
               companyId={companyId}
@@ -513,21 +633,63 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
         open={deleteConfirmOpen} 
         onOpenChange={(open) => {
           if (!open) {
+            // 이슈 #1241 해결: pointer-events 스타일이 남아있는 문제 해결
             // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
             setTimeout(() => {
               setDeleteConfirmOpen(false);
               setIngredientToDelete(null);
-            }, 0);
+              
+              // 핵심 수정: 모달 닫힌 후 남아있는 스타일 속성 제거 및 DOM 정리
+              document.body.style.pointerEvents = '';
+              document.body.style.touchAction = '';
+              
+              // Note: DOM 요소 직접 제거는 안전하게 처리 - React와의 충돌 방지
+              try {
+                // aria-hidden 속성 제거 - 안전하게 처리
+                document.querySelectorAll('[aria-hidden="true"]').forEach(el => {
+                  try {
+                    if (el instanceof HTMLElement && !el.dataset.permanent && document.body.contains(el)) {
+                      el.removeAttribute('aria-hidden');
+                    }
+                  } catch (e) {
+                    // 속성 제거 중 오류 시 무시
+                  }
+                });
+              } catch (e) {
+                // 오류 발생 시 조용히 처리
+                console.warn("모달 닫기 처리 중 오류:", e);
+              }
+            }, 100); // 시간을 0에서 100으로 증가
           } else {
             setDeleteConfirmOpen(open);
           }
         }}
       >
-        <DialogContent>
+        <DialogContent
+          aria-describedby="delete-dialog-description"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            document.body.focus();
+            
+            // 이슈 #1236 해결: 터치 이벤트 차단 문제
+            document.body.style.pointerEvents = '';
+            document.body.style.touchAction = '';
+            document.documentElement.style.touchAction = '';
+            
+            // 모든 포커스 제거
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur();
+            }
+          }}
+          onPointerDownOutside={(e) => {
+            // 이슈 #1236 해결: 모달 외부 클릭 시 포인터 이벤트 정상화
+            e.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>식재료 삭제</DialogTitle>
           </DialogHeader>
-          <p className="py-4">
+          <p className="py-4" id="delete-dialog-description">
             정말로 <span className="font-semibold">{ingredientToDelete?.name}</span> 식재료를 삭제하시겠습니까?<br />
             이 작업은 되돌릴 수 없습니다.
           </p>

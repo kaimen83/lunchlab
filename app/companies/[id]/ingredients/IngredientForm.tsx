@@ -55,8 +55,34 @@ export default function IngredientForm({
       document.body.style.overscrollBehavior = '';
       
       // 추가 정리 작업: 모든 이벤트 리스너가 제대로 정리되도록 함
-      document.body.style.touchAction = 'auto';
-      document.documentElement.style.touchAction = 'auto';
+      document.body.style.touchAction = '';
+      document.documentElement.style.touchAction = '';
+      document.body.style.pointerEvents = '';
+      
+      // 컴포넌트 언마운트 시 포커스 설정 - 모바일 터치 이벤트 문제 해결을 위함
+      requestAnimationFrame(() => {
+        try {
+          document.body.focus();
+          
+          // 모바일 터치 이벤트 복원
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+          
+          // 안전하게 DOM 속성 제거
+          document.querySelectorAll('[aria-hidden="true"]').forEach(el => {
+            try {
+              if (el instanceof HTMLElement && !el.dataset.permanent && document.body.contains(el)) {
+                el.removeAttribute('aria-hidden');
+              }
+            } catch (e) {
+              // 오류 시 무시
+            }
+          });
+        } catch (e) {
+          console.warn("언마운트 정리 중 오류:", e);
+        }
+      });
     };
   }, []);
 
@@ -64,10 +90,34 @@ export default function IngredientForm({
   const handleCancel = () => {
     // form 상태 리셋
     form.reset();
+    // 포커스 해제
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    
     // 부모 컴포넌트의 onCancel 호출 전 약간의 지연 추가
     setTimeout(() => {
+      document.body.style.touchAction = '';
+      document.documentElement.style.touchAction = '';
+      document.body.style.pointerEvents = '';
+      
+      // 안전하게 DOM 속성 제거
+      try {
+        document.querySelectorAll('[aria-hidden="true"]').forEach(el => {
+          try {
+            if (el instanceof HTMLElement && !el.dataset.permanent && document.body.contains(el)) {
+              el.removeAttribute('aria-hidden');
+            }
+          } catch (e) {
+            // 오류 시 무시
+          }
+        });
+      } catch (e) {
+        console.warn("취소 처리 중 오류:", e);
+      }
+      
       onCancel();
-    }, 10);
+    }, 100); // 100ms 지연으로 변경
   };
 
   return (
