@@ -209,11 +209,7 @@ export default function MenuIngredientsView({ companyId, menuId }: MenuIngredien
                               </div>
                               {item.ingredient.name}
                             </CardTitle>
-                            <CardDescription className="flex flex-col mt-2 space-y-2">
-                              <div className="flex justify-between items-center text-sm bg-slate-50 p-2 rounded">
-                                <span>사용량</span>
-                                <span className="font-medium text-blue-600">{formatAmount(item.amount)} {item.ingredient.unit}</span>
-                              </div>
+                            <CardDescription className="flex flex-col mt-2">
                               <div className="text-xs text-gray-500">
                                 기준: {formatAmount(item.ingredient.package_amount)} {item.ingredient.unit} / {formatCurrency(item.ingredient.price)}
                               </div>

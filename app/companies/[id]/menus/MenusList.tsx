@@ -325,13 +325,6 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
       </CardHeader>
 
       <CardContent className="pb-2 pt-0">
-        <div className="flex items-center justify-between mb-2 bg-slate-100 p-2 rounded">
-          <span className="text-sm font-medium">총 식자재 비용:</span>
-          <span className="text-lg font-bold">
-            {formatCurrency(menu.containers?.reduce((sum, container) => sum + container.ingredients_cost, 0) || 0)}
-          </span>
-        </div>
-
         <Accordion
           type="single"
           collapsible
@@ -341,6 +334,7 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
           <AccordionItem value="item-1" className="border-b-0">
             <AccordionTrigger className="py-2">
               <div className="flex items-center text-sm">
+                <Package className="h-4 w-4 mr-2 text-slate-500" />
                 용기 및 식자재 정보
               </div>
             </AccordionTrigger>
@@ -348,22 +342,20 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
               {menu.containers && menu.containers.length > 0 ? (
                 <div className="space-y-3">
                   {menu.containers.map((container) => (
-                    <div key={container.id} className="border rounded-md overflow-hidden">
-                      <div className="flex justify-between items-center bg-blue-50 p-2 border-b">
-                        <span className="font-medium">{container.container.name}</span>
-                        <Badge variant="secondary">{formatCurrency(container.ingredients_cost)}</Badge>
-                      </div>
-                      
-                      <div className="p-2 bg-gray-50">
-                        <div className="text-xs">
-                          <span className="font-semibold">식자재 비용:</span> {formatCurrency(container.ingredients_cost)}
+                    <div key={container.id} className="rounded-md overflow-hidden shadow-sm border">
+                      <div className="flex items-center justify-between bg-blue-50 p-2 border-b">
+                        <div className="flex items-center">
+                          <div className="mr-2 bg-white p-1 rounded-full w-6 h-6 flex items-center justify-center shadow-sm">
+                            <Package className="h-3 w-3 text-blue-500" />
+                          </div>
+                          <span className="font-medium text-sm">{container.container.name}</span>
                         </div>
+                        <Badge variant="secondary" className="bg-white">{formatCurrency(container.ingredients_cost)}</Badge>
                       </div>
                       
                       {container.ingredients.length > 0 && (
-                        <div className="p-2 text-xs">
-                          <div className="font-semibold mb-1">주요 식자재:</div>
-                          <ul className="space-y-1">
+                        <div className="p-2 text-xs bg-white">
+                          <div className="space-y-1 ml-2">
                             {container.ingredients
                               .sort((a, b) => {
                                 const aCost = (a.ingredient.price / a.ingredient.package_amount) * a.amount;
@@ -372,18 +364,24 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                               })
                               .slice(0, 3)
                               .map(item => (
-                                <li key={item.id}>
-                                  <span>{item.ingredient.name} ({item.amount}{item.ingredient.unit})</span>
-                                </li>
+                                <div key={item.id} className="flex items-center">
+                                  <div className="h-1 w-1 rounded-full bg-slate-300 mr-2"></div>
+                                  <span>{item.ingredient.name}</span>
+                                </div>
                               ))}
-                          </ul>
+                            {container.ingredients.length > 3 && (
+                              <div className="text-xs text-blue-500 mt-1 ml-3">
+                                + {container.ingredients.length - 3}개 더...
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-sm text-gray-500">등록된 용기가 없습니다</div>
+                <div className="text-sm text-gray-500 text-center py-2">등록된 용기가 없습니다</div>
               )}
             </AccordionContent>
           </AccordionItem>
