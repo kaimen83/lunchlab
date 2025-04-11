@@ -76,7 +76,7 @@ export async function GET(request: Request, context: RouteContext) {
       .from('menu_ingredients')
       .select(`
         id,
-        amount_per_person,
+        amount,
         ingredient:ingredients (
           id,
           name,
@@ -232,7 +232,7 @@ export async function PUT(request: Request, context: RouteContext) {
     const menuIngredients = ingredients.map(ingredient => ({
       menu_id: menuId,
       ingredient_id: ingredient.id,
-      amount_per_person: ingredient.amountPerPerson
+      amount: ingredient.amount
     }));
     
     const { error: ingredientsError } = await supabase

@@ -74,22 +74,8 @@ export async function GET(request: Request, context: RouteContext) {
     // 메뉴 식재료 목록 조회
     const { data: menuIngredients, error: ingredientsError } = await supabase
       .from('menu_ingredients')
-      .select('id, menu_id, ingredient_id, amount_per_person, ingredient:ingredients(id, name, package_amount, unit, price, memo1, memo2)')
-      .eq('menu_id', menuId)
-      .then(result => {
-        // 수동으로 amount_per_person를 amount로 변환
-        if (result.data) {
-          return {
-            ...result,
-            data: result.data.map(item => ({
-              ...item,
-              amount: item.amount_per_person,
-              // 기존 속성 유지
-            }))
-          };
-        }
-        return result;
-      });
+      .select('id, menu_id, ingredient_id, amount, ingredient:ingredients(id, name, package_amount, unit, price, memo1, memo2)')
+      .eq('menu_id', menuId);
     
     if (ingredientsError) {
       console.error('메뉴 식재료 조회 오류:', ingredientsError);
