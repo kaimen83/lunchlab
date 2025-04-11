@@ -7,10 +7,15 @@ import { Button } from '@/components/ui/button';
 import { useUser } from '@clerk/nextjs';
 import { UserProfile } from '@/lib/types';
 
-export function ProfileSetupModal() {
+interface ProfileSetupModalProps {
+  onClose?: () => void;
+  initialOpen?: boolean;
+}
+
+export function ProfileSetupModal({ onClose, initialOpen = true }: ProfileSetupModalProps) {
   const { user } = useUser();
   const router = useRouter();
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(initialOpen);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -41,13 +46,49 @@ export function ProfileSetupModal() {
     }
   }, [user]);
 
-  // 모달이 닫히지 않도록 함
-  const handleOpenChange = (open: boolean) => {
-    // 이미 열려있는 상태면 닫히지 않도록 함
-    if (isOpen && !open) {
-      return;
+  // 모달 닫기 시 DOM 이벤트 정리 함수
+  const cleanupDOMAfterClose = () => {
+    // 터치 및 포인터 이벤트 관련 스타일 정리
+    document.body.style.pointerEvents = '';
+    document.body.style.touchAction = '';
+    document.documentElement.style.touchAction = '';
+    
+    // 안전하게 DOM 속성 제거
+    try {
+      document.querySelectorAll('[aria-hidden="true"]').forEach(el => {
+        try {
+          if (el instanceof HTMLElement && !el.dataset.permanent && document.body.contains(el)) {
+            el.removeAttribute('aria-hidden');
+          }
+        } catch (e) {
+          // 오류 시 무시
+        }
+      });
+      
+      // 포커스 해제
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    } catch (e) {
+      console.warn("모달 닫기 정리 중 오류:", e);
     }
-    setIsOpen(open);
+  };
+
+  // 모달이 닫힐 때 처리
+  const handleOpenChange = (open: boolean) => {
+    if (isOpen && !open) {
+      // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
+      setTimeout(() => {
+        setIsOpen(false);
+        cleanupDOMAfterClose();
+        
+        if (onClose) {
+          onClose();
+        }
+      }, 100);
+    } else {
+      setIsOpen(open);
+    }
   };
 
   // 입력 값 변경 처리
@@ -84,8 +125,15 @@ export function ProfileSetupModal() {
       }
 
       // 성공적으로 저장되면 모달 닫고 페이지 새로고침
-      setIsOpen(false);
-      router.refresh();
+      setTimeout(() => {
+        setIsOpen(false);
+        cleanupDOMAfterClose();
+        
+        if (onClose) {
+          onClose();
+        }
+        router.refresh();
+      }, 100);
     } catch (err) {
       setError(err instanceof Error ? err.message : '오류가 발생했습니다.');
     } finally {
@@ -95,10 +143,32 @@ export function ProfileSetupModal() {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[425px]" onPointerDownOutside={e => e.preventDefault()} onEscapeKeyDown={e => e.preventDefault()}>
+      <DialogContent 
+        className="sm:max-w-[425px]" 
+        onPointerDownOutside={(e) => {
+          // 모달 외부 클릭 시 포인터 이벤트 정상화
+          e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          document.body.focus();
+          
+          // 터치 이벤트 차단 문제 해결
+          document.body.style.pointerEvents = '';
+          document.body.style.touchAction = '';
+          document.documentElement.style.touchAction = '';
+          
+          // 모든 포커스 제거
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+        }}
+        aria-describedby="profile-setup-description"
+      >
         <DialogHeader>
           <DialogTitle>프로필 설정</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id="profile-setup-description">
             서비스 이용을 위해 추가 정보를 입력해주세요. 이 정보는 서비스 이용에 필요합니다.
           </DialogDescription>
         </DialogHeader>
