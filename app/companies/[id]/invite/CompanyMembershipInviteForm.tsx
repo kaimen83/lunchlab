@@ -78,7 +78,7 @@ export function CompanyMembershipInviteForm({
   
   // 사용자 표시 이름 가져오기
   const getUserDisplayName = (user: User) => {
-    // 프로젝트 사용자 프로필이 있는 경우 우선 사용
+    // 프로필이 완료되었고 사용자 지정 이름이 있으면 그것을 사용
     if (user.profileCompleted && user.profile?.name) {
       return user.profile.name;
     }

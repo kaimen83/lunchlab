@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { clerkClient } from '@clerk/nextjs/server';
+import { UserProfile } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
   try {
@@ -32,6 +33,10 @@ export async function GET(req: NextRequest) {
       // 현재 로그인한 사용자는 제외
       if (user.id === userId) return false;
       
+      // 프로필 이름이 있는 경우 사용자 지정 이름으로 검색
+      const profile = user.publicMetadata?.profile as UserProfile | undefined;
+      const customName = profile?.name?.toLowerCase() || '';
+      
       // 이름, 성, 이메일로 검색
       const firstName = (user.firstName || '').toLowerCase();
       const lastName = (user.lastName || '').toLowerCase();
@@ -39,6 +44,7 @@ export async function GET(req: NextRequest) {
       const email = user.emailAddresses[0]?.emailAddress?.toLowerCase() || '';
       
       return (
+        customName.includes(normalizedQuery) ||
         firstName.includes(normalizedQuery) ||
         lastName.includes(normalizedQuery) ||
         fullName.includes(normalizedQuery) ||
@@ -50,13 +56,20 @@ export async function GET(req: NextRequest) {
     const limitedResults = searchResults.slice(0, 10);
     
     // 필요한 정보만 추출하여 반환
-    const simplifiedUsers = limitedResults.map(user => ({
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      imageUrl: user.imageUrl,
-      email: user.emailAddresses[0]?.emailAddress
-    }));
+    const simplifiedUsers = limitedResults.map(user => {
+      const profile = user.publicMetadata?.profile as UserProfile | undefined;
+      const profileCompleted = !!user.publicMetadata?.profileCompleted;
+      
+      return {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        imageUrl: user.imageUrl,
+        email: user.emailAddresses[0]?.emailAddress,
+        profile: profile || null,
+        profileCompleted
+      };
+    });
     
     return NextResponse.json({ users: simplifiedUsers });
   } catch (error) {
