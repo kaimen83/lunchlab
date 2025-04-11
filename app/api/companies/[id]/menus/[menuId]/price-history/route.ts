@@ -44,7 +44,7 @@ export async function GET(request: Request, context: RouteContext) {
       .from('menu_price_history')
       .select('*')
       .eq('menu_id', menuId)
-      .order('created_at', { ascending: false });
+      .order('recorded_at', { ascending: false });
     
     if (historyError) {
       console.error('가격 이력 조회 오류:', historyError);

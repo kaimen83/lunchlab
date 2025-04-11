@@ -46,7 +46,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import MenuForm from "./MenuForm";
 import MenuIngredientsView from "./MenuIngredientsView";
-import MenuPriceHistory from "./MenuPriceHistory";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,6 +68,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogFooter,
+} from "@/components/ui/alert-dialog";
 
 interface Container {
   id: string;
@@ -122,7 +131,6 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
   const [selectedMenu, setSelectedMenu] = useState<Menu | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [ingredientsModalOpen, setIngredientsModalOpen] = useState(false);
-  const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [menuToDelete, setMenuToDelete] = useState<Menu | null>(null);
@@ -274,12 +282,6 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
     setIngredientsModalOpen(true);
   };
 
-  // 가격 이력 모달
-  const handleViewPriceHistory = (menu: Menu) => {
-    setSelectedMenu(menu);
-    setHistoryModalOpen(true);
-  };
-
   // 메뉴 저장 후 처리
   const handleSaveMenu = (savedMenu: Menu) => {
     if (modalMode === "create") {
@@ -357,11 +359,7 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => handleViewIngredients(menu)}>
                 <PackageOpen className="h-4 w-4 mr-2" />
-                <span>식재료 보기</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleViewPriceHistory(menu)}>
-                <LineChart className="h-4 w-4 mr-2" />
-                <span>가격 이력</span>
+                <span>식자재 보기</span>
               </DropdownMenuItem>
               {isOwnerOrAdmin && (
                 <>
@@ -590,50 +588,124 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                           </div>
                         )}
                       </CardTitle>
-                      <Badge variant="outline" className="bg-white">
-                        {formatCurrency(menu.cost_price)}
-                      </Badge>
                     </div>
                   </CardHeader>
                   
                   <CardContent className="p-0">
                     {menu.containers && menu.containers.length > 0 ? (
-                      <div className="px-4 py-3">
-                        <div className="text-sm font-medium mb-2 flex items-center">
-                          <Package className="h-4 w-4 mr-1 text-slate-500" />
-                          <span>용기 정보</span>
-                        </div>
-                        <div className="space-y-2">
-                          {menu.containers.map((container) => (
-                            <div 
-                              key={container.id}
-                              className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-md text-sm"
-                            >
-                              <span>{container.container.name}</span>
-                              <Badge variant="secondary" className="bg-white">
-                                {formatCurrency(container.ingredients_cost)}
-                              </Badge>
-                            </div>
-                          ))}
-                        </div>
-                        
-                        <div className="text-sm font-medium mt-4 mb-2 flex items-center">
-                          <CookingPot className="h-4 w-4 mr-1 text-slate-500" />
-                          <span>주요 식자재</span>
-                        </div>
-                        <div className="space-y-1.5 pl-2">
-                          {getTopIngredients(menu.containers).map((ingredient, idx) => (
-                            <div key={idx} className="flex items-center justify-between text-xs">
+                      <div className="p-4">
+                        <Accordion
+                          type="single"
+                          collapsible
+                          className="w-full"
+                        >
+                          <AccordionItem value="containers" className="border-b-0">
+                            <AccordionTrigger className="py-1 text-sm">
                               <div className="flex items-center">
-                                <div className="h-1.5 w-1.5 rounded-full bg-blue-400 mr-2"></div>
-                                <span>{ingredient.name}</span>
+                                <Package className="h-4 w-4 mr-2 text-slate-500" />
+                                <span>용기 및 식자재 정보</span>
                               </div>
-                              <span className="text-slate-500">
-                                {formatCurrency(ingredient.cost)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                              <div className="space-y-4 mt-2">
+                                {menu.containers.map((container) => (
+                                  <div
+                                    key={container.id}
+                                    className="rounded-md overflow-hidden shadow-sm border"
+                                  >
+                                    <div className="flex items-center justify-between bg-blue-50 p-2 border-b">
+                                      <div className="flex items-center">
+                                        <div className="mr-2 bg-white p-1 rounded-full w-6 h-6 flex items-center justify-center shadow-sm">
+                                          <Package className="h-3 w-3 text-blue-500" />
+                                        </div>
+                                        <span className="font-medium text-sm">
+                                          {container.container.name}
+                                        </span>
+                                      </div>
+                                      <Badge variant="secondary" className="bg-white">
+                                        {formatCurrency(container.ingredients_cost)}
+                                      </Badge>
+                                    </div>
+
+                                    {container.ingredients.length > 0 && (
+                                      <div className="p-2 text-xs bg-white">
+                                        <div className="text-gray-500 mb-2 text-[10px] flex justify-between px-1">
+                                          <span>식자재</span>
+                                          <div className="flex space-x-3">
+                                            <span>사용량</span>
+                                            <span>원가</span>
+                                          </div>
+                                        </div>
+                                        <div className="space-y-2 ml-1">
+                                          {container.ingredients
+                                            .sort((a, b) => {
+                                              const aCost =
+                                                (a.ingredient.price /
+                                                  a.ingredient.package_amount) *
+                                                a.amount;
+                                              const bCost =
+                                                (b.ingredient.price /
+                                                  b.ingredient.package_amount) *
+                                                b.amount;
+                                              return bCost - aCost;
+                                            })
+                                            .slice(0, expandedContainers.includes(container.id) ? container.ingredients.length : 3)
+                                            .map((item) => {
+                                              const unitPrice = item.ingredient.price / item.ingredient.package_amount;
+                                              const itemCost = unitPrice * item.amount;
+                                              return (
+                                                <div
+                                                  key={item.id}
+                                                  className="flex items-center justify-between border-b border-gray-100 pb-1"
+                                                >
+                                                  <div className="flex items-center">
+                                                    <div className="h-1 w-1 rounded-full bg-slate-300 mr-2"></div>
+                                                    <span>{item.ingredient.name}</span>
+                                                  </div>
+                                                  <div className="flex items-center gap-4">
+                                                    <span className="text-gray-600 tabular-nums">
+                                                      {item.amount} {item.ingredient.unit}
+                                                    </span>
+                                                    <span className="text-blue-600 tabular-nums w-14 text-right">
+                                                      {formatCurrency(itemCost)}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          {container.ingredients.length > 3 && !expandedContainers.includes(container.id) && (
+                                            <div 
+                                              className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleContainerExpand(container.id);
+                                              }}
+                                            >
+                                              <span>+{container.ingredients.length - 3}개 더보기</span>
+                                              <ChevronDown className="h-3 w-3" />
+                                            </div>
+                                          )}
+                                          {expandedContainers.includes(container.id) && (
+                                            <div 
+                                              className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleContainerExpand(container.id);
+                                              }}
+                                            >
+                                              <span>접기</span>
+                                              <ChevronUp className="h-3 w-3" />
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
                       </div>
                     ) : (
                       <div className="px-4 py-3 text-sm text-center text-gray-500">
@@ -651,15 +723,6 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                     >
                       <PackageOpen className="h-4 w-4 mr-1" />
                       <span className="text-xs">식자재</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleViewPriceHistory(menu)}
-                      className="h-8"
-                    >
-                      <LineChart className="h-4 w-4 mr-1" />
-                      <span className="text-xs">가격이력</span>
                     </Button>
                     
                     {isOwnerOrAdmin && (
@@ -833,13 +896,6 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                                 >
                                   <PackageOpen className="h-4 w-4" />
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleViewPriceHistory(menu)}
-                                >
-                                  <LineChart className="h-4 w-4" />
-                                </Button>
 
                                 {isOwnerOrAdmin && (
                                   <>
@@ -874,340 +930,51 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
       </div>
 
       {/* 메뉴 추가/수정 모달 */}
-      <Dialog
-        open={modalOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            // 이슈 #1241 해결: pointer-events 스타일이 남아있는 문제 해결
-            // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
-            setTimeout(() => {
-              setModalOpen(false);
-              if (!ingredientsModalOpen && !historyModalOpen)
-                setSelectedMenu(null);
-
-              // 핵심 수정: 모달 닫힌 후 남아있는 스타일 속성 제거 및 DOM 정리
-              document.body.style.pointerEvents = "";
-              document.body.style.touchAction = "";
-
-              // Note: DOM 요소 직접 제거는 안전하게 처리 - React와의 충돌 방지
-              try {
-                // aria-hidden 속성 제거 - 안전하게 처리
-                document
-                  .querySelectorAll('[aria-hidden="true"]')
-                  .forEach((el) => {
-                    try {
-                      if (
-                        el instanceof HTMLElement &&
-                        !el.dataset.permanent &&
-                        document.body.contains(el)
-                      ) {
-                        el.removeAttribute("aria-hidden");
-                      }
-                    } catch (e) {
-                      // 속성 제거 중 오류 시 무시
-                    }
-                  });
-              } catch (e) {
-                // 오류 발생 시 조용히 처리
-                console.warn("모달 닫기 처리 중 오류:", e);
-              }
-            }, 100);
-          } else {
-            setModalOpen(open);
-          }
-        }}
-      >
-        <DialogContent
-          className="sm:max-w-2xl max-h-[90vh] overflow-y-auto"
-          aria-describedby="menu-form-description"
-          onCloseAutoFocus={(event) => {
-            event.preventDefault();
-            document.body.focus();
-
-            // 이슈 #1236 해결: 터치 이벤트 차단 문제
-            document.body.style.pointerEvents = "";
-            document.body.style.touchAction = "";
-            document.documentElement.style.touchAction = "";
-
-            // 모든 포커스 제거
-            if (document.activeElement instanceof HTMLElement) {
-              document.activeElement.blur();
-            }
-          }}
-          onPointerDownOutside={(e) => {
-            // 이슈 #1236 해결: 모달 외부 클릭 시 포인터 이벤트 정상화
-            e.preventDefault();
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>
-              {modalMode === "create" ? "메뉴 추가" : "메뉴 수정"}
-            </DialogTitle>
-          </DialogHeader>
-          <div id="menu-form-description" className="sr-only">
-            {modalMode === "create"
-              ? "새 메뉴를 추가합니다"
-              : "메뉴 정보를 수정합니다"}
-          </div>
-          <MenuForm
-            companyId={companyId}
-            menu={selectedMenu}
-            mode={modalMode}
-            onSave={handleSaveMenu}
-            onCancel={() => setModalOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* 재료 보기 모달 */}
-      {ingredientsModalOpen && selectedMenu && (
-        <Dialog
-          open={ingredientsModalOpen}
-          onOpenChange={(open) => {
-            if (!open) {
-              // 이슈 #1241 해결: pointer-events 스타일이 남아있는 문제 해결
-              // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
-              setTimeout(() => {
-                setIngredientsModalOpen(false);
-                if (!modalOpen && !historyModalOpen) setSelectedMenu(null);
-
-                // 핵심 수정: 모달 닫힌 후 남아있는 스타일 속성 제거 및 DOM 정리
-                document.body.style.pointerEvents = "";
-                document.body.style.touchAction = "";
-
-                // Note: DOM 요소 직접 제거는 안전하게 처리 - React와의 충돌 방지
-                try {
-                  // aria-hidden 속성 제거 - 안전하게 처리
-                  document
-                    .querySelectorAll('[aria-hidden="true"]')
-                    .forEach((el) => {
-                      try {
-                        if (
-                          el instanceof HTMLElement &&
-                          !el.dataset.permanent &&
-                          document.body.contains(el)
-                        ) {
-                          el.removeAttribute("aria-hidden");
-                        }
-                      } catch (e) {
-                        // 속성 제거 중 오류 시 무시
-                      }
-                    });
-                } catch (e) {
-                  // 오류 발생 시 조용히 처리
-                  console.warn("모달 닫기 처리 중 오류:", e);
-                }
-              }, 100);
-            } else {
-              setIngredientsModalOpen(open);
-            }
-          }}
-        >
-          <DialogContent
-            className="sm:max-w-2xl max-h-[90vh] overflow-y-auto"
-            aria-describedby="menu-ingredients-description"
-            onCloseAutoFocus={(event) => {
-              event.preventDefault();
-              document.body.focus();
-
-              // 이슈 #1236 해결: 터치 이벤트 차단 문제
-              document.body.style.pointerEvents = "";
-              document.body.style.touchAction = "";
-              document.documentElement.style.touchAction = "";
-
-              // 모든 포커스 제거
-              if (document.activeElement instanceof HTMLElement) {
-                document.activeElement.blur();
-              }
-            }}
-            onPointerDownOutside={(e) => {
-              // 이슈 #1236 해결: 모달 외부 클릭 시 포인터 이벤트 정상화
-              e.preventDefault();
-            }}
-          >
-            <DialogHeader>
-              <DialogTitle>메뉴 식재료 - {selectedMenu?.name}</DialogTitle>
-            </DialogHeader>
-            <div id="menu-ingredients-description" className="sr-only">
-              {selectedMenu?.name}의 식재료 정보를 확인합니다
-            </div>
-            {selectedMenu && (
-              <MenuIngredientsView
-                companyId={companyId}
-                menuId={selectedMenu.id}
-              />
-            )}
+      {modalOpen && (
+        <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+          <DialogContent className="sm:max-w-[800px] p-0">
+            <MenuForm
+              companyId={companyId}
+              menu={selectedMenu}
+              mode={modalMode}
+              onSave={handleSaveMenu}
+              onCancel={() => setModalOpen(false)}
+            />
           </DialogContent>
         </Dialog>
       )}
 
-      {/* 가격 이력 모달 */}
-      {historyModalOpen && selectedMenu && (
-        <Dialog
-          open={historyModalOpen}
-          onOpenChange={(open) => {
-            if (!open) {
-              // 이슈 #1241 해결: pointer-events 스타일이 남아있는 문제 해결
-              // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
-              setTimeout(() => {
-                setHistoryModalOpen(false);
-                if (!modalOpen && !ingredientsModalOpen) setSelectedMenu(null);
-
-                // 핵심 수정: 모달 닫힌 후 남아있는 스타일 속성 제거 및 DOM 정리
-                document.body.style.pointerEvents = "";
-                document.body.style.touchAction = "";
-
-                // Note: DOM 요소 직접 제거는 안전하게 처리 - React와의 충돌 방지
-                try {
-                  // aria-hidden 속성 제거 - 안전하게 처리
-                  document
-                    .querySelectorAll('[aria-hidden="true"]')
-                    .forEach((el) => {
-                      try {
-                        if (
-                          el instanceof HTMLElement &&
-                          !el.dataset.permanent &&
-                          document.body.contains(el)
-                        ) {
-                          el.removeAttribute("aria-hidden");
-                        }
-                      } catch (e) {
-                        // 속성 제거 중 오류 시 무시
-                      }
-                    });
-                } catch (e) {
-                  // 오류 발생 시 조용히 처리
-                  console.warn("모달 닫기 처리 중 오류:", e);
-                }
-              }, 100);
-            } else {
-              setHistoryModalOpen(open);
-            }
-          }}
-        >
-          <DialogContent
-            className="sm:max-w-4xl max-h-[90vh] overflow-y-auto"
-            aria-describedby="menu-price-history-description"
-            onCloseAutoFocus={(event) => {
-              event.preventDefault();
-              document.body.focus();
-
-              // 이슈 #1236 해결: 터치 이벤트 차단 문제
-              document.body.style.pointerEvents = "";
-              document.body.style.touchAction = "";
-              document.documentElement.style.touchAction = "";
-
-              // 모든 포커스 제거
-              if (document.activeElement instanceof HTMLElement) {
-                document.activeElement.blur();
-              }
-            }}
-            onPointerDownOutside={(e) => {
-              // 이슈 #1236 해결: 모달 외부 클릭 시 포인터 이벤트 정상화
-              e.preventDefault();
-            }}
-          >
+      {/* 메뉴 식재료 모달 */}
+      {ingredientsModalOpen && selectedMenu && (
+        <Dialog open={ingredientsModalOpen} onOpenChange={setIngredientsModalOpen}>
+          <DialogContent className="sm:max-w-[700px]">
             <DialogHeader>
-              <DialogTitle>가격 이력 - {selectedMenu?.name}</DialogTitle>
+              <DialogTitle>{selectedMenu.name} - 식자재 정보</DialogTitle>
             </DialogHeader>
-            <div id="menu-price-history-description" className="sr-only">
-              {selectedMenu?.name}의 가격 변동 이력을 확인합니다
-            </div>
-            {selectedMenu && (
-              <MenuPriceHistory
-                companyId={companyId}
-                menuId={selectedMenu.id}
-              />
-            )}
+            <ScrollArea className="max-h-[70vh]">
+              <MenuIngredientsView companyId={companyId} menuId={selectedMenu.id} />
+            </ScrollArea>
           </DialogContent>
         </Dialog>
       )}
 
       {/* 삭제 확인 다이얼로그 */}
-      <Dialog
-        open={deleteConfirmOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            // 이슈 #1241 해결: pointer-events 스타일이 남아있는 문제 해결
-            // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
-            setTimeout(() => {
-              setDeleteConfirmOpen(false);
-              setMenuToDelete(null);
-
-              // 핵심 수정: 모달 닫힌 후 남아있는 스타일 속성 제거 및 DOM 정리
-              document.body.style.pointerEvents = "";
-              document.body.style.touchAction = "";
-
-              // Note: DOM 요소 직접 제거는 안전하게 처리 - React와의 충돌 방지
-              try {
-                // aria-hidden 속성 제거 - 안전하게 처리
-                document
-                  .querySelectorAll('[aria-hidden="true"]')
-                  .forEach((el) => {
-                    try {
-                      if (
-                        el instanceof HTMLElement &&
-                        !el.dataset.permanent &&
-                        document.body.contains(el)
-                      ) {
-                        el.removeAttribute("aria-hidden");
-                      }
-                    } catch (e) {
-                      // 속성 제거 중 오류 시 무시
-                    }
-                  });
-              } catch (e) {
-                // 오류 발생 시 조용히 처리
-                console.warn("모달 닫기 처리 중 오류:", e);
-              }
-            }, 100);
-          } else {
-            setDeleteConfirmOpen(open);
-          }
-        }}
-      >
-        <DialogContent
-          aria-describedby="menu-delete-dialog-description"
-          onCloseAutoFocus={(event) => {
-            event.preventDefault();
-            document.body.focus();
-
-            // 이슈 #1236 해결: 터치 이벤트 차단 문제
-            document.body.style.pointerEvents = "";
-            document.body.style.touchAction = "";
-            document.documentElement.style.touchAction = "";
-
-            // 모든 포커스 제거
-            if (document.activeElement instanceof HTMLElement) {
-              document.activeElement.blur();
-            }
-          }}
-          onPointerDownOutside={(e) => {
-            // 이슈 #1236 해결: 모달 외부 클릭 시 포인터 이벤트 정상화
-            e.preventDefault();
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>메뉴 삭제</DialogTitle>
-          </DialogHeader>
-          <p className="py-4" id="menu-delete-dialog-description">
-            정말로 <span className="font-semibold">{menuToDelete?.name}</span>{" "}
-            메뉴를 삭제하시겠습니까?
-            <br />이 작업은 되돌릴 수 없습니다.
-          </p>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteConfirmOpen(false)}
-            >
-              취소
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteMenu}>
-              삭제
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>메뉴 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              정말로 <span className="font-semibold">{menuToDelete?.name}</span>{" "}
+              메뉴를 삭제하시겠습니까?
+              <br />이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteMenu}>삭제</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
