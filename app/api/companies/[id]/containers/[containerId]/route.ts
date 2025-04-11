@@ -10,7 +10,37 @@ interface RouteContext {
   }>;
 }
 
-// 컨테이너 업데이트
+// 컨테이너 가져오기
+export async function GET(
+  request: NextRequest,
+  context: RouteContext
+) {
+  try {
+    const { id: companyId, containerId } = await context.params;
+    const supabase = createServerSupabaseClient();
+
+    const { data, error } = await supabase
+      .from('containers')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('id', containerId)
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('컨테이너 로딩 오류:', error);
+    return NextResponse.json(
+      { error: '컨테이너를 불러오는데 실패했습니다.' },
+      { status: 500 }
+    );
+  }
+}
+
+// 컨테이너 수정
 export async function PATCH(
   request: NextRequest,
   context: RouteContext
@@ -34,10 +64,9 @@ export async function PATCH(
         name: body.name,
         description: body.description || null,
         category: body.category || null,
-        updated_at: new Date().toISOString(),
       })
+      .eq('company_id', companyId)
       .eq('id', containerId)
-      .eq('company_id', companyId) // 회사 ID 확인 (추가 보안)
       .select()
       .single();
 
@@ -47,9 +76,9 @@ export async function PATCH(
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error('컨테이너 업데이트 오류:', error);
+    console.error('컨테이너 수정 오류:', error);
     return NextResponse.json(
-      { error: '컨테이너 업데이트에 실패했습니다.' },
+      { error: '컨테이너 수정에 실패했습니다.' },
       { status: 500 }
     );
   }
@@ -64,24 +93,28 @@ export async function DELETE(
     const { id: companyId, containerId } = await context.params;
     const supabase = createServerSupabaseClient();
 
-    // 컨테이너가 실제 해당 회사 소유인지 확인
-    const { data: containerData, error: checkError } = await supabase
-      .from('containers')
-      .select('id')
-      .eq('id', containerId)
-      .eq('company_id', companyId)
-      .single();
+    // 메뉴에서 이 컨테이너를 사용 중인지 확인
+    const { count, error: countError } = await supabase
+      .from('menu_containers')
+      .select('*', { count: 'exact', head: true })
+      .eq('container_id', containerId);
 
-    if (checkError || !containerData) {
+    if (countError) {
+      throw countError;
+    }
+
+    // 사용 중인 컨테이너는 삭제 불가
+    if (count && count > 0) {
       return NextResponse.json(
-        { error: '컨테이너를 찾을 수 없거나 접근 권한이 없습니다.' },
-        { status: 404 }
+        { error: '이 용기는 하나 이상의 메뉴에서 사용 중이므로 삭제할 수 없습니다.' },
+        { status: 409 }
       );
     }
 
     const { error } = await supabase
       .from('containers')
       .delete()
+      .eq('company_id', companyId)
       .eq('id', containerId);
 
     if (error) {

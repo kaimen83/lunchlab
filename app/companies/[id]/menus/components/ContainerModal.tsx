@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Category } from './CategoryModal';
 
 // 컨테이너 데이터 타입
 export interface Container {
@@ -62,7 +63,35 @@ export default function ContainerModal({
 }: ContainerModalProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
   const isEditMode = !!container;
+
+  // 카테고리 목록 불러오기
+  const fetchCategories = async () => {
+    if (!open) return;
+    
+    setLoadingCategories(true);
+    try {
+      const response = await fetch(`/api/companies/${companyId}/containers/categories`);
+      
+      if (!response.ok) {
+        throw new Error('카테고리 목록을 불러오는데 실패했습니다.');
+      }
+      
+      const data = await response.json();
+      setCategories(data || []);
+    } catch (error) {
+      console.error('카테고리 불러오기 오류:', error);
+      toast({
+        title: '알림',
+        description: '카테고리 목록을 불러오는데 실패했습니다. 기본 카테고리를 사용합니다.',
+        variant: 'default',
+      });
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
 
   // 폼 초기화
   const form = useForm<ContainerFormValues>({
@@ -73,6 +102,13 @@ export default function ContainerModal({
       category: container?.category || '',
     }
   });
+
+  // 모달이 열릴 때 카테고리 목록 로드
+  useEffect(() => {
+    if (open) {
+      fetchCategories();
+    }
+  }, [open, companyId]);
 
   // container 값이 변경될 때마다 폼 값 재설정
   useEffect(() => {
@@ -133,6 +169,23 @@ export default function ContainerModal({
     }
   };
 
+  // 카테고리 옵션 - 사용자 정의 카테고리와 기본 카테고리 결합
+  const categoryOptions = [
+    ...categories.map(cat => ({ label: cat.name, value: cat.code })),
+    // 기본 카테고리 (사용자 정의 카테고리가 없거나 기본값으로 사용할 경우)
+    { label: '플라스틱', value: 'plastic' },
+    { label: '종이', value: 'paper' },
+    { label: '유리', value: 'glass' },
+    { label: '금속', value: 'metal' },
+    { label: '친환경', value: 'eco' },
+    { label: '기타', value: 'other' },
+  ];
+
+  // 중복 제거
+  const uniqueCategoryOptions = Array.from(new Map(
+    categoryOptions.map(option => [option.value, option])
+  ).values());
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
@@ -188,17 +241,17 @@ export default function ContainerModal({
                     <Select
                       value={field.value}
                       onValueChange={field.onChange}
+                      disabled={loadingCategories}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="용기 분류 선택" />
+                        <SelectValue placeholder={loadingCategories ? "카테고리 불러오는 중..." : "용기 분류 선택"} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="plastic">플라스틱</SelectItem>
-                        <SelectItem value="paper">종이</SelectItem>
-                        <SelectItem value="glass">유리</SelectItem>
-                        <SelectItem value="metal">금속</SelectItem>
-                        <SelectItem value="eco">친환경</SelectItem>
-                        <SelectItem value="other">기타</SelectItem>
+                        {uniqueCategoryOptions.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </FormControl>

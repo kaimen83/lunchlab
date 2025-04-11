@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, Trash2, Package, Filter, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Package, Filter, Search, Settings, Tag } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -39,7 +39,10 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import ContainerModal, { Container } from './ContainerModal';
+import CategoryManager from './CategoryManager';
 
 interface ContainersListProps {
   companyId: string;
@@ -55,6 +58,7 @@ export default function ContainersList({ companyId }: ContainersListProps) {
   const [containerToDelete, setContainerToDelete] = useState<Container | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<string>('containers');
 
   // 용기 목록 불러오기
   const fetchContainers = async () => {
@@ -179,118 +183,153 @@ export default function ContainersList({ companyId }: ContainersListProps) {
   });
 
   return (
-    <div className="space-y-4">
-      {/* 상단 필터 및 검색 영역 */}
-      <div className="flex flex-col sm:flex-row gap-3 justify-between">
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="용기 검색..." 
-              className="pl-9"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          
-          <div className="w-auto sm:w-44">
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full">
-                <div className="flex items-center">
-                  <Filter className="mr-2 h-4 w-4" />
-                  <span>분류</span>
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">전체 보기</SelectItem>
-                <SelectItem value="plastic">플라스틱</SelectItem>
-                <SelectItem value="paper">종이</SelectItem>
-                <SelectItem value="glass">유리</SelectItem>
-                <SelectItem value="metal">금속</SelectItem>
-                <SelectItem value="eco">친환경</SelectItem>
-                <SelectItem value="other">기타</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+    <div className="space-y-6">
+      <Tabs 
+        defaultValue="containers" 
+        value={activeTab} 
+        onValueChange={setActiveTab}
+        className="w-full"
+      >
+        <TabsList className="mb-4 grid w-full grid-cols-2">
+          <TabsTrigger value="containers" className="flex items-center">
+            <Package className="h-4 w-4 mr-2" />
+            <span>용기 관리</span>
+          </TabsTrigger>
+          <TabsTrigger value="categories" className="flex items-center">
+            <Tag className="h-4 w-4 mr-2" />
+            <span>분류 관리</span>
+          </TabsTrigger>
+        </TabsList>
         
-        <Button onClick={handleAddClick} className="w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          용기 추가
-        </Button>
-      </div>
+        <TabsContent value="containers" className="space-y-4">
+          {/* 상단 필터 및 검색 영역 */}
+          <div className="flex flex-col sm:flex-row gap-3 justify-between">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-64">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="용기 검색..." 
+                  className="pl-9"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              
+              <div className="w-auto sm:w-44">
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-full">
+                    <div className="flex items-center">
+                      <Filter className="mr-2 h-4 w-4" />
+                      <span>분류</span>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체 보기</SelectItem>
+                    <SelectItem value="plastic">플라스틱</SelectItem>
+                    <SelectItem value="paper">종이</SelectItem>
+                    <SelectItem value="glass">유리</SelectItem>
+                    <SelectItem value="metal">금속</SelectItem>
+                    <SelectItem value="eco">친환경</SelectItem>
+                    <SelectItem value="other">기타</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button onClick={handleAddClick} className="flex-1 sm:flex-auto">
+                <Plus className="mr-2 h-4 w-4" />
+                용기 추가
+              </Button>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={() => setActiveTab('categories')} 
+                title="분류 관리" 
+                className="hidden sm:flex"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
 
-      {/* 컨테이너 목록 */}
-      {loading ? (
-        <div className="py-12 text-center text-muted-foreground">로딩 중...</div>
-      ) : filteredContainers.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {filteredContainers.map((container) => (
-            <Card key={container.id} className="overflow-hidden">
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg flex items-center">
-                      <Package className="h-4 w-4 mr-2 text-primary" />
-                      {container.name}
-                    </CardTitle>
-                    {container.category && (
-                      <Badge variant="outline" className="mt-1">
-                        {getCategoryLabel(container.category)}
-                      </Badge>
+          {/* 컨테이너 목록 */}
+          {loading ? (
+            <div className="py-12 text-center text-muted-foreground">로딩 중...</div>
+          ) : filteredContainers.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {filteredContainers.map((container) => (
+                <Card key={container.id} className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg flex items-center">
+                          <Package className="h-4 w-4 mr-2 text-primary" />
+                          {container.name}
+                        </CardTitle>
+                        {container.category && (
+                          <Badge variant="outline" className="mt-1">
+                            {getCategoryLabel(container.category)}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEditClick(container)}
+                          className="h-8 w-8"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteClick(container)}
+                          className="h-8 w-8 text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  {container.description && (
+                    <CardContent className="py-2">
+                      <p className="text-sm text-muted-foreground">{container.description}</p>
+                    </CardContent>
+                  )}
+                  <CardFooter className="pt-2 pb-3 flex justify-between text-xs text-muted-foreground">
+                    <span>
+                      생성: {new Date(container.created_at).toLocaleDateString('ko-KR')}
+                    </span>
+                    {container.updated_at && (
+                      <span>
+                        수정: {new Date(container.updated_at).toLocaleDateString('ko-KR')}
+                      </span>
                     )}
-                  </div>
-                  <div className="flex space-x-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEditClick(container)}
-                      className="h-8 w-8"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteClick(container)}
-                      className="h-8 w-8 text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              {container.description && (
-                <CardContent className="py-2">
-                  <p className="text-sm text-muted-foreground">{container.description}</p>
-                </CardContent>
-              )}
-              <CardFooter className="pt-2 pb-3 flex justify-between text-xs text-muted-foreground">
-                <span>
-                  생성: {new Date(container.created_at).toLocaleDateString('ko-KR')}
-                </span>
-                {container.updated_at && (
-                  <span>
-                    수정: {new Date(container.updated_at).toLocaleDateString('ko-KR')}
-                  </span>
-                )}
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="py-12 text-center border rounded-md">
-          <Package className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-          <h3 className="text-lg font-medium mb-1">등록된 용기가 없습니다</h3>
-          <p className="text-muted-foreground mb-4">
-            '용기 추가' 버튼을 클릭하여 새 용기를 등록하세요.
-          </p>
-          <Button onClick={handleAddClick}>
-            <Plus className="mr-2 h-4 w-4" />
-            용기 추가
-          </Button>
-        </div>
-      )}
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="py-12 text-center border rounded-md">
+              <Package className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+              <h3 className="text-lg font-medium mb-1">등록된 용기가 없습니다</h3>
+              <p className="text-muted-foreground mb-4">
+                '용기 추가' 버튼을 클릭하여 새 용기를 등록하세요.
+              </p>
+              <Button onClick={handleAddClick}>
+                <Plus className="mr-2 h-4 w-4" />
+                용기 추가
+              </Button>
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="categories">
+          <CategoryManager companyId={companyId} />
+        </TabsContent>
+      </Tabs>
 
       {/* 용기 추가/수정 모달 */}
       <ContainerModal
