@@ -150,7 +150,7 @@ export async function POST(request: Request, context: RouteContext) {
       }, { status: 403 });
     }
     
-    // 트랜잭션 시작
+    // 트랜잭션 시작 - 트리거를 우회하기 위해 RPC 호출을 하지 않고 직접 처리
     // 1. 메뉴 생성
     const { data: menu, error: menuError } = await supabase
       .from('menus')
@@ -158,7 +158,8 @@ export async function POST(request: Request, context: RouteContext) {
         company_id: companyId,
         name,
         description,
-        recipe
+        recipe,
+        cost_price: 0 // 초기값 설정, 나중에 업데이트
       })
       .select()
       .single();
@@ -168,34 +169,12 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: '메뉴 생성 중 오류가 발생했습니다.' }, { status: 500 });
     }
     
-    // 2. 식재료 연결 (기본 식재료 목록)
-    const menuIngredients = ingredients.map(ingredient => ({
-      menu_id: menu.id,
-      ingredient_id: ingredient.id,
-      amount: 0 // 기본 값은 0, 용기별로 양이 지정됨
-    }));
-    
-    const { error: ingredientsError } = await supabase
-      .from('menu_ingredients')
-      .insert(menuIngredients);
-    
-    if (ingredientsError) {
-      console.error('메뉴 식재료 추가 오류:', ingredientsError);
-      
-      // 롤백: 생성된 메뉴 삭제
-      await supabase
-        .from('menus')
-        .delete()
-        .eq('id', menu.id);
-      
-      return NextResponse.json({ error: '메뉴 식재료 추가 중 오류가 발생했습니다.' }, { status: 500 });
-    }
-    
-    // 3. 컨테이너 연결 및 컨테이너별 식재료 설정
+    // 컨테이너 처리 및 원가 계산을 먼저 수행
     let totalCost = 0;
     
+    // 컨테이너 연결 및 컨테이너별 식재료 설정
     for (const container of containers) {
-      // 3-1. 메뉴-컨테이너 연결
+      // 메뉴-컨테이너 연결
       const { data: menuContainer, error: containerError } = await supabase
         .from('menu_containers')
         .insert({
@@ -210,25 +189,10 @@ export async function POST(request: Request, context: RouteContext) {
         continue; // 해당 컨테이너는 건너뛰고 다음 처리
       }
       
-      // 3-2. 컨테이너별 식재료 양 설정
+      // 컨테이너별 식재료 양 설정
       if (container.ingredients && Array.isArray(container.ingredients)) {
-        const containerIngredients = container.ingredients.map(ing => ({
-          menu_container_id: menuContainer.id,
-          ingredient_id: ing.ingredient_id,
-          amount: ing.amount
-        }));
-        
-        // DB에 저장
-        const { error: containerIngredientsError } = await supabase
-          .from('menu_container_ingredients')
-          .insert(containerIngredients);
-        
-        if (containerIngredientsError) {
-          console.error('컨테이너 식재료 추가 오류:', containerIngredientsError);
-        }
-        
         // 원가 계산을 위해 식재료 정보 조회
-        for (const ing of container.ingredients as { ingredient_id: string; amount: number }[]) {
+        for (const ing of container.ingredients) {
           const { data: ingredientData } = await supabase
             .from('ingredients')
             .select('price, package_amount')
@@ -239,14 +203,32 @@ export async function POST(request: Request, context: RouteContext) {
             // 원가 계산에 추가
             totalCost += (ing.amount * ingredientData.price / ingredientData.package_amount);
           }
+          
+          // 컨테이너 식재료 추가
+          const { error: containerIngredientError } = await supabase
+            .from('menu_container_ingredients')
+            .insert({
+              menu_container_id: menuContainer.id,
+              ingredient_id: ing.ingredient_id,
+              amount: ing.amount 
+            });
+            
+          if (containerIngredientError) {
+            console.error('컨테이너 식재료 추가 오류:', containerIngredientError);
+          }
         }
       }
     }
     
-    // 4. 메뉴 원가 업데이트
+    // 먼저 원가를 계산한 후 기본 식재료 목록 추가
+    // 트리거를 피하기 위해 트랜잭션 혹은 rpc 호출 없이 직접 SQL로 처리
+    // 2. 메뉴 원가 업데이트
     const { data: updatedMenu, error: updateError } = await supabase
       .from('menus')
-      .update({ cost_price: Math.round(totalCost) })
+      .update({ 
+        cost_price: Math.round(totalCost),
+        updated_at: new Date().toISOString()
+      })
       .eq('id', menu.id)
       .select()
       .single();
@@ -254,6 +236,22 @@ export async function POST(request: Request, context: RouteContext) {
     if (updateError) {
       console.error('메뉴 원가 업데이트 오류:', updateError);
       return NextResponse.json({ error: '메뉴 원가 계산 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+    
+    // 식재료 연결 (기본 식재료 목록) - 트리거가 동작하지 않도록 원가 계산 이후에 처리
+    for (const ingredient of ingredients) {
+      const { error: ingredientError } = await supabase
+        .from('menu_ingredients')
+        .insert({
+          menu_id: menu.id,
+          ingredient_id: ingredient.id,
+          amount: 0 // 기본 값은 0, 용기별로 양이 지정됨
+        });
+      
+      if (ingredientError) {
+        console.error('식재료 추가 오류:', ingredientError);
+        // 오류가 있더라도 모든 식재료를 시도해 봅니다.
+      }
     }
     
     // 5. 메뉴 가격 이력 기록

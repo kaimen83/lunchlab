@@ -128,7 +128,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       const menuIngredients = ingredients.map((ingredient: SelectedIngredient) => ({
         menu_id: menuId,
         ingredient_id: ingredient.id,
-        amount: ingredient.amount
+        amount: ingredient.amount // amount 필드만 사용, amount_per_person이 아님
       }));
       
       const { error: ingredientsError } = await supabase
@@ -137,7 +137,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       
       if (ingredientsError) {
         console.error('메뉴 식재료 추가 오류:', ingredientsError);
-        return NextResponse.json({ error: '메뉴 식재료 추가 중 오류가 발생했습니다.' }, { status: 500 });
+        return NextResponse.json({ 
+          error: '메뉴 식재료 추가 중 오류가 발생했습니다. 식재료 양 필드를 확인해주세요.' 
+        }, { status: 500 });
       }
     }
     
@@ -157,7 +159,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       // 새 컨테이너 추가
       let totalCost = 0;
       
-      for (const container of containers) {
+      for (const container of containers as Container[]) {
         // 컨테이너 연결
         const { data: menuContainer, error: containerError } = await supabase
           .from('menu_containers')
@@ -178,7 +180,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           const containerIngredients = container.ingredients.map((ing: ContainerIngredient) => ({
             menu_container_id: menuContainer.id,
             ingredient_id: ing.ingredient_id,
-            amount: ing.amount
+            amount: ing.amount // amount 필드만 사용, amount_per_person이 아님
           }));
           
           const { error: containerIngredientsError } = await supabase
@@ -187,6 +189,9 @@ export async function PATCH(request: Request, context: RouteContext) {
           
           if (containerIngredientsError) {
             console.error('컨테이너 식재료 추가 오류:', containerIngredientsError);
+            return NextResponse.json({ 
+              error: '컨테이너 식재료 추가 중 오류가 발생했습니다. 식재료 양 필드를 확인해주세요.' 
+            }, { status: 500 });
           }
           
           // 원가 계산을 위해 식재료 정보 조회
@@ -243,6 +248,6 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json(finalMenu);
   } catch (error) {
     console.error('메뉴 수정 중 오류 발생:', error);
-    return NextResponse.json({ error: '메뉴 식재료 추가 중 오류가 발생했습니다.' }, { status: 500 });
+    return NextResponse.json({ error: '메뉴 수정 중 오류가 발생했습니다.' }, { status: 500 });
   }
 } 
