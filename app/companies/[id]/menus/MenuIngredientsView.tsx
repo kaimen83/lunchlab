@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Package } from 'lucide-react';
 
 interface Ingredient {
   id: string;
@@ -22,6 +25,25 @@ interface MenuIngredient {
   ingredient: Ingredient;
 }
 
+interface Container {
+  id: string;
+  container: {
+    id: string;
+    name: string;
+    description?: string;
+    category?: string;
+    price: number;
+  };
+  ingredients: {
+    id: string;
+    ingredient_id: string;
+    amount: number;
+    ingredient: Ingredient;
+  }[];
+  ingredients_cost: number;
+  total_cost: number;
+}
+
 interface MenuIngredientsViewProps {
   companyId: string;
   menuId: string;
@@ -30,34 +52,46 @@ interface MenuIngredientsViewProps {
 export default function MenuIngredientsView({ companyId, menuId }: MenuIngredientsViewProps) {
   const { toast } = useToast();
   const [ingredients, setIngredients] = useState<MenuIngredient[]>([]);
+  const [containers, setContainers] = useState<Container[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalCost, setTotalCost] = useState(0);
 
   useEffect(() => {
-    const fetchIngredients = async () => {
+    const fetchData = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/companies/${companyId}/menus/${menuId}/ingredients`);
+        // 메뉴 식재료 목록 조회
+        const ingredientsResponse = await fetch(`/api/companies/${companyId}/menus/${menuId}/ingredients`);
         
-        if (!response.ok) {
+        if (!ingredientsResponse.ok) {
           throw new Error('메뉴 식재료 목록을 불러오는데 실패했습니다.');
         }
         
-        const data = await response.json();
-        setIngredients(data);
+        const ingredientsData = await ingredientsResponse.json();
+        setIngredients(ingredientsData);
         
-        // 총 원가 계산
-        const cost = data.reduce((total: number, item: MenuIngredient) => {
+        // 메뉴 용기 및 용기별 식재료 조회
+        const containersResponse = await fetch(`/api/companies/${companyId}/menus/${menuId}/containers`);
+        
+        if (!containersResponse.ok) {
+          throw new Error('메뉴 용기 정보를 불러오는데 실패했습니다.');
+        }
+        
+        const containersData = await containersResponse.json();
+        setContainers(containersData);
+        
+        // 총 원가 계산 (모든 용기의 식재료 원가 합)
+        const cost = ingredientsData.reduce((total: number, item: MenuIngredient) => {
           const unitPrice = item.ingredient.price / item.ingredient.package_amount;
           return total + (unitPrice * item.amount);
         }, 0);
         
         setTotalCost(cost);
       } catch (error) {
-        console.error('메뉴 식재료 로드 오류:', error);
+        console.error('메뉴 데이터 로드 오류:', error);
         toast({
           title: '오류 발생',
-          description: error instanceof Error ? error.message : '메뉴 식재료를 불러오는데 실패했습니다.',
+          description: error instanceof Error ? error.message : '메뉴 정보를 불러오는데 실패했습니다.',
           variant: 'destructive',
         });
       } finally {
@@ -65,7 +99,7 @@ export default function MenuIngredientsView({ companyId, menuId }: MenuIngredien
       }
     };
 
-    fetchIngredients();
+    fetchData();
   }, [companyId, menuId, toast]);
 
   // 양 포맷팅
@@ -81,56 +115,121 @@ export default function MenuIngredientsView({ companyId, menuId }: MenuIngredien
     return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(amount);
   };
 
+  // 용기별 식재료 테이블 렌더링
+  const renderContainerIngredients = (container: Container) => {
+    return (
+      <Card key={container.id} className="mb-4">
+        <CardHeader className="pb-2">
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-lg flex items-center">
+              <Package className="h-4 w-4 mr-2" />
+              {container.container.name}
+            </CardTitle>
+            <div className="font-bold text-blue-700">
+              {formatCurrency(container.ingredients_cost)}
+            </div>
+          </div>
+          {container.container.description && (
+            <CardDescription>{container.container.description}</CardDescription>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="bg-blue-50 p-2 rounded text-sm mb-4">
+            <span className="font-semibold">식재료 총 비용:</span> {formatCurrency(container.ingredients_cost)}
+          </div>
+          
+          {container.ingredients.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>식재료</TableHead>
+                  <TableHead>양</TableHead>
+                  <TableHead>단가</TableHead>
+                  <TableHead>비용</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {container.ingredients.map((item) => {
+                  const unitPrice = item.ingredient.price / item.ingredient.package_amount;
+                  const itemCost = unitPrice * item.amount;
+                  
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">{item.ingredient.name}</TableCell>
+                      <TableCell>
+                        {formatAmount(item.amount)} {item.ingredient.unit}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {formatAmount(item.ingredient.package_amount)} {item.ingredient.unit} / {formatCurrency(item.ingredient.price)}
+                      </TableCell>
+                      <TableCell>
+                        {formatCurrency(itemCost)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-4 text-gray-500">이 용기에 등록된 식재료가 없습니다.</div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <div className="space-y-4">
       {isLoading ? (
         <div className="text-center py-8">로딩 중...</div>
-      ) : ingredients.length === 0 ? (
-        <div className="text-center py-8">등록된 식재료가 없습니다.</div>
       ) : (
         <>
-          <div className="border-b pb-2 mb-4">
-            <div className="flex justify-between items-center">
-              <div className="font-medium">총 원가:</div>
-              <div className="text-lg font-bold">
-                {formatCurrency(totalCost)}
-              </div>
-            </div>
-          </div>
-          
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>식재료</TableHead>
-                <TableHead>양</TableHead>
-                <TableHead>단가</TableHead>
-                <TableHead>비용</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {ingredients.map((item) => {
-                // 단위당 가격 계산 (package_amount 당 price의 비율)
-                const unitPrice = item.ingredient.price / item.ingredient.package_amount;
-                // 사용량에 따른 금액 계산
-                const itemCost = unitPrice * item.amount;
-                
-                return (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.ingredient.name}</TableCell>
-                    <TableCell>
-                      {formatAmount(item.amount)} {item.ingredient.unit}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {formatAmount(item.ingredient.package_amount)} {item.ingredient.unit} / {formatCurrency(item.ingredient.price)}
-                    </TableCell>
-                    <TableCell>
-                      {formatCurrency(itemCost)}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          {containers.length > 0 ? (
+            <Tabs defaultValue="containers" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="containers">용기별 보기</TabsTrigger>
+                <TabsTrigger value="all">전체 식재료</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="containers" className="space-y-4">
+                {containers.map(container => renderContainerIngredients(container))}
+              </TabsContent>
+              
+              <TabsContent value="all">
+                {ingredients.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {ingredients
+                      .sort((a, b) => a.ingredient.name.localeCompare(b.ingredient.name))
+                      .map((item) => (
+                        <Card key={item.id} className="overflow-hidden border hover:shadow-md transition-shadow">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-md flex items-center">
+                              <div className="mr-2 bg-blue-100 p-1 rounded-full w-7 h-7 flex items-center justify-center">
+                                <span className="text-xs font-semibold text-blue-700">{item.ingredient.name.charAt(0)}</span>
+                              </div>
+                              {item.ingredient.name}
+                            </CardTitle>
+                            <CardDescription className="flex flex-col mt-2 space-y-2">
+                              <div className="flex justify-between items-center text-sm bg-slate-50 p-2 rounded">
+                                <span>사용량</span>
+                                <span className="font-medium text-blue-600">{formatAmount(item.amount)} {item.ingredient.unit}</span>
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                기준: {formatAmount(item.ingredient.package_amount)} {item.ingredient.unit} / {formatCurrency(item.ingredient.price)}
+                              </div>
+                            </CardDescription>
+                          </CardHeader>
+                        </Card>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">등록된 식재료가 없습니다.</div>
+                )}
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <div className="text-center py-8">등록된 용기 정보가 없습니다.</div>
+          )}
         </>
       )}
     </div>

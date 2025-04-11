@@ -68,8 +68,88 @@ export async function GET(request: Request, context: RouteContext) {
       console.error('메뉴 조회 오류:', menusError);
       return NextResponse.json({ error: '메뉴 목록 조회 중 오류가 발생했습니다.' }, { status: 500 });
     }
+
+    // 각 메뉴의 용기 및 용기별 원가 정보 조회
+    const menusWithContainers = await Promise.all(
+      (menus || []).map(async (menu) => {
+        // 메뉴의 용기 정보 조회
+        const { data: menuContainers, error: containersError } = await supabase
+          .from('menu_containers')
+          .select(`
+            id,
+            container:container_id (
+              id, 
+              name, 
+              description, 
+              category,
+              price
+            )
+          `)
+          .eq('menu_id', menu.id);
+
+        if (containersError) {
+          console.error('메뉴 용기 조회 오류:', containersError);
+          return { ...menu, containers: [] };
+        }
+
+        // 각 용기별 식재료와 원가 계산
+        const containers = await Promise.all(
+          (menuContainers || []).map(async (menuContainer) => {
+            // 용기에 포함된 식재료 조회
+            const { data: ingredients, error: ingredientsError } = await supabase
+              .from('menu_container_ingredients')
+              .select(`
+                id,
+                ingredient_id,
+                amount,
+                ingredient:ingredient_id (
+                  id,
+                  name,
+                  package_amount,
+                  unit,
+                  price
+                )
+              `)
+              .eq('menu_container_id', menuContainer.id);
+
+            if (ingredientsError) {
+              console.error('용기 식재료 조회 오류:', ingredientsError);
+              return {
+                ...menuContainer,
+                ingredients: [],
+                ingredients_cost: 0,
+                total_cost: menuContainer.container.price || 0
+              };
+            }
+
+            // 용기 식재료 원가 계산
+            const ingredientsCost = (ingredients || []).reduce((total, item) => {
+              if (!item.ingredient) return total;
+              const unitPrice = item.ingredient.price / item.ingredient.package_amount;
+              return total + (unitPrice * item.amount);
+            }, 0);
+
+            // 용기 자체 가격 + 식재료 원가
+            const containerPrice = menuContainer.container.price || 0;
+            const totalCost = containerPrice + ingredientsCost;
+
+            return {
+              ...menuContainer,
+              ingredients: ingredients || [],
+              ingredients_cost: ingredientsCost,
+              total_cost: totalCost
+            };
+          })
+        );
+
+        return {
+          ...menu,
+          containers
+        };
+      })
+    );
     
-    return NextResponse.json(menus || []);
+    return NextResponse.json(menusWithContainers || []);
   } catch (error) {
     console.error('메뉴 조회 중 오류 발생:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });

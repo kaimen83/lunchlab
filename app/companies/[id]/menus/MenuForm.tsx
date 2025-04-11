@@ -380,7 +380,14 @@ export default function MenuForm({
           ? `/api/companies/${companyId}/menus`
           : `/api/companies/${companyId}/menus/${menu?.id}`;
         
+        // API는 PATCH와 PUT 메서드 모두 지원하도록 변경되었습니다
         const method = mode === 'create' ? 'POST' : 'PATCH';
+        
+        console.log(`메뉴 ${mode === 'create' ? '생성' : '수정'} 요청 중:`, {
+          url,
+          method,
+          data: menuData
+        });
         
         const response = await fetch(url, {
           method,
@@ -390,20 +397,33 @@ export default function MenuForm({
           body: JSON.stringify(menuData),
         });
         
+        // 응답이 정상이 아니면 에러 처리
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || '요청 처리 중 오류가 발생했습니다.');
+          // 응답 본문이 유효한 JSON인지 확인
+          try {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `요청 처리 중 오류가 발생했습니다. (${response.status})`);
+          } catch (jsonError) {
+            // JSON 파싱 오류가 발생한 경우
+            throw new Error(`요청 처리 중 오류가 발생했습니다. (${response.status}): ${response.statusText}`);
+          }
         }
         
-        const savedMenu = await response.json();
-        
-        toast({
-          title: mode === 'create' ? '메뉴 추가 완료' : '메뉴 수정 완료',
-          description: `${savedMenu.name} 메뉴가 ${mode === 'create' ? '추가' : '수정'}되었습니다.`,
-          variant: 'default',
-        });
-        
-        onSave(savedMenu);
+        // 응답 본문이 유효한 JSON인지 확인
+        try {
+          const savedMenu = await response.json();
+          
+          toast({
+            title: mode === 'create' ? '메뉴 추가 완료' : '메뉴 수정 완료',
+            description: `${savedMenu.name} 메뉴가 ${mode === 'create' ? '추가' : '수정'}되었습니다.`,
+            variant: 'default',
+          });
+          
+          onSave(savedMenu);
+        } catch (jsonError) {
+          console.error('응답 파싱 오류:', jsonError);
+          throw new Error('서버 응답을 처리하는 중 오류가 발생했습니다.');
+        }
       } catch (error) {
         console.error('메뉴 저장 오류:', error);
         toast({

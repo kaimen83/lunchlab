@@ -47,7 +47,8 @@ export async function GET(request: Request, context: RouteContext) {
           id,
           name,
           description,
-          category
+          category,
+          price
         )
       `)
       .eq('menu_id', menuId);
@@ -85,13 +86,31 @@ export async function GET(request: Request, context: RouteContext) {
           console.error('컨테이너 식재료 조회 오류:', ingredientsError);
           return {
             ...menuContainer,
-            ingredients: []
+            ingredients: [],
+            ingredients_cost: 0,
+            total_cost: menuContainer.container.price || 0
           };
         }
         
+        // 식재료 원가 계산
+        const ingredientsCost = (ingredients || []).reduce((total, item) => {
+          if (!item.ingredient) return total;
+          
+          const unitPrice = item.ingredient.price / item.ingredient.package_amount;
+          return total + (unitPrice * item.amount);
+        }, 0);
+        
+        // 용기 자체 가격
+        const containerPrice = menuContainer.container.price || 0;
+        
+        // 총 원가 = 용기 가격 + 식재료 원가
+        const totalCost = containerPrice + ingredientsCost;
+        
         return {
           ...menuContainer,
-          ingredients: ingredients || []
+          ingredients: ingredients || [],
+          ingredients_cost: ingredientsCost,
+          total_cost: totalCost
         };
       })
     );
