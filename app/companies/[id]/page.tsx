@@ -84,8 +84,8 @@ export default async function CompanyPage({ params }: CompanyPageProps) {
       <div className="flex-1 overflow-y-auto bg-white">
         <div className="w-full max-w-4xl mx-auto p-3 sm:p-4">
           {/* 회사 정보 카드 - 모바일 최적화 */}
-          <div className="border-l-2 border-gray-200 pl-3 sm:pl-4 py-3 relative mt-4 sm:mt-6">
-            <div className="absolute left-[-15px] top-0 w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-blue-100 flex items-center justify-center">
+          <div className="border-l-2 border-gray-200 pl-4 sm:pl-5 py-3 relative mt-4 sm:mt-6">
+            <div className="absolute left-[-9px] sm:left-[-15px] top-0 w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-blue-100 flex items-center justify-center">
               <Building className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
             </div>
             
@@ -126,8 +126,8 @@ export default async function CompanyPage({ params }: CompanyPageProps) {
           </div>
           
           {/* 멤버 목록 타임라인 메시지 - 모바일 최적화 */}
-          <div className="border-l-2 border-gray-200 pl-3 sm:pl-4 py-3 relative mt-4 sm:mt-6">
-            <div className="absolute left-[-15px] top-0 w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-purple-100 flex items-center justify-center">
+          <div className="border-l-2 border-gray-200 pl-4 sm:pl-5 py-3 relative mt-4 sm:mt-6">
+            <div className="absolute left-[-9px] sm:left-[-15px] top-0 w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-purple-100 flex items-center justify-center">
               <Users className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600" />
             </div>
             
