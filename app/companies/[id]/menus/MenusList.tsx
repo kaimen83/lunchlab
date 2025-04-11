@@ -128,6 +128,7 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
   const [menuToDelete, setMenuToDelete] = useState<Menu | null>(null);
   const [tabsView, setTabsView] = useState<"basic" | "detailed">("basic");
   const [expandedMenuId, setExpandedMenuId] = useState<string | null>(null);
+  const [expandedContainers, setExpandedContainers] = useState<string[]>([]);
 
   const isOwnerOrAdmin = userRole === "owner" || userRole === "admin";
 
@@ -332,6 +333,15 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
     return ingredientCosts.sort((a, b) => b.cost - a.cost).slice(0, 3);
   };
 
+  // 컨테이너 식자재 더보기 토글
+  const toggleContainerExpand = (containerId: string) => {
+    setExpandedContainers(prev => 
+      prev.includes(containerId) 
+        ? prev.filter(id => id !== containerId)
+        : [...prev, containerId]
+    );
+  };
+
   // 모바일 카드 아이템 렌더링 (개선된 버전)
   const renderMobileCard = (menu: Menu) => (
     <Card className="mb-3">
@@ -417,7 +427,14 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
 
                       {container.ingredients.length > 0 && (
                         <div className="p-2 text-xs bg-white">
-                          <div className="space-y-1 ml-2">
+                          <div className="text-gray-500 mb-2 text-[10px] flex justify-between px-1">
+                            <span>식자재</span>
+                            <div className="flex space-x-3">
+                              <span>사용량</span>
+                              <span>원가</span>
+                            </div>
+                          </div>
+                          <div className="space-y-2 ml-1">
                             {container.ingredients
                               .sort((a, b) => {
                                 const aCost =
@@ -430,19 +447,52 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                                   b.amount;
                                 return bCost - aCost;
                               })
-                              .slice(0, 3)
-                              .map((item) => (
-                                <div
-                                  key={item.id}
-                                  className="flex items-center"
-                                >
-                                  <div className="h-1 w-1 rounded-full bg-slate-300 mr-2"></div>
-                                  <span>{item.ingredient.name}</span>
-                                </div>
-                              ))}
-                            {container.ingredients.length > 3 && (
-                              <div className="text-xs text-blue-500 mt-1 ml-3">
-                                + {container.ingredients.length - 3}개 더...
+                              .slice(0, expandedContainers.includes(container.id) ? container.ingredients.length : 3)
+                              .map((item) => {
+                                const unitPrice = item.ingredient.price / item.ingredient.package_amount;
+                                const itemCost = unitPrice * item.amount;
+                                return (
+                                  <div
+                                    key={item.id}
+                                    className="flex items-center justify-between border-b border-gray-100 pb-1"
+                                  >
+                                    <div className="flex items-center">
+                                      <div className="h-1 w-1 rounded-full bg-slate-300 mr-2"></div>
+                                      <span>{item.ingredient.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                      <span className="text-gray-600 tabular-nums">
+                                        {item.amount} {item.ingredient.unit}
+                                      </span>
+                                      <span className="text-blue-600 tabular-nums w-14 text-right">
+                                        {formatCurrency(itemCost)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            {container.ingredients.length > 3 && !expandedContainers.includes(container.id) && (
+                              <div 
+                                className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleContainerExpand(container.id);
+                                }}
+                              >
+                                <span>+{container.ingredients.length - 3}개 더보기</span>
+                                <ChevronDown className="h-3 w-3" />
+                              </div>
+                            )}
+                            {expandedContainers.includes(container.id) && (
+                              <div 
+                                className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleContainerExpand(container.id);
+                                }}
+                              >
+                                <span>접기</span>
+                                <ChevronUp className="h-3 w-3" />
                               </div>
                             )}
                           </div>
@@ -492,8 +542,8 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
           }
         >
           <TabsList>
-            <TabsTrigger value="basic">기본 보기</TabsTrigger>
-            <TabsTrigger value="detailed">상세 보기</TabsTrigger>
+            <TabsTrigger value="basic">카드 보기</TabsTrigger>
+            <TabsTrigger value="detailed">테이블 보기</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -513,159 +563,136 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
         )}
       </div>
 
-      {/* 데스크톱 뷰 - 테이블 형태로 표시 */}
+      {/* 데스크톱 뷰 - 카드 또는 테이블 형태로 표시 */}
       <div className="hidden sm:block">
-        <Card>
-          <CardContent className="p-0">
-            {/* 기본 보기 모드 */}
-            {tabsView === "basic" && (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead
-                      onClick={() => toggleSort("name")}
-                      className="cursor-pointer hover:bg-gray-50"
-                    >
-                      <div className="flex items-center">
-                        이름
-                        {sortField === "name" &&
-                          (sortDirection === "asc" ? (
-                            <ChevronUp className="ml-1 h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="ml-1 h-4 w-4" />
-                          ))}
-                      </div>
-                    </TableHead>
-                    <TableHead>용기 옵션</TableHead>
-                    <TableHead>주요 식자재</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center">
-                        로딩 중...
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredMenus.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center">
-                        {searchQuery
-                          ? "검색 결과가 없습니다."
-                          : "등록된 메뉴가 없습니다."}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredMenus.map((menu) => (
-                      <TableRow key={menu.id}>
-                        <TableCell className="font-medium">
-                          <div>{menu.name}</div>
-                          {menu.description && (
-                            <div className="text-xs text-gray-500">
-                              {menu.description}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {menu.containers && menu.containers.length > 0 ? (
-                            <div className="space-y-1">
-                              {menu.containers.map((container) => (
-                                <TooltipProvider key={container.id}>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div className="flex items-center justify-between border rounded p-1 hover:bg-gray-50">
-                                        <span className="text-sm">
-                                          {container.container.name}
-                                        </span>
-                                        <Badge variant="outline">
-                                          {formatCurrency(
-                                            container.ingredients_cost,
-                                          )}
-                                        </Badge>
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="right">
-                                      <div className="text-xs space-y-1">
-                                        <div>
-                                          식자재 비용:{" "}
-                                          {formatCurrency(
-                                            container.ingredients_cost,
-                                          )}
-                                        </div>
-                                      </div>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-gray-500 text-sm">
-                              등록된 용기가 없습니다
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {menu.containers && menu.containers.length > 0 ? (
-                            <div className="text-sm">
-                              {getTopIngredients(menu.containers).map(
-                                (ingredient, idx) => (
-                                  <div key={idx} className="mb-1">
-                                    <span>{ingredient.name}</span>
-                                  </div>
-                                ),
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-500 text-sm">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1 justify-end">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleViewIngredients(menu)}
-                            >
-                              <PackageOpen className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleViewPriceHistory(menu)}
-                            >
-                              <LineChart className="h-4 w-4" />
-                            </Button>
-
-                            {isOwnerOrAdmin && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleEditMenu(menu)}
-                                >
-                                  <FilePen className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDeleteConfirm(menu)}
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
-                              </>
-                            )}
+        {tabsView === "basic" ? (
+          /* 카드 그리드 형태 (PC용) */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {isLoading ? (
+              <div className="p-4 text-center text-gray-500 col-span-full">로딩 중...</div>
+            ) : filteredMenus.length === 0 ? (
+              <div className="p-4 text-center text-gray-500 col-span-full">
+                {searchQuery ? "검색 결과가 없습니다." : "등록된 메뉴가 없습니다."}
+              </div>
+            ) : (
+              filteredMenus.map((menu) => (
+                <Card key={menu.id} className="overflow-hidden">
+                  <CardHeader className="pb-2 bg-gradient-to-r from-blue-50 to-gray-50">
+                    <div className="flex justify-between items-start">
+                      <CardTitle className="text-lg">
+                        <div className="flex items-center">
+                          <CookingPot className="h-4 w-4 mr-2 text-primary" />
+                          {menu.name}
+                        </div>
+                        {menu.description && (
+                          <div className="text-xs font-normal text-gray-500 mt-1">
+                            {menu.description}
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                        )}
+                      </CardTitle>
+                      <Badge variant="outline" className="bg-white">
+                        {formatCurrency(menu.cost_price)}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent className="p-0">
+                    {menu.containers && menu.containers.length > 0 ? (
+                      <div className="px-4 py-3">
+                        <div className="text-sm font-medium mb-2 flex items-center">
+                          <Package className="h-4 w-4 mr-1 text-slate-500" />
+                          <span>용기 정보</span>
+                        </div>
+                        <div className="space-y-2">
+                          {menu.containers.map((container) => (
+                            <div 
+                              key={container.id}
+                              className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-md text-sm"
+                            >
+                              <span>{container.container.name}</span>
+                              <Badge variant="secondary" className="bg-white">
+                                {formatCurrency(container.ingredients_cost)}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <div className="text-sm font-medium mt-4 mb-2 flex items-center">
+                          <CookingPot className="h-4 w-4 mr-1 text-slate-500" />
+                          <span>주요 식자재</span>
+                        </div>
+                        <div className="space-y-1.5 pl-2">
+                          {getTopIngredients(menu.containers).map((ingredient, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-xs">
+                              <div className="flex items-center">
+                                <div className="h-1.5 w-1.5 rounded-full bg-blue-400 mr-2"></div>
+                                <span>{ingredient.name}</span>
+                              </div>
+                              <span className="text-slate-500">
+                                {formatCurrency(ingredient.cost)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-center text-gray-500">
+                        등록된 용기가 없습니다
+                      </div>
+                    )}
+                  </CardContent>
+                  
+                  <CardFooter className="bg-slate-50 p-2 flex justify-end space-x-1 border-t">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleViewIngredients(menu)}
+                      className="h-8"
+                    >
+                      <PackageOpen className="h-4 w-4 mr-1" />
+                      <span className="text-xs">식자재</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleViewPriceHistory(menu)}
+                      className="h-8"
+                    >
+                      <LineChart className="h-4 w-4 mr-1" />
+                      <span className="text-xs">가격이력</span>
+                    </Button>
+                    
+                    {isOwnerOrAdmin && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditMenu(menu)}
+                          className="h-8"
+                        >
+                          <FilePen className="h-4 w-4 mr-1" />
+                          <span className="text-xs">수정</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 h-8"
+                          onClick={() => handleDeleteConfirm(menu)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          <span className="text-xs">삭제</span>
+                        </Button>
+                      </>
+                    )}
+                  </CardFooter>
+                </Card>
+              ))
             )}
-
-            {/* 상세 보기 모드 */}
-            {tabsView === "detailed" && (
+          </div>
+        ) : (
+          /* 테이블 형태 */
+          <Card>
+            <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -841,9 +868,9 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                   )}
                 </TableBody>
               </Table>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* 메뉴 추가/수정 모달 */}
