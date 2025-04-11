@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Package, Filter, Search } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -22,6 +22,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import ContainerModal, { Container } from './ContainerModal';
 
 interface ContainersListProps {
@@ -36,6 +53,8 @@ export default function ContainersList({ companyId }: ContainersListProps) {
   const [selectedContainer, setSelectedContainer] = useState<Container | undefined>(undefined);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [containerToDelete, setContainerToDelete] = useState<Container | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // 용기 목록 불러오기
   const fetchContainers = async () => {
@@ -134,63 +153,142 @@ export default function ContainersList({ companyId }: ContainersListProps) {
     return categories[category] || category;
   };
 
+  // 카테고리 색상 매핑
+  const getCategoryColor = (category?: string) => {
+    if (!category) return 'default';
+    
+    const categoryColors: Record<string, string> = {
+      'plastic': 'blue',
+      'paper': 'green',
+      'glass': 'violet',
+      'metal': 'slate',
+      'eco': 'emerald',
+      'other': 'gray'
+    };
+    
+    return categoryColors[category] || 'default';
+  };
+
+  // 필터링된 용기 목록
+  const filteredContainers = containers.filter(container => {
+    const matchesCategory = categoryFilter === 'all' || container.category === categoryFilter;
+    const matchesSearch = container.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (container.description && container.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    return matchesCategory && matchesSearch;
+  });
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">용기 관리</h3>
-        <Button onClick={handleAddClick} size="sm">
-          <Plus className="mr-1 h-4 w-4" />
+      {/* 상단 필터 및 검색 영역 */}
+      <div className="flex flex-col sm:flex-row gap-3 justify-between">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-64">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="용기 검색..." 
+              className="pl-9"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          
+          <div className="w-auto sm:w-44">
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full">
+                <div className="flex items-center">
+                  <Filter className="mr-2 h-4 w-4" />
+                  <span>분류</span>
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">전체 보기</SelectItem>
+                <SelectItem value="plastic">플라스틱</SelectItem>
+                <SelectItem value="paper">종이</SelectItem>
+                <SelectItem value="glass">유리</SelectItem>
+                <SelectItem value="metal">금속</SelectItem>
+                <SelectItem value="eco">친환경</SelectItem>
+                <SelectItem value="other">기타</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        
+        <Button onClick={handleAddClick} className="w-full sm:w-auto">
+          <Plus className="mr-2 h-4 w-4" />
           용기 추가
         </Button>
       </div>
 
+      {/* 컨테이너 목록 */}
       {loading ? (
-        <div className="py-4 text-center text-muted-foreground">로딩 중...</div>
-      ) : containers.length > 0 ? (
-        <div className="border rounded-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>이름</TableHead>
-                <TableHead>분류</TableHead>
-                <TableHead>설명</TableHead>
-                <TableHead className="w-[100px] text-right">관리</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {containers.map((container) => (
-                <TableRow key={container.id}>
-                  <TableCell className="font-medium">{container.name}</TableCell>
-                  <TableCell>{getCategoryLabel(container.category)}</TableCell>
-                  <TableCell className="text-muted-foreground">{container.description || '-'}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEditClick(container)}
-                        title="수정"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteClick(container)}
-                        title="삭제"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="py-12 text-center text-muted-foreground">로딩 중...</div>
+      ) : filteredContainers.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {filteredContainers.map((container) => (
+            <Card key={container.id} className="overflow-hidden">
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-lg flex items-center">
+                      <Package className="h-4 w-4 mr-2 text-primary" />
+                      {container.name}
+                    </CardTitle>
+                    {container.category && (
+                      <Badge variant="outline" className="mt-1">
+                        {getCategoryLabel(container.category)}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex space-x-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEditClick(container)}
+                      className="h-8 w-8"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteClick(container)}
+                      className="h-8 w-8 text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              {container.description && (
+                <CardContent className="py-2">
+                  <p className="text-sm text-muted-foreground">{container.description}</p>
+                </CardContent>
+              )}
+              <CardFooter className="pt-2 pb-3 flex justify-between text-xs text-muted-foreground">
+                <span>
+                  생성: {new Date(container.created_at).toLocaleDateString('ko-KR')}
+                </span>
+                {container.updated_at && (
+                  <span>
+                    수정: {new Date(container.updated_at).toLocaleDateString('ko-KR')}
+                  </span>
+                )}
+              </CardFooter>
+            </Card>
+          ))}
         </div>
       ) : (
-        <div className="py-4 text-center border rounded-md text-muted-foreground">
-          등록된 용기가 없습니다. '용기 추가' 버튼을 클릭하여 새 용기를 추가하세요.
+        <div className="py-12 text-center border rounded-md">
+          <Package className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+          <h3 className="text-lg font-medium mb-1">등록된 용기가 없습니다</h3>
+          <p className="text-muted-foreground mb-4">
+            '용기 추가' 버튼을 클릭하여 새 용기를 등록하세요.
+          </p>
+          <Button onClick={handleAddClick}>
+            <Plus className="mr-2 h-4 w-4" />
+            용기 추가
+          </Button>
         </div>
       )}
 

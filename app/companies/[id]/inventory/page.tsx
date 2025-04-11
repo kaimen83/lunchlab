@@ -3,8 +3,9 @@ import { redirect, notFound } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import IngredientsList from '../ingredients/IngredientsList';
 import MenusList from '../menus/MenusList';
+import ContainersList from '../menus/components/ContainersList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ClipboardList, BookOpen } from 'lucide-react';
+import { ClipboardList, BookOpen, Package } from 'lucide-react';
 
 interface InventoryPageProps {
   params: Promise<{
@@ -143,6 +144,14 @@ export default async function InventoryPage({ params, searchParams }: InventoryP
                 <span className="text-xs sm:text-sm">메뉴</span>
               </TabsTrigger>
             )}
+
+            {hasMenusFeature && (
+              <TabsTrigger value="containers" className="flex-1 sm:flex-initial items-center">
+                <Package className="h-4 w-4 mr-2 hidden sm:inline" />
+                <Package className="h-4 w-4 sm:hidden mb-1" />
+                <span className="text-xs sm:text-sm">용기설정</span>
+              </TabsTrigger>
+            )}
           </TabsList>
           
           {hasIngredientsFeature && (
@@ -154,6 +163,18 @@ export default async function InventoryPage({ params, searchParams }: InventoryP
           {hasMenusFeature && (
             <TabsContent value="menus">
               <MenusList companyId={companyId} userRole={membership.role} />
+            </TabsContent>
+          )}
+
+          {hasMenusFeature && (
+            <TabsContent value="containers">
+              <div className="bg-white p-4 rounded-lg shadow-sm border">
+                <h2 className="text-xl font-semibold mb-4">용기 관리</h2>
+                <p className="text-muted-foreground mb-6">
+                  메뉴에 사용할 용기를 등록하고 관리하세요. 용기 정보는 원가 계산과 메뉴 구성에 활용됩니다.
+                </p>
+                <ContainersList companyId={companyId} />
+              </div>
             </TabsContent>
           )}
         </Tabs>

@@ -1,38 +1,74 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { 
-  Plus, FilePen, Trash2, Search, FileText, 
-  ChevronDown, ChevronUp, LineChart, CookingPot, PackageOpen, MoreVertical, Package, Eye, Info, DollarSign
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { Card, CardContent, CardHeader, CardFooter, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
-import MenuForm from './MenuForm';
-import MenuIngredientsView from './MenuIngredientsView';
-import MenuPriceHistory from './MenuPriceHistory';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Plus,
+  FilePen,
+  Trash2,
+  Search,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  LineChart,
+  CookingPot,
+  PackageOpen,
+  MoreVertical,
+  Package,
+  Eye,
+  Info,
+  DollarSign,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import MenuForm from "./MenuForm";
+import MenuIngredientsView from "./MenuIngredientsView";
+import MenuPriceHistory from "./MenuPriceHistory";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
-import ContainersList from './components/ContainersList';
-import { 
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
-  AccordionTrigger
+  AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Container {
   id: string;
@@ -80,40 +116,42 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
   const { toast } = useToast();
   const [menus, setMenus] = useState<Menu[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortField, setSortField] = useState<keyof Menu>('name');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortField, setSortField] = useState<keyof Menu>("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [selectedMenu, setSelectedMenu] = useState<Menu | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [ingredientsModalOpen, setIngredientsModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [menuToDelete, setMenuToDelete] = useState<Menu | null>(null);
-  const [containerDialogOpen, setContainerDialogOpen] = useState(false);
-  const [tabsView, setTabsView] = useState<'basic' | 'detailed'>('basic');
+  const [tabsView, setTabsView] = useState<"basic" | "detailed">("basic");
   const [expandedMenuId, setExpandedMenuId] = useState<string | null>(null);
 
-  const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin';
+  const isOwnerOrAdmin = userRole === "owner" || userRole === "admin";
 
   // 메뉴 목록 로드
   const loadMenus = async () => {
     setIsLoading(true);
     try {
       const response = await fetch(`/api/companies/${companyId}/menus`);
-      
+
       if (!response.ok) {
-        throw new Error('메뉴 목록을 불러오는데 실패했습니다.');
+        throw new Error("메뉴 목록을 불러오는데 실패했습니다.");
       }
-      
+
       const data = await response.json();
       setMenus(data);
     } catch (error) {
-      console.error('메뉴 로드 오류:', error);
+      console.error("메뉴 로드 오류:", error);
       toast({
-        title: '오류 발생',
-        description: error instanceof Error ? error.message : '메뉴 목록을 불러오는데 실패했습니다.',
-        variant: 'destructive',
+        title: "오류 발생",
+        description:
+          error instanceof Error
+            ? error.message
+            : "메뉴 목록을 불러오는데 실패했습니다.",
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -127,46 +165,48 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
   // 정렬 처리
   const toggleSort = (field: keyof Menu) => {
     if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortDirection('asc');
+      setSortDirection("asc");
     }
   };
 
   // 정렬 및 필터링된 메뉴 목록
   const filteredMenus = menus
-    .filter(menu => 
-      menu.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (menu.description && menu.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    .filter(
+      (menu) =>
+        menu.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (menu.description &&
+          menu.description.toLowerCase().includes(searchQuery.toLowerCase())),
     )
     .sort((a, b) => {
       const aValue = a[sortField];
       const bValue = b[sortField];
-      
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortDirection === 'asc' 
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        return sortDirection === "asc"
           ? aValue.localeCompare(bValue)
           : bValue.localeCompare(aValue);
       }
-      
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+
+      if (typeof aValue === "number" && typeof bValue === "number") {
+        return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
       }
-      
+
       return 0;
     });
 
   // 메뉴 추가 모달 열기
   const handleAddMenu = () => {
-    setModalMode('create');
+    setModalMode("create");
     setSelectedMenu(null);
     setModalOpen(true);
   };
 
   // 메뉴 수정 모달 열기
   const handleEditMenu = (menu: Menu) => {
-    setModalMode('edit');
+    setModalMode("edit");
     setSelectedMenu(menu);
     setModalOpen(true);
   };
@@ -180,40 +220,48 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
   // 메뉴 삭제 처리
   const handleDeleteMenu = async () => {
     if (!menuToDelete) return;
-    
+
     try {
-      const response = await fetch(`/api/companies/${companyId}/menus/${menuToDelete.id}`, {
-        method: 'DELETE',
-      });
-      
+      const response = await fetch(
+        `/api/companies/${companyId}/menus/${menuToDelete.id}`,
+        {
+          method: "DELETE",
+        },
+      );
+
       if (!response.ok) {
         const data = await response.json();
-        
+
         // 식단 계획에서 사용 중인 경우 특별 처리
         if (response.status === 409) {
-          throw new Error(data.error || '해당 메뉴가 식단 계획에서 사용 중입니다.');
+          throw new Error(
+            data.error || "해당 메뉴가 식단 계획에서 사용 중입니다.",
+          );
         }
-        
-        throw new Error(data.error || '메뉴 삭제에 실패했습니다.');
+
+        throw new Error(data.error || "메뉴 삭제에 실패했습니다.");
       }
-      
+
       // 목록에서 해당 메뉴 제거
-      setMenus(prev => prev.filter(i => i.id !== menuToDelete.id));
-      
+      setMenus((prev) => prev.filter((i) => i.id !== menuToDelete.id));
+
       toast({
-        title: '삭제 완료',
+        title: "삭제 완료",
         description: `${menuToDelete.name} 메뉴가 삭제되었습니다.`,
-        variant: 'default',
+        variant: "default",
       });
-      
+
       setDeleteConfirmOpen(false);
       setMenuToDelete(null);
     } catch (error) {
-      console.error('메뉴 삭제 오류:', error);
+      console.error("메뉴 삭제 오류:", error);
       toast({
-        title: '오류 발생',
-        description: error instanceof Error ? error.message : '메뉴 삭제 중 오류가 발생했습니다.',
-        variant: 'destructive',
+        title: "오류 발생",
+        description:
+          error instanceof Error
+            ? error.message
+            : "메뉴 삭제 중 오류가 발생했습니다.",
+        variant: "destructive",
       });
       setDeleteConfirmOpen(false);
     }
@@ -233,50 +281,55 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
 
   // 메뉴 저장 후 처리
   const handleSaveMenu = (savedMenu: Menu) => {
-    if (modalMode === 'create') {
-      setMenus(prev => [...prev, savedMenu]);
+    if (modalMode === "create") {
+      setMenus((prev) => [...prev, savedMenu]);
     } else {
-      setMenus(prev => 
-        prev.map(i => i.id === savedMenu.id ? savedMenu : i)
+      setMenus((prev) =>
+        prev.map((i) => (i.id === savedMenu.id ? savedMenu : i)),
       );
     }
-    
+
     setModalOpen(false);
     setSelectedMenu(null);
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(amount);
+    return new Intl.NumberFormat("ko-KR", {
+      style: "currency",
+      currency: "KRW",
+    }).format(amount);
   };
 
   // 식자재 요약 정보 표시 (가장 비싼 상위 3개)
   const getTopIngredients = (containers: Container[] | undefined) => {
     if (!containers || containers.length === 0) return [];
-    
+
     // 모든 용기의 식자재를 하나의 배열로 평탄화
-    const allIngredients = containers.flatMap(container => container.ingredients);
-    
+    const allIngredients = containers.flatMap(
+      (container) => container.ingredients,
+    );
+
     // 식자재별 총 비용 계산
-    const ingredientCosts: {name: string, cost: number}[] = [];
-    allIngredients.forEach(item => {
+    const ingredientCosts: { name: string; cost: number }[] = [];
+    allIngredients.forEach((item) => {
       const unitPrice = item.ingredient.price / item.ingredient.package_amount;
       const itemCost = unitPrice * item.amount;
-      
-      const existingIdx = ingredientCosts.findIndex(i => i.name === item.ingredient.name);
+
+      const existingIdx = ingredientCosts.findIndex(
+        (i) => i.name === item.ingredient.name,
+      );
       if (existingIdx >= 0) {
         ingredientCosts[existingIdx].cost += itemCost;
       } else {
         ingredientCosts.push({
           name: item.ingredient.name,
-          cost: itemCost
+          cost: itemCost,
         });
       }
     });
-    
+
     // 비용이 높은 순으로 정렬하고 상위 3개 반환
-    return ingredientCosts
-      .sort((a, b) => b.cost - a.cost)
-      .slice(0, 3);
+    return ingredientCosts.sort((a, b) => b.cost - a.cost).slice(0, 3);
   };
 
   // 모바일 카드 아이템 렌더링 (개선된 버전)
@@ -307,8 +360,8 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                     <FilePen className="h-4 w-4 mr-2" />
                     <span>수정</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className="text-red-500" 
+                  <DropdownMenuItem
+                    className="text-red-500"
                     onClick={() => handleDeleteConfirm(menu)}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
@@ -328,8 +381,10 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
         <Accordion
           type="single"
           collapsible
-          value={expandedMenuId === menu.id ? 'item-1' : undefined}
-          onValueChange={(value: string | undefined) => setExpandedMenuId(value ? menu.id : null)}
+          value={expandedMenuId === menu.id ? "item-1" : undefined}
+          onValueChange={(value: string | undefined) =>
+            setExpandedMenuId(value ? menu.id : null)
+          }
         >
           <AccordionItem value="item-1" className="border-b-0">
             <AccordionTrigger className="py-2">
@@ -342,29 +397,45 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
               {menu.containers && menu.containers.length > 0 ? (
                 <div className="space-y-3">
                   {menu.containers.map((container) => (
-                    <div key={container.id} className="rounded-md overflow-hidden shadow-sm border">
+                    <div
+                      key={container.id}
+                      className="rounded-md overflow-hidden shadow-sm border"
+                    >
                       <div className="flex items-center justify-between bg-blue-50 p-2 border-b">
                         <div className="flex items-center">
                           <div className="mr-2 bg-white p-1 rounded-full w-6 h-6 flex items-center justify-center shadow-sm">
                             <Package className="h-3 w-3 text-blue-500" />
                           </div>
-                          <span className="font-medium text-sm">{container.container.name}</span>
+                          <span className="font-medium text-sm">
+                            {container.container.name}
+                          </span>
                         </div>
-                        <Badge variant="secondary" className="bg-white">{formatCurrency(container.ingredients_cost)}</Badge>
+                        <Badge variant="secondary" className="bg-white">
+                          {formatCurrency(container.ingredients_cost)}
+                        </Badge>
                       </div>
-                      
+
                       {container.ingredients.length > 0 && (
                         <div className="p-2 text-xs bg-white">
                           <div className="space-y-1 ml-2">
                             {container.ingredients
                               .sort((a, b) => {
-                                const aCost = (a.ingredient.price / a.ingredient.package_amount) * a.amount;
-                                const bCost = (b.ingredient.price / b.ingredient.package_amount) * b.amount;
+                                const aCost =
+                                  (a.ingredient.price /
+                                    a.ingredient.package_amount) *
+                                  a.amount;
+                                const bCost =
+                                  (b.ingredient.price /
+                                    b.ingredient.package_amount) *
+                                  b.amount;
                                 return bCost - aCost;
                               })
                               .slice(0, 3)
-                              .map(item => (
-                                <div key={item.id} className="flex items-center">
+                              .map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="flex items-center"
+                                >
                                   <div className="h-1 w-1 rounded-full bg-slate-300 mr-2"></div>
                                   <span>{item.ingredient.name}</span>
                                 </div>
@@ -381,7 +452,9 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                   ))}
                 </div>
               ) : (
-                <div className="text-sm text-gray-500 text-center py-2">등록된 용기가 없습니다</div>
+                <div className="text-sm text-gray-500 text-center py-2">
+                  등록된 용기가 없습니다
+                </div>
               )}
             </AccordionContent>
           </AccordionItem>
@@ -391,36 +464,33 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
   );
 
   return (
-    <div className="p-2 sm:p-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 mb-4 sm:mb-6">
-        <div className="flex items-center gap-2 w-full sm:w-[320px]">
-          <Search className="w-4 h-4 text-gray-500" />
+    <div className="space-y-4">
+      {/* 검색 및 추가 버튼 */}
+      <div className="flex flex-col sm:flex-row justify-between gap-2">
+        <div className="flex items-center relative w-full sm:w-64">
+          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="메뉴 검색"
+            placeholder="메뉴 검색..."
+            className="pl-8 w-full"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full"
           />
         </div>
         <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
           <Button onClick={handleAddMenu} className="flex-1 sm:flex-auto">
             <Plus className="mr-2 h-4 w-4" /> 메뉴 추가
           </Button>
-          {isOwnerOrAdmin && (
-            <Button 
-              variant="outline" 
-              onClick={() => setContainerDialogOpen(true)} 
-              className="flex-1 sm:flex-auto"
-            >
-              <Package className="mr-2 h-4 w-4" /> 용기 설정
-            </Button>
-          )}
         </div>
       </div>
 
       {/* 테이블 뷰 전환 */}
       <div className="hidden sm:flex justify-end mb-2">
-        <Tabs value={tabsView} onValueChange={(value: string) => setTabsView(value as 'basic' | 'detailed')}>
+        <Tabs
+          value={tabsView}
+          onValueChange={(value: string) =>
+            setTabsView(value as "basic" | "detailed")
+          }
+        >
           <TabsList>
             <TabsTrigger value="basic">기본 보기</TabsTrigger>
             <TabsTrigger value="detailed">상세 보기</TabsTrigger>
@@ -434,11 +504,11 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
           <div className="p-4 text-center text-gray-500">로딩 중...</div>
         ) : filteredMenus.length === 0 ? (
           <div className="p-4 text-center text-gray-500">
-            {searchQuery ? '검색 결과가 없습니다.' : '등록된 메뉴가 없습니다.'}
+            {searchQuery ? "검색 결과가 없습니다." : "등록된 메뉴가 없습니다."}
           </div>
         ) : (
           <div className="space-y-2">
-            {filteredMenus.map(menu => renderMobileCard(menu))}
+            {filteredMenus.map((menu) => renderMobileCard(menu))}
           </div>
         )}
       </div>
@@ -448,21 +518,22 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
         <Card>
           <CardContent className="p-0">
             {/* 기본 보기 모드 */}
-            {tabsView === 'basic' && (
+            {tabsView === "basic" && (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead 
-                      onClick={() => toggleSort('name')}
+                    <TableHead
+                      onClick={() => toggleSort("name")}
                       className="cursor-pointer hover:bg-gray-50"
                     >
                       <div className="flex items-center">
                         이름
-                        {sortField === 'name' && (
-                          sortDirection === 'asc' ? 
-                          <ChevronUp className="ml-1 h-4 w-4" /> : 
-                          <ChevronDown className="ml-1 h-4 w-4" />
-                        )}
+                        {sortField === "name" &&
+                          (sortDirection === "asc" ? (
+                            <ChevronUp className="ml-1 h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="ml-1 h-4 w-4" />
+                          ))}
                       </div>
                     </TableHead>
                     <TableHead>용기 옵션</TableHead>
@@ -473,36 +544,55 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center">로딩 중...</TableCell>
+                      <TableCell colSpan={4} className="text-center">
+                        로딩 중...
+                      </TableCell>
                     </TableRow>
                   ) : filteredMenus.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center">
-                        {searchQuery ? '검색 결과가 없습니다.' : '등록된 메뉴가 없습니다.'}
+                        {searchQuery
+                          ? "검색 결과가 없습니다."
+                          : "등록된 메뉴가 없습니다."}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredMenus.map(menu => (
+                    filteredMenus.map((menu) => (
                       <TableRow key={menu.id}>
                         <TableCell className="font-medium">
                           <div>{menu.name}</div>
-                          {menu.description && <div className="text-xs text-gray-500">{menu.description}</div>}
+                          {menu.description && (
+                            <div className="text-xs text-gray-500">
+                              {menu.description}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           {menu.containers && menu.containers.length > 0 ? (
                             <div className="space-y-1">
-                              {menu.containers.map(container => (
+                              {menu.containers.map((container) => (
                                 <TooltipProvider key={container.id}>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <div className="flex items-center justify-between border rounded p-1 hover:bg-gray-50">
-                                        <span className="text-sm">{container.container.name}</span>
-                                        <Badge variant="outline">{formatCurrency(container.ingredients_cost)}</Badge>
+                                        <span className="text-sm">
+                                          {container.container.name}
+                                        </span>
+                                        <Badge variant="outline">
+                                          {formatCurrency(
+                                            container.ingredients_cost,
+                                          )}
+                                        </Badge>
                                       </div>
                                     </TooltipTrigger>
                                     <TooltipContent side="right">
                                       <div className="text-xs space-y-1">
-                                        <div>식자재 비용: {formatCurrency(container.ingredients_cost)}</div>
+                                        <div>
+                                          식자재 비용:{" "}
+                                          {formatCurrency(
+                                            container.ingredients_cost,
+                                          )}
+                                        </div>
                                       </div>
                                     </TooltipContent>
                                   </Tooltip>
@@ -510,17 +600,21 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                               ))}
                             </div>
                           ) : (
-                            <span className="text-gray-500 text-sm">등록된 용기가 없습니다</span>
+                            <span className="text-gray-500 text-sm">
+                              등록된 용기가 없습니다
+                            </span>
                           )}
                         </TableCell>
                         <TableCell>
                           {menu.containers && menu.containers.length > 0 ? (
                             <div className="text-sm">
-                              {getTopIngredients(menu.containers).map((ingredient, idx) => (
-                                <div key={idx} className="mb-1">
-                                  <span>{ingredient.name}</span>
-                                </div>
-                              ))}
+                              {getTopIngredients(menu.containers).map(
+                                (ingredient, idx) => (
+                                  <div key={idx} className="mb-1">
+                                    <span>{ingredient.name}</span>
+                                  </div>
+                                ),
+                              )}
                             </div>
                           ) : (
                             <span className="text-gray-500 text-sm">-</span>
@@ -528,19 +622,35 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1 justify-end">
-                            <Button variant="ghost" size="icon" onClick={() => handleViewIngredients(menu)}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleViewIngredients(menu)}
+                            >
                               <PackageOpen className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleViewPriceHistory(menu)}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleViewPriceHistory(menu)}
+                            >
                               <LineChart className="h-4 w-4" />
                             </Button>
-                            
+
                             {isOwnerOrAdmin && (
                               <>
-                                <Button variant="ghost" size="icon" onClick={() => handleEditMenu(menu)}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleEditMenu(menu)}
+                                >
                                   <FilePen className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleDeleteConfirm(menu)}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDeleteConfirm(menu)}
+                                >
                                   <Trash2 className="h-4 w-4 text-red-500" />
                                 </Button>
                               </>
@@ -555,7 +665,7 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
             )}
 
             {/* 상세 보기 모드 */}
-            {tabsView === 'detailed' && (
+            {tabsView === "detailed" && (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -569,39 +679,62 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center">로딩 중...</TableCell>
+                      <TableCell colSpan={5} className="text-center">
+                        로딩 중...
+                      </TableCell>
                     </TableRow>
                   ) : filteredMenus.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center">
-                        {searchQuery ? '검색 결과가 없습니다.' : '등록된 메뉴가 없습니다.'}
+                        {searchQuery
+                          ? "검색 결과가 없습니다."
+                          : "등록된 메뉴가 없습니다."}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredMenus.flatMap(menu => {
+                    filteredMenus.flatMap((menu) => {
                       // 용기가 없는 경우 단일 행 표시
                       if (!menu.containers || menu.containers.length === 0) {
                         return (
                           <TableRow key={menu.id}>
                             <TableCell className="font-medium">
                               <div>{menu.name}</div>
-                              {menu.description && <div className="text-xs text-gray-500">{menu.description}</div>}
+                              {menu.description && (
+                                <div className="text-xs text-gray-500">
+                                  {menu.description}
+                                </div>
+                              )}
                             </TableCell>
-                            <TableCell colSpan={2} className="text-center text-gray-500">
+                            <TableCell
+                              colSpan={2}
+                              className="text-center text-gray-500"
+                            >
                               등록된 용기가 없습니다
                             </TableCell>
                             <TableCell>-</TableCell>
                             <TableCell>
                               <div className="flex gap-1 justify-end">
-                                <Button variant="ghost" size="icon" onClick={() => handleViewIngredients(menu)}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleViewIngredients(menu)}
+                                >
                                   <PackageOpen className="h-4 w-4" />
                                 </Button>
                                 {isOwnerOrAdmin && (
                                   <>
-                                    <Button variant="ghost" size="icon" onClick={() => handleEditMenu(menu)}>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleEditMenu(menu)}
+                                    >
                                       <FilePen className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" onClick={() => handleDeleteConfirm(menu)}>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleDeleteConfirm(menu)}
+                                    >
                                       <Trash2 className="h-4 w-4 text-red-500" />
                                     </Button>
                                   </>
@@ -611,30 +744,53 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                           </TableRow>
                         );
                       }
-                      
+
                       // 용기가 있는 경우 용기별로 행 생성
                       return menu.containers!.map((container, idx) => (
-                        <TableRow key={`${menu.id}_${container.id}`} className={idx === 0 ? "" : "opacity-80"}>
+                        <TableRow
+                          key={`${menu.id}_${container.id}`}
+                          className={idx === 0 ? "" : "opacity-80"}
+                        >
                           {idx === 0 ? (
-                            <TableCell className="font-medium" rowSpan={menu.containers!.length}>
+                            <TableCell
+                              className="font-medium"
+                              rowSpan={menu.containers!.length}
+                            >
                               <div>{menu.name}</div>
-                              {menu.description && <div className="text-xs text-gray-500">{menu.description}</div>}
+                              {menu.description && (
+                                <div className="text-xs text-gray-500">
+                                  {menu.description}
+                                </div>
+                              )}
                             </TableCell>
                           ) : null}
-                          <TableCell className="font-medium text-sm">{container.container.name}</TableCell>
-                          <TableCell className="text-sm">{formatCurrency(container.ingredients_cost)}</TableCell>
+                          <TableCell className="font-medium text-sm">
+                            {container.container.name}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {formatCurrency(container.ingredients_cost)}
+                          </TableCell>
                           <TableCell>
                             <ScrollArea className="h-20">
                               <div className="space-y-1 pr-3">
                                 {container.ingredients
                                   .sort((a, b) => {
-                                    const aCost = (a.ingredient.price / a.ingredient.package_amount) * a.amount;
-                                    const bCost = (b.ingredient.price / b.ingredient.package_amount) * b.amount;
+                                    const aCost =
+                                      (a.ingredient.price /
+                                        a.ingredient.package_amount) *
+                                      a.amount;
+                                    const bCost =
+                                      (b.ingredient.price /
+                                        b.ingredient.package_amount) *
+                                      b.amount;
                                     return bCost - aCost;
                                   })
-                                  .map(item => (
+                                  .map((item) => (
                                     <div key={item.id} className="text-xs">
-                                      <span>{item.ingredient.name} ({item.amount}{item.ingredient.unit})</span>
+                                      <span>
+                                        {item.ingredient.name} ({item.amount}
+                                        {item.ingredient.unit})
+                                      </span>
                                     </div>
                                   ))}
                               </div>
@@ -643,19 +799,35 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                           {idx === 0 ? (
                             <TableCell rowSpan={menu.containers!.length}>
                               <div className="flex gap-1 justify-end">
-                                <Button variant="ghost" size="icon" onClick={() => handleViewIngredients(menu)}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleViewIngredients(menu)}
+                                >
                                   <PackageOpen className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleViewPriceHistory(menu)}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleViewPriceHistory(menu)}
+                                >
                                   <LineChart className="h-4 w-4" />
                                 </Button>
-                                
+
                                 {isOwnerOrAdmin && (
                                   <>
-                                    <Button variant="ghost" size="icon" onClick={() => handleEditMenu(menu)}>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleEditMenu(menu)}
+                                    >
                                       <FilePen className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" onClick={() => handleDeleteConfirm(menu)}>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleDeleteConfirm(menu)}
+                                    >
                                       <Trash2 className="h-4 w-4 text-red-500" />
                                     </Button>
                                   </>
@@ -674,24 +846,82 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
         </Card>
       </div>
 
-      {/* 용기 설정 모달 */}
-      <Dialog open={containerDialogOpen} onOpenChange={setContainerDialogOpen}>
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>용기 관리</DialogTitle>
-          </DialogHeader>
-          <div className="py-2">
-            <ContainersList companyId={companyId} />
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* 메뉴 추가/수정 모달 */}
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <Dialog
+        open={modalOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            // 이슈 #1241 해결: pointer-events 스타일이 남아있는 문제 해결
+            // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
+            setTimeout(() => {
+              setModalOpen(false);
+              if (!ingredientsModalOpen && !historyModalOpen)
+                setSelectedMenu(null);
+
+              // 핵심 수정: 모달 닫힌 후 남아있는 스타일 속성 제거 및 DOM 정리
+              document.body.style.pointerEvents = "";
+              document.body.style.touchAction = "";
+
+              // Note: DOM 요소 직접 제거는 안전하게 처리 - React와의 충돌 방지
+              try {
+                // aria-hidden 속성 제거 - 안전하게 처리
+                document
+                  .querySelectorAll('[aria-hidden="true"]')
+                  .forEach((el) => {
+                    try {
+                      if (
+                        el instanceof HTMLElement &&
+                        !el.dataset.permanent &&
+                        document.body.contains(el)
+                      ) {
+                        el.removeAttribute("aria-hidden");
+                      }
+                    } catch (e) {
+                      // 속성 제거 중 오류 시 무시
+                    }
+                  });
+              } catch (e) {
+                // 오류 발생 시 조용히 처리
+                console.warn("모달 닫기 처리 중 오류:", e);
+              }
+            }, 100);
+          } else {
+            setModalOpen(open);
+          }
+        }}
+      >
+        <DialogContent
+          className="sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+          aria-describedby="menu-form-description"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            document.body.focus();
+
+            // 이슈 #1236 해결: 터치 이벤트 차단 문제
+            document.body.style.pointerEvents = "";
+            document.body.style.touchAction = "";
+            document.documentElement.style.touchAction = "";
+
+            // 모든 포커스 제거
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur();
+            }
+          }}
+          onPointerDownOutside={(e) => {
+            // 이슈 #1236 해결: 모달 외부 클릭 시 포인터 이벤트 정상화
+            e.preventDefault();
+          }}
+        >
           <DialogHeader>
-            <DialogTitle>{modalMode === 'create' ? '메뉴 추가' : '메뉴 수정'}</DialogTitle>
+            <DialogTitle>
+              {modalMode === "create" ? "메뉴 추가" : "메뉴 수정"}
+            </DialogTitle>
           </DialogHeader>
+          <div id="menu-form-description" className="sr-only">
+            {modalMode === "create"
+              ? "새 메뉴를 추가합니다"
+              : "메뉴 정보를 수정합니다"}
+          </div>
           <MenuForm
             companyId={companyId}
             menu={selectedMenu}
@@ -704,14 +934,79 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
 
       {/* 재료 보기 모달 */}
       {ingredientsModalOpen && selectedMenu && (
-        <Dialog open={ingredientsModalOpen} onOpenChange={setIngredientsModalOpen}>
-          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <Dialog
+          open={ingredientsModalOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              // 이슈 #1241 해결: pointer-events 스타일이 남아있는 문제 해결
+              // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
+              setTimeout(() => {
+                setIngredientsModalOpen(false);
+                if (!modalOpen && !historyModalOpen) setSelectedMenu(null);
+
+                // 핵심 수정: 모달 닫힌 후 남아있는 스타일 속성 제거 및 DOM 정리
+                document.body.style.pointerEvents = "";
+                document.body.style.touchAction = "";
+
+                // Note: DOM 요소 직접 제거는 안전하게 처리 - React와의 충돌 방지
+                try {
+                  // aria-hidden 속성 제거 - 안전하게 처리
+                  document
+                    .querySelectorAll('[aria-hidden="true"]')
+                    .forEach((el) => {
+                      try {
+                        if (
+                          el instanceof HTMLElement &&
+                          !el.dataset.permanent &&
+                          document.body.contains(el)
+                        ) {
+                          el.removeAttribute("aria-hidden");
+                        }
+                      } catch (e) {
+                        // 속성 제거 중 오류 시 무시
+                      }
+                    });
+                } catch (e) {
+                  // 오류 발생 시 조용히 처리
+                  console.warn("모달 닫기 처리 중 오류:", e);
+                }
+              }, 100);
+            } else {
+              setIngredientsModalOpen(open);
+            }
+          }}
+        >
+          <DialogContent
+            className="sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+            aria-describedby="menu-ingredients-description"
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              document.body.focus();
+
+              // 이슈 #1236 해결: 터치 이벤트 차단 문제
+              document.body.style.pointerEvents = "";
+              document.body.style.touchAction = "";
+              document.documentElement.style.touchAction = "";
+
+              // 모든 포커스 제거
+              if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur();
+              }
+            }}
+            onPointerDownOutside={(e) => {
+              // 이슈 #1236 해결: 모달 외부 클릭 시 포인터 이벤트 정상화
+              e.preventDefault();
+            }}
+          >
             <DialogHeader>
               <DialogTitle>메뉴 식재료 - {selectedMenu?.name}</DialogTitle>
             </DialogHeader>
+            <div id="menu-ingredients-description" className="sr-only">
+              {selectedMenu?.name}의 식재료 정보를 확인합니다
+            </div>
             {selectedMenu && (
-              <MenuIngredientsView 
-                companyId={companyId} 
+              <MenuIngredientsView
+                companyId={companyId}
                 menuId={selectedMenu.id}
               />
             )}
@@ -721,14 +1016,79 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
 
       {/* 가격 이력 모달 */}
       {historyModalOpen && selectedMenu && (
-        <Dialog open={historyModalOpen} onOpenChange={setHistoryModalOpen}>
-          <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <Dialog
+          open={historyModalOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              // 이슈 #1241 해결: pointer-events 스타일이 남아있는 문제 해결
+              // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
+              setTimeout(() => {
+                setHistoryModalOpen(false);
+                if (!modalOpen && !ingredientsModalOpen) setSelectedMenu(null);
+
+                // 핵심 수정: 모달 닫힌 후 남아있는 스타일 속성 제거 및 DOM 정리
+                document.body.style.pointerEvents = "";
+                document.body.style.touchAction = "";
+
+                // Note: DOM 요소 직접 제거는 안전하게 처리 - React와의 충돌 방지
+                try {
+                  // aria-hidden 속성 제거 - 안전하게 처리
+                  document
+                    .querySelectorAll('[aria-hidden="true"]')
+                    .forEach((el) => {
+                      try {
+                        if (
+                          el instanceof HTMLElement &&
+                          !el.dataset.permanent &&
+                          document.body.contains(el)
+                        ) {
+                          el.removeAttribute("aria-hidden");
+                        }
+                      } catch (e) {
+                        // 속성 제거 중 오류 시 무시
+                      }
+                    });
+                } catch (e) {
+                  // 오류 발생 시 조용히 처리
+                  console.warn("모달 닫기 처리 중 오류:", e);
+                }
+              }, 100);
+            } else {
+              setHistoryModalOpen(open);
+            }
+          }}
+        >
+          <DialogContent
+            className="sm:max-w-4xl max-h-[90vh] overflow-y-auto"
+            aria-describedby="menu-price-history-description"
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              document.body.focus();
+
+              // 이슈 #1236 해결: 터치 이벤트 차단 문제
+              document.body.style.pointerEvents = "";
+              document.body.style.touchAction = "";
+              document.documentElement.style.touchAction = "";
+
+              // 모든 포커스 제거
+              if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur();
+              }
+            }}
+            onPointerDownOutside={(e) => {
+              // 이슈 #1236 해결: 모달 외부 클릭 시 포인터 이벤트 정상화
+              e.preventDefault();
+            }}
+          >
             <DialogHeader>
               <DialogTitle>가격 이력 - {selectedMenu?.name}</DialogTitle>
             </DialogHeader>
+            <div id="menu-price-history-description" className="sr-only">
+              {selectedMenu?.name}의 가격 변동 이력을 확인합니다
+            </div>
             {selectedMenu && (
-              <MenuPriceHistory 
-                companyId={companyId} 
+              <MenuPriceHistory
+                companyId={companyId}
                 menuId={selectedMenu.id}
               />
             )}
@@ -737,21 +1097,90 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
       )}
 
       {/* 삭제 확인 다이얼로그 */}
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent>
+      <Dialog
+        open={deleteConfirmOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            // 이슈 #1241 해결: pointer-events 스타일이 남아있는 문제 해결
+            // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
+            setTimeout(() => {
+              setDeleteConfirmOpen(false);
+              setMenuToDelete(null);
+
+              // 핵심 수정: 모달 닫힌 후 남아있는 스타일 속성 제거 및 DOM 정리
+              document.body.style.pointerEvents = "";
+              document.body.style.touchAction = "";
+
+              // Note: DOM 요소 직접 제거는 안전하게 처리 - React와의 충돌 방지
+              try {
+                // aria-hidden 속성 제거 - 안전하게 처리
+                document
+                  .querySelectorAll('[aria-hidden="true"]')
+                  .forEach((el) => {
+                    try {
+                      if (
+                        el instanceof HTMLElement &&
+                        !el.dataset.permanent &&
+                        document.body.contains(el)
+                      ) {
+                        el.removeAttribute("aria-hidden");
+                      }
+                    } catch (e) {
+                      // 속성 제거 중 오류 시 무시
+                    }
+                  });
+              } catch (e) {
+                // 오류 발생 시 조용히 처리
+                console.warn("모달 닫기 처리 중 오류:", e);
+              }
+            }, 100);
+          } else {
+            setDeleteConfirmOpen(open);
+          }
+        }}
+      >
+        <DialogContent
+          aria-describedby="menu-delete-dialog-description"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            document.body.focus();
+
+            // 이슈 #1236 해결: 터치 이벤트 차단 문제
+            document.body.style.pointerEvents = "";
+            document.body.style.touchAction = "";
+            document.documentElement.style.touchAction = "";
+
+            // 모든 포커스 제거
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur();
+            }
+          }}
+          onPointerDownOutside={(e) => {
+            // 이슈 #1236 해결: 모달 외부 클릭 시 포인터 이벤트 정상화
+            e.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>메뉴 삭제</DialogTitle>
           </DialogHeader>
-          <p className="py-4">
-            정말로 <span className="font-semibold">{menuToDelete?.name}</span> 메뉴를 삭제하시겠습니까?<br />
-            이 작업은 되돌릴 수 없습니다.
+          <p className="py-4" id="menu-delete-dialog-description">
+            정말로 <span className="font-semibold">{menuToDelete?.name}</span>{" "}
+            메뉴를 삭제하시겠습니까?
+            <br />이 작업은 되돌릴 수 없습니다.
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>취소</Button>
-            <Button variant="destructive" onClick={handleDeleteMenu}>삭제</Button>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmOpen(false)}
+            >
+              취소
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteMenu}>
+              삭제
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
-} 
+}
