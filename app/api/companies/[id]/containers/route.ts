@@ -62,7 +62,6 @@ export async function POST(
         company_id: companyId,
         name: body.name,
         description: body.description || null,
-        category: body.category || null,
       })
       .select()
       .single();
