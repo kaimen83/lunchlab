@@ -162,7 +162,13 @@ export default async function InventoryPage({ params, searchParams }: InventoryP
           
           {hasMenusFeature && (
             <TabsContent value="menus">
-              <MenusList companyId={companyId} userRole={membership.role} />
+              <div className="bg-white p-4 rounded-lg shadow-sm border">
+                <h2 className="text-xl font-semibold mb-4">메뉴 관리</h2>
+                <p className="text-muted-foreground mb-6">
+                  식당에서 제공하는 메뉴를 등록하고 관리하세요. 등록된 메뉴는 식단 계획과 원가 관리에 활용됩니다.
+                </p>
+                <MenusList companyId={companyId} userRole={membership.role} />
+              </div>
             </TabsContent>
           )}
 
