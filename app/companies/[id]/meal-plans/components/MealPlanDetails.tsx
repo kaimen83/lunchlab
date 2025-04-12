@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import { FilePen, Trash2 } from 'lucide-react';
+import { FilePen, Trash2, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { MealPlan } from '../types';
 import { getMealTimeName, calculateMealPlanCost, formatCurrency } from '../utils';
@@ -40,28 +40,51 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
       <div>
         <h4 className="font-medium mb-2">포함 메뉴 ({mealPlan.meal_plan_menus.length}개)</h4>
         {mealPlan.meal_plan_menus.length === 0 ? (
-          <p className="text-sm text-gray-500">등록된 메뉴가 없습니다.</p>
+          <p className="text-sm text-muted-foreground">등록된 메뉴가 없습니다.</p>
         ) : (
-          <ul className="space-y-2">
-            {mealPlan.meal_plan_menus.map((item) => (
-              <li key={item.id} className="flex justify-between text-sm">
-                <div>
-                  <span className="font-medium">{item.menu.name}</span>
-                  {item.menu.description && (
-                    <p className="text-xs text-gray-500">{item.menu.description}</p>
-                  )}
-                </div>
-                <span className="text-gray-500">
-                  {new Intl.NumberFormat('ko-KR').format(item.menu.cost_price)}원
-                </span>
-              </li>
-            ))}
+          <ul className="space-y-3">
+            {mealPlan.meal_plan_menus.map((item) => {
+              // 메뉴와 용기 비용 계산
+              const menuCost = item.menu.cost_price || 0;
+              const containerCost = item.container?.price || 0;
+              const totalCost = menuCost + containerCost;
+              
+              return (
+                <li key={item.id} className="border-b pb-2 last:border-0 last:pb-0">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-1">
+                      <div className="font-medium">{item.menu.name}</div>
+                      {item.menu.description && (
+                        <p className="text-xs text-muted-foreground">{item.menu.description}</p>
+                      )}
+                      
+                      {item.container && (
+                        <div className="flex items-center text-xs text-muted-foreground mt-1">
+                          <Package className="h-3 w-3 mr-1" />
+                          <span>{item.container.name}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="text-right">
+                      <div className="font-medium">{formatCurrency(totalCost)}</div>
+                      {item.container && (
+                        <div className="text-xs text-muted-foreground">
+                          메뉴: {formatCurrency(menuCost)}<br />
+                          용기: {formatCurrency(containerCost)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
       
-      <div className="flex justify-between items-center pt-2">
-        <div className="font-medium">
+      <div className="flex justify-between items-center pt-2 border-t">
+        <div className="font-medium text-lg">
           총 비용: {formatCurrency(calculateMealPlanCost(mealPlan))}
         </div>
       </div>

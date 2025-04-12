@@ -31,6 +31,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
             name,
             description,
             cost_price
+          ),
+          container:containers(
+            id,
+            name,
+            description,
+            price
           )
         )
       `)
@@ -71,12 +77,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const supabase = createServerSupabaseClient();
     
     // 요청 본문에서 데이터 추출
-    const { name, date, meal_time, menu_ids } = await request.json();
+    const { name, date, meal_time, menu_selections } = await request.json();
     
     // 필수 필드 확인
-    if (!name || !date || !meal_time || !menu_ids || !Array.isArray(menu_ids) || menu_ids.length === 0) {
+    if (!name || !date || !meal_time || !menu_selections || !Array.isArray(menu_selections) || menu_selections.length === 0) {
       return NextResponse.json(
-        { error: '필수 필드가 누락되었습니다 (name, date, meal_time, menu_ids)' },
+        { error: '필수 필드가 누락되었습니다 (name, date, meal_time, menu_selections)' },
         { status: 400 }
       );
     }
@@ -101,10 +107,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
     
-    // 메뉴 연결 데이터 생성
-    const menuLinks = menu_ids.map(menuId => ({
+    // 메뉴 및 용기 연결 데이터 생성
+    const menuLinks = menu_selections.map(selection => ({
       meal_plan_id: mealPlan.id,
-      menu_id: menuId
+      menu_id: selection.menuId,
+      container_id: selection.containerId || null
     }));
     
     // 메뉴 연결 추가
@@ -135,6 +142,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
             name,
             description,
             cost_price
+          ),
+          container:containers(
+            id,
+            name,
+            description,
+            price
           )
         )
       `)

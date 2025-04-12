@@ -2,12 +2,19 @@ export interface MealPlanMenu {
   id: string;
   meal_plan_id: string;
   menu_id: string;
+  container_id?: string | null;
   menu: {
     id: string;
     name: string;
     description: string | null;
     cost_price: number;
   };
+  container?: {
+    id: string;
+    name: string;
+    description: string | null;
+    price: number;
+  } | null;
 }
 
 export interface MealPlan {

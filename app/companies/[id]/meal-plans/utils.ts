@@ -22,11 +22,19 @@ export const calculateMealPlanCost = (mealPlan: MealPlan): number => {
   }
   
   return mealPlan.meal_plan_menus.reduce((totalCost, item) => {
-    // 메뉴 데이터가 있고, cost_price가 숫자인 경우에만 합산
+    let itemCost = 0;
+    
+    // 메뉴 비용 계산
     if (item.menu && typeof item.menu.cost_price === 'number') {
-      return totalCost + item.menu.cost_price;
+      itemCost += item.menu.cost_price;
     }
-    return totalCost;
+    
+    // 용기 비용 추가 (있는 경우)
+    if (item.container && typeof item.container.price === 'number') {
+      itemCost += item.container.price;
+    }
+    
+    return totalCost + itemCost;
   }, 0);
 };
 
@@ -47,7 +55,8 @@ export const getMenuNames = (mealPlan: MealPlan): string => {
 export const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('ko-KR', { 
     style: 'currency', 
-    currency: 'KRW' 
+    currency: 'KRW',
+    maximumFractionDigits: 0
   }).format(amount);
 };
 

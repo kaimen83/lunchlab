@@ -29,6 +29,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
             name,
             description,
             cost_price
+          ),
+          container:containers(
+            id,
+            name,
+            description,
+            price
           )
         )
       `)
@@ -69,7 +75,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const supabase = createServerSupabaseClient();
     
     // 요청 바디에서 업데이트할 정보 추출
-    const { name, date, meal_time, menu_ids } = await request.json();
+    const { name, date, meal_time, menu_selections } = await request.json();
     
     // 식단이 존재하는지 확인
     const { data: existingMealPlan, error: fetchError } = await supabase
@@ -108,8 +114,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
     
-    // 메뉴 ID가 제공된 경우, 연결된 메뉴 업데이트
-    if (menu_ids && Array.isArray(menu_ids)) {
+    // 메뉴 선택 정보가 제공된 경우, 연결된 메뉴 및 용기 업데이트
+    if (menu_selections && Array.isArray(menu_selections)) {
       // 기존 메뉴 연결 삭제
       const { error: deleteError } = await supabase
         .from('meal_plan_menus')
@@ -124,11 +130,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         );
       }
       
-      // 새 메뉴 연결 추가
-      if (menu_ids.length > 0) {
-        const menuLinks = menu_ids.map(menuId => ({
+      // 새 메뉴 및 용기 연결 추가
+      if (menu_selections.length > 0) {
+        const menuLinks = menu_selections.map(selection => ({
           meal_plan_id: mealPlanId,
-          menu_id: menuId
+          menu_id: selection.menuId,
+          container_id: selection.containerId || null
         }));
         
         const { error: insertError } = await supabase
@@ -157,6 +164,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
             name,
             description,
             cost_price
+          ),
+          container:containers(
+            id,
+            name,
+            description,
+            price
           )
         )
       `)
