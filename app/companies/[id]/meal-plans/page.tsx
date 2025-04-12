@@ -4,46 +4,18 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar as CalendarIcon, Plus, Loader2, ChevronLeft, ChevronRight, Utensils, Edit, Trash2, Eye } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
+import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogHeader,
-  DialogTitle,
-  DialogFooter 
-} from '@/components/ui/dialog';
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, addDays, isSameDay, addWeeks, subWeeks } from 'date-fns';
-import { ko } from 'date-fns/locale';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, isSameDay } from 'date-fns';
+import WeekView from './components/WeekView';
+import MonthView from './components/MonthView';
 import MealPlanForm from './components/MealPlanForm';
 import MealPlanDetails from './components/MealPlanDetails';
-
-interface MealPlanMenu {
-  id: string;
-  meal_plan_id: string;
-  menu_id: string;
-  menu: {
-    id: string;
-    name: string;
-    description: string | null;
-    cost_price: number;
-  };
-}
-
-interface MealPlan {
-  id: string;
-  company_id: string;
-  name: string;
-  date: string;
-  meal_time: 'breakfast' | 'lunch' | 'dinner';
-  created_at: string;
-  updated_at: string;
-  meal_plan_menus: MealPlanMenu[];
-}
+import MealPlanListModal from './components/MealPlanListModal';
+import CalendarHeader from './components/CalendarHeader';
+import { MealPlan, ViewType, FormMode } from './types';
+import { getMealTimeName } from './utils';
 
 export default function MealPlansPage() {
   const { id: companyId } = useParams<{ id: string }>();
@@ -53,11 +25,11 @@ export default function MealPlansPage() {
   const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentWeek, setCurrentWeek] = useState<Date>(new Date());
-  const [viewType, setViewType] = useState<'week' | 'month'>('week');
+  const [viewType, setViewType] = useState<ViewType>('week');
   const [selectedMealPlan, setSelectedMealPlan] = useState<MealPlan | null>(null);
   const [showMealPlanForm, setShowMealPlanForm] = useState<boolean>(false);
   const [showMealPlanDetails, setShowMealPlanDetails] = useState<boolean>(false);
-  const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
+  const [formMode, setFormMode] = useState<FormMode>('create');
   const [selectedMealTime, setSelectedMealTime] = useState<'breakfast' | 'lunch' | 'dinner'>('lunch');
   const [selectedPlansForSlot, setSelectedPlansForSlot] = useState<MealPlan[] | null>(null);
   const [showMealPlanListModal, setShowMealPlanListModal] = useState<boolean>(false);
@@ -100,11 +72,11 @@ export default function MealPlansPage() {
         variant: 'destructive',
       });
     } finally {
-    setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
-  // 식단 추가
+  // 식단 추가 버튼 클릭 핸들러
   const handleAddMealPlan = () => {
     // 현재 시간에 따라 식사 시간 선택
     const now = new Date();
@@ -124,6 +96,47 @@ export default function MealPlansPage() {
     setSelectedMealTime(mealTime);
     setFormMode('create');
     setSelectedMealPlan(null);
+    setShowMealPlanForm(true);
+  };
+
+  // 식단 폼 열기 (날짜와 식사 시간 지정)
+  const handleAddMealPlanForDateAndTime = (date: Date, mealTime: 'breakfast' | 'lunch' | 'dinner') => {
+    setSelectedDate(date);
+    setFormMode('create');
+    setSelectedMealTime(mealTime);
+    setSelectedMealPlan({
+      id: '',
+      company_id: companyId as string,
+      name: '',
+      date: format(date, 'yyyy-MM-dd'),
+      meal_time: mealTime,
+      created_at: '',
+      updated_at: '',
+      meal_plan_menus: []
+    });
+    setShowMealPlanForm(true);
+  };
+
+  // 월간 뷰에서 식단 추가 (시간 자동 선택)
+  const handleAddMealPlanFromMonthView = (date: Date) => {
+    // 현재 시간에 따라 식사 시간 선택
+    const now = new Date();
+    const hour = now.getHours();
+    
+    let mealTime: 'breakfast' | 'lunch' | 'dinner';
+    
+    // 시간대별 식사 시간 설정
+    if (hour < 10) {
+      mealTime = 'breakfast'; // 10시 이전은 아침
+    } else if (hour < 15) {
+      mealTime = 'lunch'; // 10시 ~ 15시는 점심
+    } else {
+      mealTime = 'dinner'; // 15시 이후는 저녁
+    }
+    
+    setSelectedMealTime(mealTime);
+    setSelectedDate(date);
+    setFormMode('create');
     setShowMealPlanForm(true);
   };
 
@@ -222,7 +235,7 @@ export default function MealPlansPage() {
   };
 
   // 주간 이동
-  const handlePreviousWeek = () => {
+  const handlePreviousPeriod = () => {
     if (viewType === 'week') {
       setCurrentWeek(subWeeks(currentWeek, 1));
     } else {
@@ -233,7 +246,7 @@ export default function MealPlansPage() {
     }
   };
 
-  const handleNextWeek = () => {
+  const handleNextPeriod = () => {
     if (viewType === 'week') {
       setCurrentWeek(addWeeks(currentWeek, 1));
     } else {
@@ -244,201 +257,31 @@ export default function MealPlansPage() {
     }
   };
 
+  // 오늘로 이동
+  const handleGoToToday = () => {
+    setCurrentWeek(new Date());
+  };
+
+  // 뷰 타입 변경
+  const handleViewTypeChange = (type: ViewType) => {
+    setViewType(type);
+  };
+
+  // 특정 시간대 식단 목록 보기
+  const handleViewMealTimeSlot = (date: Date, mealTime: 'breakfast' | 'lunch' | 'dinner', plans: MealPlan[]) => {
+    setSelectedDate(date);
+    setSelectedMealTime(mealTime);
+    setSelectedPlansForSlot(plans);
+    setShowMealPlanListModal(true);
+  };
+
   // 현재 주의 시작일과 종료일
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
   const daysOfWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  // 날짜별 식단 필터링
-  const getMealPlansByDate = (date: Date, mealTime?: 'breakfast' | 'lunch' | 'dinner') => {
-    const dateString = format(date, 'yyyy-MM-dd');
-    return mealPlans.filter(
-      (plan) => plan.date === dateString && (!mealTime || plan.meal_time === mealTime)
-    );
-  };
-
-  // 식사 시간대 한글 이름
-  const getMealTimeName = (mealTime: 'breakfast' | 'lunch' | 'dinner') => {
-    switch (mealTime) {
-      case 'breakfast':
-        return '아침';
-      case 'lunch':
-        return '점심';
-      case 'dinner':
-        return '저녁';
-      default:
-        return mealTime;
-    }
-  };
-
-  // 식단 총 원가 계산 함수
-  const calculateMealPlanCost = (mealPlan: MealPlan): number => {
-    if (!mealPlan.meal_plan_menus) {
-      return 0;
-    }
-    
-    return mealPlan.meal_plan_menus.reduce((totalCost, item) => {
-      // 메뉴 데이터가 있고, cost_price가 숫자인 경우에만 합산
-      if (item.menu && typeof item.menu.cost_price === 'number') {
-        return totalCost + item.menu.cost_price;
-      }
-      return totalCost;
-    }, 0);
-  };
-
-  // 식단에 포함된 메뉴 이름 렌더링
-  const renderMenuNames = (mealPlan: MealPlan) => {
-    if (!mealPlan.meal_plan_menus || mealPlan.meal_plan_menus.length === 0) {
-      return '메뉴 없음';
-    }
-    
-    const menuNames = mealPlan.meal_plan_menus.map(item => item.menu.name);
-    if (menuNames.length <= 2) {
-      return menuNames.join(', ');
-    }
-    return `${menuNames[0]}, ${menuNames[1]} 외 ${menuNames.length - 2}개`;
-  };
-
-  // 통화 형식 변환 함수
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('ko-KR', { 
-      style: 'currency', 
-      currency: 'KRW' 
-    }).format(amount);
-  };
-
-  // 식단 카드 렌더링
-  const renderMealPlanCard = (mealPlan: MealPlan) => (
-    <div 
-      key={mealPlan.id} 
-      className="p-2 rounded-md cursor-pointer hover:bg-blue-50 border border-transparent hover:border-blue-200 transition-all duration-150"
-      onClick={() => handleViewMealPlan(mealPlan)}
-    >
-      <div className="flex justify-between items-center mb-0.5">
-        <div className="font-medium text-xs truncate mr-2">{mealPlan.name}</div>
-        <div className="text-xs font-semibold text-blue-600 whitespace-nowrap">
-          {formatCurrency(calculateMealPlanCost(mealPlan))}
-        </div>
-      </div>
-      <div className="text-xs text-gray-500 truncate">{renderMenuNames(mealPlan)}</div>
-    </div>
-  );
-
-  // 주간 뷰 렌더링
-  const renderWeekView = () => (
-    <div className="grid grid-cols-8 border-t border-l border-gray-200">
-      {/* 첫 번째 열: 시간대 */}
-      <div className="col-span-1 border-r border-gray-200">
-        <div className="h-16 border-b border-gray-200"></div> {/* 날짜 헤더 높이 맞춤 */} 
-        <div className="h-48 flex items-center justify-center font-semibold text-sm text-gray-500 border-b border-gray-200">
-          아침
-        </div>
-        <div className="h-48 flex items-center justify-center font-semibold text-sm text-gray-500 border-b border-gray-200">
-          점심
-        </div>
-        <div className="h-48 flex items-center justify-center font-semibold text-sm text-gray-500 border-b border-gray-200">
-          저녁
-        </div>
-      </div>
-      
-      {/* 나머지 열: 요일별 식단 */} 
-      {daysOfWeek.map((day, index) => (
-        <div key={index} className="col-span-1 border-r border-gray-200">
-          <div className="h-16 text-center py-3 border-b border-gray-200 bg-gray-50">
-            <div className="font-semibold text-sm">{format(day, 'E', { locale: ko })}</div>
-            <div className="text-lg font-bold mt-1">{format(day, 'd')}</div>
-          </div>
-          
-          {/* 아침 식단 */}
-          <div className="h-48 border-b border-gray-200 p-2 space-y-2 overflow-y-auto relative group">
-            {getMealPlansByDate(day, 'breakfast').map(renderMealPlanCard)}
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="absolute bottom-2 right-2 w-full max-w-[calc(100%-1rem)] opacity-40 hover:opacity-100 transition-opacity text-xs"
-              onClick={() => {
-                setSelectedDate(day);
-                setFormMode('create');
-                setSelectedMealTime('breakfast');
-                setSelectedMealPlan({
-                  id: '',
-                  company_id: companyId as string,
-                  name: '',
-                  date: format(day, 'yyyy-MM-dd'),
-                  meal_time: 'breakfast',
-                  created_at: '',
-                  updated_at: '',
-                  meal_plan_menus: []
-                });
-                setShowMealPlanForm(true);
-              }}
-            >
-              <Plus className="h-3 w-3 mr-1" /> 추가
-            </Button>
-          </div>
-          
-          {/* 점심 식단 */} 
-          <div className="h-48 border-b border-gray-200 p-2 space-y-2 overflow-y-auto relative group">
-            {getMealPlansByDate(day, 'lunch').map(renderMealPlanCard)}
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="absolute bottom-2 right-2 w-full max-w-[calc(100%-1rem)] opacity-40 hover:opacity-100 transition-opacity text-xs"
-              onClick={() => {
-                setSelectedDate(day);
-                setFormMode('create');
-                setSelectedMealTime('lunch');
-                setSelectedMealPlan({
-                  id: '',
-                  company_id: companyId as string,
-                  name: '',
-                  date: format(day, 'yyyy-MM-dd'),
-                  meal_time: 'lunch',
-                  created_at: '',
-                  updated_at: '',
-                  meal_plan_menus: []
-                });
-                setShowMealPlanForm(true);
-              }}
-            >
-              <Plus className="h-3 w-3 mr-1" /> 추가
-            </Button>
-          </div>
-          
-          {/* 저녁 식단 */} 
-          <div className="h-48 border-b border-gray-200 p-2 space-y-2 overflow-y-auto relative group">
-            {getMealPlansByDate(day, 'dinner').map(renderMealPlanCard)}
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="absolute bottom-2 right-2 w-full max-w-[calc(100%-1rem)] opacity-40 hover:opacity-100 transition-opacity text-xs"
-              onClick={() => {
-                setSelectedDate(day);
-                setFormMode('create');
-                setSelectedMealTime('dinner');
-                setSelectedMealPlan({
-                  id: '',
-                  company_id: companyId as string,
-                  name: '',
-                  date: format(day, 'yyyy-MM-dd'),
-                  meal_time: 'dinner',
-                  created_at: '',
-                  updated_at: '',
-                  meal_plan_menus: []
-                });
-                setShowMealPlanForm(true);
-              }}
-            >
-              <Plus className="h-3 w-3 mr-1" /> 추가
-            </Button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
-  // 월간 뷰 렌더링
-  const renderMonthView = () => {
+  // 월간 뷰용 주 계산
+  const getMonthWeeks = () => {
     // 현재 월의 첫 날짜와 마지막 날짜
     const year = currentWeek.getFullYear();
     const month = currentWeek.getMonth();
@@ -470,138 +313,19 @@ export default function MealPlansPage() {
       }
     });
     
-    return (
-      <div className="border-t border-gray-200">
-        <div className="grid grid-cols-7 border-l border-gray-200">
-          {['월', '화', '수', '목', '금', '토', '일'].map((day) => (
-            <div key={day} className="text-center py-3 font-semibold text-sm border-r border-b border-gray-200 bg-gray-50">
-              {day}
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 border-l border-gray-200">
-          {weeks.map((week, weekIndex) => (
-            <React.Fragment key={`week-${weekIndex}`}>
-              {week.map((day, dayIndex) => {
-                const isCurrentMonth = day.getMonth() === month;
-                const isToday = isSameDay(day, new Date());
-                
-                return (
-                  <div
-                    key={`day-${weekIndex}-${dayIndex}`}
-                    className={`min-h-[120px] border-r border-b border-gray-200 p-2 overflow-hidden relative group ${ 
-                      !isCurrentMonth ? 'bg-gray-50 text-gray-400' : isToday ? 'bg-blue-50' : 'bg-white'
-                    }`}
-                  >
-                    <div className={`text-right text-sm font-semibold mb-1 ${isToday ? 'text-blue-600' : ''}`}>
-                      {format(day, 'd')}
-                    </div>
-                    
-                    <div className="space-y-1 text-xs">
-                      {/* 아침, 점심, 저녁 식단 요약 표시 */}
-                      {(['breakfast', 'lunch', 'dinner'] as const).map((mealTime) => {
-                        const plans = getMealPlansByDate(day, mealTime);
-                        if (plans.length === 0) return null;
-                        
-                        // 이 시간대의 첫 번째 식단 정보 (표시용)
-                        const firstPlan = plans[0];
-                        // 월간 뷰에서는 합산 원가를 표시하지 않음
-                        // const totalCostForTime = plans.reduce((sum, plan) => sum + calculateMealPlanCost(plan), 0);
-                        
-                        return (
-                          <div 
-                            key={mealTime}
-                            className="flex items-center justify-between cursor-pointer text-gray-700 hover:text-blue-600 group"
-                            onClick={() => {
-                              setSelectedDate(day); // 날짜 설정
-                              setSelectedMealTime(mealTime); // 시간대 설정
-                              setSelectedPlansForSlot(plans); // 해당 슬롯의 모든 식단 설정
-                              setShowMealPlanListModal(true); // 목록 모달 표시
-                            }}
-                          >
-                            <div className="flex items-center truncate">
-                              <span className={`w-3 h-3 rounded-full mr-1.5 flex-shrink-0 ${ 
-                                mealTime === 'breakfast' ? 'bg-yellow-400' : mealTime === 'lunch' ? 'bg-green-400' : 'bg-red-400'
-                              }`}></span>
-                              <span className="truncate text-xs group-hover:underline">
-                                {`${firstPlan.name}${plans.length > 1 ? ` 외 ${plans.length - 1}` : ''}`}
-                              </span>
-                            </div>
-                            {/* 월간 뷰에서는 원가 표시 제거 */}
-                            {/* <span className="text-xs font-medium text-blue-600 whitespace-nowrap ml-1">
-                              {formatCurrency(totalCostForTime)}
-                            </span> */}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    
-                    {/* 식단 추가 버튼 */}
-                    {isCurrentMonth && (
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="absolute bottom-1 right-1 w-6 h-6 p-0 opacity-40 hover:opacity-100 transition-opacity"
-                        onClick={() => {
-                          // 현재 시간에 따라 식사 시간 선택
-                          const now = new Date();
-                          const hour = now.getHours();
-                          
-                          let mealTime: 'breakfast' | 'lunch' | 'dinner';
-                          
-                          // 시간대별 식사 시간 설정
-                          if (hour < 10) {
-                            mealTime = 'breakfast'; // 10시 이전은 아침
-                          } else if (hour < 15) {
-                            mealTime = 'lunch'; // 10시 ~ 15시는 점심
-                          } else {
-                            mealTime = 'dinner'; // 15시 이후는 저녁
-                          }
-                          
-                          setSelectedMealTime(mealTime);
-                          setSelectedDate(day);
-                          setFormMode('create');
-                          setShowMealPlanForm(true);
-                        }}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-            </React.Fragment>
-          ))}
-        </div>
-      </div>
-    );
+    return weeks;
   };
 
   return (
     <div className="container mx-auto py-8 px-4 md:px-6 lg:px-8">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">식단 관리</h1>
-        
-        <div className="flex items-center gap-4">
-          <Tabs value={viewType} onValueChange={(value) => setViewType(value as 'week' | 'month')}>
-            <TabsList>
-              <TabsTrigger value="week">주간</TabsTrigger>
-              <TabsTrigger value="month">월간</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={handlePreviousWeek} aria-label="Previous period">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon" onClick={() => setCurrentWeek(new Date())} aria-label="Today">
-              <CalendarIcon className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon" onClick={handleNextWeek} aria-label="Next period">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
+      <CalendarHeader 
+        viewType={viewType}
+        currentWeek={currentWeek}
+        onViewTypeChange={handleViewTypeChange}
+        onPreviousPeriod={handlePreviousPeriod}
+        onNextPeriod={handleNextPeriod}
+        onToday={handleGoToToday}
+      />
       
       <Card className="shadow-sm">
         <CardHeader className="border-b px-6 py-4">
@@ -616,8 +340,22 @@ export default function MealPlansPage() {
             <div className="flex justify-center items-center h-64">
               <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
             </div>
+          ) : viewType === 'week' ? (
+            <WeekView 
+              daysOfWeek={daysOfWeek}
+              mealPlans={mealPlans}
+              companyId={companyId as string}
+              onViewMealPlan={handleViewMealPlan}
+              onAddMealPlan={handleAddMealPlanForDateAndTime}
+            />
           ) : (
-            viewType === 'week' ? renderWeekView() : renderMonthView()
+            <MonthView 
+              weeks={getMonthWeeks()}
+              mealPlans={mealPlans}
+              currentMonth={currentWeek.getMonth()}
+              onViewMealTimeSlot={handleViewMealTimeSlot}
+              onAddMealPlan={handleAddMealPlanFromMonthView}
+            />
           )}
         </CardContent>
       </Card>
@@ -668,81 +406,25 @@ export default function MealPlansPage() {
       </Dialog>
 
       {/* 식단 목록 모달 */}
-      <Dialog open={showMealPlanListModal} onOpenChange={setShowMealPlanListModal}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center">
-              <Utensils className="h-5 w-5 mr-2 text-primary" />
-              식단 목록 ({selectedPlansForSlot?.length || 0}개)
-            </DialogTitle>
-            <DialogDescription>
-              {selectedDate && selectedMealTime
-                ? `${format(selectedDate, 'yyyy년 MM월 dd일')} ${getMealTimeName(selectedMealTime)} 식단`
-                : '선택된 시간대의 식단 목록'}
-            </DialogDescription>
-          </DialogHeader>
-          {selectedPlansForSlot && selectedPlansForSlot.length > 0 ? (
-            <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-3 py-4">
-              {selectedPlansForSlot.map(plan => (
-                <Card 
-                  key={plan.id} 
-                  className="transition-all hover:shadow-md"
-                >
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div className="flex-1 mr-4 cursor-pointer" onClick={() => {setShowMealPlanListModal(false); handleViewMealPlan(plan);}}>
-                      <p className="font-semibold text-sm mb-1 truncate">{plan.name}</p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {renderMenuNames(plan)}
-                      </p>
-                      <p className="text-xs font-medium text-blue-600 mt-1">
-                        {formatCurrency(calculateMealPlanCost(plan))}
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8"
-                        onClick={() => {setShowMealPlanListModal(false); handleViewMealPlan(plan);}}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8"
-                        onClick={() => {
-                          setShowMealPlanListModal(false); // 목록 모달 닫기
-                          handleEditMealPlan(plan); // 수정 모달 열기
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
-                        onClick={() => {
-                          setShowMealPlanListModal(false); // 목록 모달 닫기
-                          setSelectedMealPlan(plan); // 삭제할 식단 설정
-                          // TODO: 삭제 확인 모달 띄우기 (별도 구현 필요)
-                          handleDeleteMealPlan(plan.id); // 우선 바로 삭제
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              해당 시간대에 등록된 식단이 없습니다.
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <MealPlanListModal
+        open={showMealPlanListModal}
+        onOpenChange={setShowMealPlanListModal}
+        selectedDate={selectedDate}
+        selectedMealTime={selectedMealTime}
+        mealPlans={selectedPlansForSlot}
+        onView={(plan) => {
+          setShowMealPlanListModal(false);
+          handleViewMealPlan(plan);
+        }}
+        onEdit={(plan) => {
+          setShowMealPlanListModal(false);
+          handleEditMealPlan(plan);
+        }}
+        onDelete={(planId) => {
+          setShowMealPlanListModal(false);
+          handleDeleteMealPlan(planId);
+        }}
+      />
     </div>
   );
 } 

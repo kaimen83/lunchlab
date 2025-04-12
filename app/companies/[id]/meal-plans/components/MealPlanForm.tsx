@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
+import { MealPlan } from '../types';
 
 interface Menu {
   id: string;
@@ -33,17 +34,6 @@ interface MealPlanMenu {
   meal_plan_id: string;
   menu_id: string;
   menu: Menu;
-}
-
-interface MealPlan {
-  id: string;
-  company_id: string;
-  name: string;
-  date: string;
-  meal_time: 'breakfast' | 'lunch' | 'dinner';
-  created_at: string;
-  updated_at: string;
-  meal_plan_menus: MealPlanMenu[];
 }
 
 interface MealPlanFormProps {

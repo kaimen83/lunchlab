@@ -16,31 +16,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { FilePen, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
-
-interface Menu {
-  id: string;
-  name: string;
-  description: string | null;
-  cost_price: number;
-}
-
-interface MealPlanMenu {
-  id: string;
-  meal_plan_id: string;
-  menu_id: string;
-  menu: Menu;
-}
-
-interface MealPlan {
-  id: string;
-  company_id: string;
-  name: string;
-  date: string;
-  meal_time: 'breakfast' | 'lunch' | 'dinner';
-  created_at: string;
-  updated_at: string;
-  meal_plan_menus: MealPlanMenu[];
-}
+import { MealPlan } from '../types';
+import { getMealTimeName, calculateMealPlanCost, formatCurrency } from '../utils';
 
 interface MealPlanDetailsProps {
   mealPlan: MealPlan;
@@ -50,25 +27,6 @@ interface MealPlanDetailsProps {
 
 export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlanDetailsProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState<boolean>(false);
-  
-  // 식사 시간대 한글 이름
-  const getMealTimeName = (mealTime: 'breakfast' | 'lunch' | 'dinner') => {
-    switch (mealTime) {
-      case 'breakfast':
-        return '아침';
-      case 'lunch':
-        return '점심';
-      case 'dinner':
-        return '저녁';
-      default:
-        return mealTime;
-    }
-  };
-  
-  // 총 비용 계산
-  const calculateTotalCost = () => {
-    return mealPlan.meal_plan_menus.reduce((sum, item) => sum + (item.menu?.cost_price || 0), 0);
-  };
   
   return (
     <div className="space-y-4">
@@ -104,7 +62,7 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
       
       <div className="flex justify-between items-center pt-2">
         <div className="font-medium">
-          총 비용: {new Intl.NumberFormat('ko-KR').format(calculateTotalCost())}원
+          총 비용: {formatCurrency(calculateMealPlanCost(mealPlan))}
         </div>
       </div>
       
