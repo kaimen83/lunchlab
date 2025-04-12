@@ -280,6 +280,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           }
           
           // 원가 계산을 위해 식재료 정보 조회
+          let containerIngredientsCost = 0;
           for (const ing of container.ingredients) {
             const { data: ingredientData } = await supabase
               .from('ingredients')
@@ -289,8 +290,22 @@ export async function PATCH(request: Request, context: RouteContext) {
             
             if (ingredientData) {
               // 원가 계산
-              totalCost += (ing.amount * ingredientData.price / ingredientData.package_amount);
+              const ingCost = ing.amount * ingredientData.price / ingredientData.package_amount;
+              totalCost += ingCost;
+              containerIngredientsCost += ingCost;
             }
+          }
+          
+          // 컨테이너별 원가 업데이트
+          const { error: updateContainerCostError } = await supabase
+            .from('menu_containers')
+            .update({ 
+              ingredients_cost: containerIngredientsCost 
+            })
+            .eq('id', menuContainer.id);
+            
+          if (updateContainerCostError) {
+            console.error('메뉴 컨테이너 원가 업데이트 오류:', updateContainerCostError);
           }
         }
       }

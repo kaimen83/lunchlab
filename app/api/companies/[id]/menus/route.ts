@@ -282,7 +282,8 @@ export async function POST(request: Request, context: RouteContext) {
         .from('menu_containers')
         .insert({
           menu_id: menu.id,
-          container_id: container.container_id
+          container_id: container.container_id,
+          ingredients_cost: 0 // 초기값 설정
         })
         .select()
         .single();
@@ -294,19 +295,10 @@ export async function POST(request: Request, context: RouteContext) {
       
       // 컨테이너별 식재료 양 설정
       if (container.ingredients && Array.isArray(container.ingredients)) {
-        // 원가 계산을 위해 식재료 정보 조회
+        let containerIngredientsCost = 0;
+        
+        // 모든 식재료 처리
         for (const ing of container.ingredients) {
-          const { data: ingredientData } = await supabase
-            .from('ingredients')
-            .select('price, package_amount')
-            .eq('id', ing.ingredient_id)
-            .single();
-          
-          if (ingredientData) {
-            // 원가 계산에 추가
-            totalCost += (ing.amount * ingredientData.price / ingredientData.package_amount);
-          }
-          
           // 컨테이너 식재료 추가
           const { error: containerIngredientError } = await supabase
             .from('menu_container_ingredients')
@@ -318,6 +310,35 @@ export async function POST(request: Request, context: RouteContext) {
             
           if (containerIngredientError) {
             console.error('컨테이너 식재료 추가 오류:', containerIngredientError);
+            continue;
+          }
+
+          // 원가 계산을 위해 식재료 정보 조회
+          const { data: ingredientData } = await supabase
+            .from('ingredients')
+            .select('price, package_amount')
+            .eq('id', ing.ingredient_id)
+            .single();
+          
+          if (ingredientData) {
+            // 원가 계산에 추가
+            const ingCost = ing.amount * ingredientData.price / ingredientData.package_amount;
+            totalCost += ingCost;
+            containerIngredientsCost += ingCost;
+          }
+        }
+        
+        // 컨테이너별 원가 업데이트
+        if (containerIngredientsCost > 0) {
+          const { error: updateContainerCostError } = await supabase
+            .from('menu_containers')
+            .update({ 
+              ingredients_cost: containerIngredientsCost 
+            })
+            .eq('id', menuContainer.id);
+            
+          if (updateContainerCostError) {
+            console.error('메뉴 컨테이너 원가 업데이트 오류:', updateContainerCostError);
           }
         }
       }
