@@ -87,6 +87,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
     
+    // 추가 유효성 검사: 모든 용기-메뉴 선택이 유효한지 확인
+    for (const selection of menu_selections) {
+      if (!selection.menuId || !selection.containerId) {
+        return NextResponse.json(
+          { error: '각 용기에는 메뉴가 할당되어야 합니다.' },
+          { status: 400 }
+        );
+      }
+    }
+    
     // 트랜잭션을 사용하여 식단 및 관련 메뉴 추가
     const { data: mealPlan, error: mealPlanError } = await supabase
       .from('meal_plans')
@@ -111,7 +121,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const menuLinks = menu_selections.map(selection => ({
       meal_plan_id: mealPlan.id,
       menu_id: selection.menuId,
-      container_id: selection.containerId || null
+      container_id: selection.containerId
     }));
     
     // 메뉴 연결 추가
