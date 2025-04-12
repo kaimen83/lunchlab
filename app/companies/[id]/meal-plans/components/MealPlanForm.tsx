@@ -48,7 +48,6 @@ interface Menu {
   id: string;
   name: string;
   description: string | null;
-  cost_price: number;
 }
 
 interface Container {
@@ -56,6 +55,17 @@ interface Container {
   name: string;
   description: string | null;
   price: number;
+}
+
+interface MenuContainer {
+  id: string;
+  menu_id: string;
+  container_id: string;
+  menu: Menu;
+  container: Container;
+  ingredients_cost: number;
+  container_price: number;
+  total_cost: number;
 }
 
 interface MealPlanFormProps {
@@ -82,14 +92,17 @@ export default function MealPlanForm({
   const [name, setName] = useState<string>('');
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [mealTime, setMealTime] = useState<'breakfast' | 'lunch' | 'dinner'>(defaultMealTime);
-  const [menus, setMenus] = useState<Menu[]>([]);
   const [containers, setContainers] = useState<Container[]>([]);
-  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [menuContainers, setMenuContainers] = useState<MenuContainer[]>([]);
+  const [containerSearchTerm, setContainerSearchTerm] = useState<string>('');
+  const [menuSearchTerm, setMenuSearchTerm] = useState<string>('');
   const [selectedContainers, setSelectedContainers] = useState<string[]>([]);
   const [containerMenuSelections, setContainerMenuSelections] = useState<Record<string, string>>({});
+  const [activeContainer, setActiveContainer] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isLoadingMenus, setIsLoadingMenus] = useState<boolean>(true);
   const [isLoadingContainers, setIsLoadingContainers] = useState<boolean>(true);
+  const [isLoadingMenuContainers, setIsLoadingMenuContainers] = useState<boolean>(true);
   
   // 초기 데이터 설정
   useEffect(() => {
@@ -118,35 +131,11 @@ export default function MealPlanForm({
       setMealTime(defaultMealTime); // 기본 식사 시간 설정
     }
     
-    // 메뉴 목록 로드
-    loadMenus();
     // 용기 목록 로드
     loadContainers();
-  }, [initialData, defaultMealTime]);
-  
-  // 메뉴 목록 로드
-  const loadMenus = async () => {
-    setIsLoadingMenus(true);
-    try {
-      const response = await fetch(`/api/companies/${companyId}/menus`);
-      
-      if (!response.ok) {
-        throw new Error('메뉴 목록을 불러오는데 실패했습니다.');
-      }
-      
-      const data = await response.json();
-      setMenus(data);
-    } catch (error) {
-      console.error('메뉴 로드 오류:', error);
-      toast({
-        title: '오류 발생',
-        description: error instanceof Error ? error.message : '메뉴 목록을 불러오는데 실패했습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoadingMenus(false);
-    }
-  };
+    // 메뉴-용기 연결 정보 로드
+    loadMenuContainers();
+  }, [initialData, defaultMealTime, companyId]);
 
   // 용기 목록 로드
   const loadContainers = async () => {
@@ -169,6 +158,31 @@ export default function MealPlanForm({
       });
     } finally {
       setIsLoadingContainers(false);
+    }
+  };
+  
+  // 메뉴-용기 연결 정보 로드
+  const loadMenuContainers = async () => {
+    setIsLoadingMenuContainers(true);
+    try {
+      const response = await fetch(`/api/companies/${companyId}/menu-containers`);
+      
+      if (!response.ok) {
+        throw new Error('메뉴-용기 연결 정보를 불러오는데 실패했습니다.');
+      }
+      
+      const data = await response.json();
+      setMenuContainers(data);
+      setIsLoadingMenus(false); // 메뉴 정보도 함께 로드되므로 메뉴 로딩 상태도 업데이트
+    } catch (error) {
+      console.error('메뉴-용기 연결 정보 로드 오류:', error);
+      toast({
+        title: '오류 발생',
+        description: error instanceof Error ? error.message : '메뉴-용기 연결 정보를 불러오는데 실패했습니다.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingMenuContainers(false);
     }
   };
   
@@ -277,15 +291,84 @@ export default function MealPlanForm({
   
   // 용기 검색
   const filteredContainers = containers.filter(container => 
-    container.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (container.description && container.description.toLowerCase().includes(searchTerm.toLowerCase()))
+    container.name.toLowerCase().includes(containerSearchTerm.toLowerCase()) ||
+    (container.description && container.description.toLowerCase().includes(containerSearchTerm.toLowerCase()))
   );
   
-  // 메뉴 선택 필터링
-  const filteredMenus = menus.filter(menu => 
-    menu.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (menu.description && menu.description.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // 해당 용기에 담길 수 있는 메뉴 목록 가져오기
+  const getMenusForContainer = (containerId: string) => {
+    if (!containerId) return [];
+    
+    // 해당 용기를 사용하는 메뉴-용기 연결 정보
+    const compatibleMenuContainers = menuContainers.filter(mc => mc.container_id === containerId);
+    
+    // 메뉴 ID 중복 제거
+    const uniqueMenus = Array.from(new Set(compatibleMenuContainers.map(mc => mc.menu_id)))
+      .map(menuId => {
+        const menuContainer = compatibleMenuContainers.find(mc => mc.menu_id === menuId);
+        return menuContainer?.menu || null;
+      })
+      .filter(Boolean) as Menu[];
+    
+    return uniqueMenus;
+  };
+
+  // 메뉴-용기 조합에 대한 원가 정보 가져오기
+  const getCostInfoForMenuAndContainer = (menuId: string, containerId: string) => {
+    const menuContainer = menuContainers.find(
+      mc => mc.menu_id === menuId && mc.container_id === containerId
+    );
+    
+    if (!menuContainer) {
+      return {
+        ingredients_cost: 0,
+        container_price: 0,
+        total_cost: 0
+      };
+    }
+    
+    return {
+      ingredients_cost: menuContainer.ingredients_cost,
+      container_price: menuContainer.container_price,
+      total_cost: menuContainer.total_cost
+    };
+  };
+
+  // 특정 메뉴가 특정 용기와 호환되는지 확인
+  const isMenuCompatibleWithContainer = (menuId: string, containerId: string) => {
+    return menuContainers.some(mc => mc.menu_id === menuId && mc.container_id === containerId);
+  };
+  
+  // 메뉴 검색 필터링
+  const getFilteredMenusForContainer = (containerId: string) => {
+    // 먼저 해당 용기와 연결된 모든 메뉴 조회
+    const compatibleMenuContainers = menuContainers.filter(mc => mc.container_id === containerId);
+    
+    // 모든 메뉴 ID 추출
+    const allMenuIds = Array.from(new Set(menuContainers.map(mc => mc.menu_id)));
+    
+    // 호환되는 메뉴 ID 추출
+    const compatibleMenuIds = compatibleMenuContainers.map(mc => mc.menu_id);
+    
+    // 모든 메뉴를 가져오되, 검색어로 필터링하고 호환되는 메뉴를 우선 정렬
+    return allMenuIds
+      .map(menuId => {
+        const menuContainer = menuContainers.find(mc => mc.menu_id === menuId);
+        return menuContainer?.menu;
+      })
+      .filter((menu): menu is Menu => !!menu && (
+        menu.name.toLowerCase().includes(menuSearchTerm.toLowerCase()) ||
+        (menu.description && menu.description.toLowerCase().includes(menuSearchTerm.toLowerCase()))
+      ))
+      .sort((a, b) => {
+        const aIsCompatible = compatibleMenuIds.includes(a.id);
+        const bIsCompatible = compatibleMenuIds.includes(b.id);
+        
+        if (aIsCompatible && !bIsCompatible) return -1;
+        if (!aIsCompatible && bIsCompatible) return 1;
+        return 0;
+      });
+  };
   
   // 선택된 용기 카운트
   const selectedContainerCount = selectedContainers.length;
@@ -297,7 +380,8 @@ export default function MealPlanForm({
 
   // 메뉴 정보 가져오기
   const getMenuDetailsById = (menuId: string) => {
-    return menus.find(menu => menu.id === menuId);
+    const menuContainer = menuContainers.find(mc => mc.menu_id === menuId);
+    return menuContainer?.menu;
   };
 
   // 포맷된 가격 표시
@@ -390,8 +474,8 @@ export default function MealPlanForm({
                 type="text"
                 placeholder="용기 검색..."
                 className="pl-9"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={containerSearchTerm}
+                onChange={(e) => setContainerSearchTerm(e.target.value)}
                 disabled={isLoading}
               />
             </div>
@@ -436,67 +520,147 @@ export default function MealPlanForm({
             </div>
           </div>
 
-          {isLoadingMenus ? (
+          {isLoadingMenus || isLoadingMenuContainers ? (
             <div className="flex justify-center items-center py-4">
               <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
             </div>
           ) : (
             <Card>
               <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>용기</TableHead>
-                      <TableHead>메뉴</TableHead>
-                      <TableHead>금액</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {selectedContainers.map((containerId) => {
-                      const containerDetails = getContainerDetailsById(containerId);
-                      const selectedMenuId = containerMenuSelections[containerId];
-                      const menuDetails = selectedMenuId ? getMenuDetailsById(selectedMenuId) : null;
-                      const totalPrice = (menuDetails?.cost_price || 0) + (containerDetails?.price || 0);
-
-                      return (
-                        <TableRow key={containerId}>
-                          <TableCell className="font-medium">
-                            {containerDetails?.name || '알 수 없는 용기'}
-                          </TableCell>
-                          <TableCell>
-                            <Select
-                              value={selectedMenuId || ''}
-                              onValueChange={(value) => handleMenuSelection(containerId, value)}
-                              disabled={isLoading}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue placeholder="메뉴 선택" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {menus.map((menu) => (
-                                  <SelectItem key={menu.id} value={menu.id}>
-                                    {menu.name} ({formatPrice(menu.cost_price)})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col">
-                              <span className="font-semibold">{formatPrice(totalPrice)}</span>
-                              {menuDetails && (
-                                <span className="text-xs text-muted-foreground">
-                                  메뉴: {formatPrice(menuDetails.cost_price || 0)} + 
-                                  용기: {formatPrice(containerDetails?.price || 0)}
-                                </span>
-                              )}
+                <Accordion type="single" collapsible className="w-full">
+                  {selectedContainers.map((containerId) => {
+                    const containerDetails = getContainerDetailsById(containerId);
+                    const selectedMenuId = containerMenuSelections[containerId];
+                    const menuDetails = selectedMenuId ? getMenuDetailsById(selectedMenuId) : null;
+                    const isContainerActive = activeContainer === containerId;
+                    const compatibleMenus = getFilteredMenusForContainer(containerId);
+                    
+                    // 선택된 메뉴-용기 조합의 원가 정보
+                    const costInfo = selectedMenuId 
+                      ? getCostInfoForMenuAndContainer(selectedMenuId, containerId)
+                      : { total_cost: containerDetails?.price || 0, ingredients_cost: 0, container_price: containerDetails?.price || 0 };
+                    
+                    return (
+                      <AccordionItem key={containerId} value={containerId}>
+                        <AccordionTrigger 
+                          onClick={() => {
+                            setActiveContainer(isContainerActive ? null : containerId);
+                            setMenuSearchTerm('');
+                          }}
+                          className="px-4 py-2"
+                        >
+                          <div className="flex flex-1 items-center justify-between mr-2">
+                            <div className="font-medium text-sm">
+                              {containerDetails?.name || '알 수 없는 용기'}
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                            {selectedMenuId ? (
+                              <div className="flex items-center">
+                                <Badge variant="outline" className="mr-2">
+                                  {menuDetails?.name || '메뉴 선택됨'}
+                                </Badge>
+                                <span className="text-sm font-semibold">
+                                  {formatPrice(costInfo.total_cost)}
+                                </span>
+                              </div>
+                            ) : (
+                              <Badge variant="destructive" className="text-xs">
+                                메뉴 미선택
+                              </Badge>
+                            )}
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="px-4 pb-4">
+                          <div className="space-y-3">
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                type="text"
+                                placeholder="메뉴 검색..."
+                                className="pl-9"
+                                value={menuSearchTerm}
+                                onChange={(e) => setMenuSearchTerm(e.target.value)}
+                                disabled={isLoading}
+                              />
+                            </div>
+                            <ScrollArea className="h-48 border rounded-md">
+                              <div className="p-2">
+                                {compatibleMenus.length > 0 ? (
+                                  compatibleMenus.map(menu => {
+                                    const isCompatible = isMenuCompatibleWithContainer(menu.id, containerId);
+                                    const menuCostInfo = getCostInfoForMenuAndContainer(menu.id, containerId);
+                                    
+                                    return (
+                                      <div 
+                                        key={menu.id} 
+                                        className={cn(
+                                          "flex items-start space-x-2 p-2 hover:bg-accent rounded-md cursor-pointer",
+                                          selectedMenuId === menu.id && "bg-accent",
+                                          !isCompatible && "opacity-70"
+                                        )}
+                                        onClick={() => handleMenuSelection(containerId, menu.id)}
+                                      >
+                                        <div className="flex-1">
+                                          <div className="flex items-center justify-between">
+                                            <div className="flex items-center">
+                                              <span className="text-sm font-medium">{menu.name}</span>
+                                              {isCompatible && (
+                                                <TooltipProvider>
+                                                  <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                      <Badge variant="secondary" className="ml-2 text-xs px-1">
+                                                        <Package className="h-3 w-3 mr-1" />
+                                                        호환
+                                                      </Badge>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                      <p>이 메뉴는 이 용기에 최적화되어 있습니다</p>
+                                                    </TooltipContent>
+                                                  </Tooltip>
+                                                </TooltipProvider>
+                                              )}
+                                            </div>
+                                            <span className="text-sm font-medium">
+                                              {formatPrice(isCompatible ? menuCostInfo.total_cost : (containerDetails?.price || 0))}
+                                            </span>
+                                          </div>
+                                          {menu.description && (
+                                            <p className="text-xs text-muted-foreground">{menu.description}</p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })
+                                ) : (
+                                  <div className="text-center py-4 text-muted-foreground">검색 결과가 없습니다</div>
+                                )}
+                              </div>
+                            </ScrollArea>
+                            
+                            {selectedMenuId && (
+                              <div className="mt-2 bg-muted p-2 rounded-md">
+                                <div className="flex justify-between items-center">
+                                  <div>
+                                    <div className="text-sm font-medium">선택된 메뉴: {menuDetails?.name}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {menuDetails?.description || '설명 없음'}
+                                    </div>
+                                  </div>
+                                  <div className="text-sm">
+                                    <div className="font-semibold text-right">{formatPrice(costInfo.total_cost)}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                      식재료: {formatPrice(costInfo.ingredients_cost)} + 
+                                      용기: {formatPrice(costInfo.container_price)}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    );
+                  })}
+                </Accordion>
               </CardContent>
             </Card>
           )}
