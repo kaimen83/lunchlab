@@ -77,14 +77,6 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
         <Badge variant="outline">{getMealTimeName(mealPlan.meal_time)}</Badge>
       </div>
       
-      <div className="text-sm text-gray-500">
-        <p>날짜: {format(new Date(mealPlan.date), 'yyyy년 MM월 dd일')}</p>
-        <p>등록일: {format(new Date(mealPlan.created_at), 'yyyy년 MM월 dd일 HH:mm')}</p>
-        {mealPlan.updated_at && mealPlan.updated_at !== mealPlan.created_at && (
-          <p>수정일: {format(new Date(mealPlan.updated_at), 'yyyy년 MM월 dd일 HH:mm')}</p>
-        )}
-      </div>
-      
       <Separator />
       
       <div>
