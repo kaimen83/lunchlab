@@ -147,8 +147,74 @@ export default function MenuForm({
       });
       
       // 메뉴에 포함된 식재료 및 컨테이너 조회
-      fetchMenuIngredients(menu.id);
-      fetchMenuContainers(menu.id);
+      const loadMenuData = async () => {
+        try {
+          // 식재료 로드
+          const ingredientsResponse = await fetch(`/api/companies/${companyId}/menus/${menu.id}/ingredients`);
+          if (!ingredientsResponse.ok) {
+            throw new Error('식재료 목록을 불러오는데 실패했습니다.');
+          }
+          const ingredientsData = await ingredientsResponse.json();
+          setSelectedIngredients(ingredientsData);
+          
+          // 용기 및 용기별 식재료 로드
+          const containersResponse = await fetch(`/api/companies/${companyId}/menus/${menu.id}/containers`);
+          if (!containersResponse.ok) {
+            throw new Error('용기 정보를 불러오는데 실패했습니다.');
+          }
+          const containersData = await containersResponse.json();
+          
+          // 용기 목록 설정
+          const containers = containersData.map((item: any) => item.container);
+          setSelectedContainers(containers);
+          
+          // 용기별 식재료 설정
+          const containerIngredientsMap: Record<string, ContainerIngredient[]> = {};
+          containersData.forEach((item: any) => {
+            const containerId = item.container.id;
+            containerIngredientsMap[containerId] = item.ingredients.map((ing: any) => ({
+              container_id: containerId,
+              ingredient_id: ing.ingredient_id,
+              amount: ing.amount
+            }));
+          });
+          
+          setContainerIngredients(containerIngredientsMap);
+          
+          // 모든 데이터가 로드된 후 원가 계산
+          const newContainerCosts: Record<string, number> = {};
+          let totalCost = 0;
+          
+          // 각 용기별로 식재료 원가 계산
+          Object.entries(containerIngredientsMap).forEach(([containerId, containerItems]) => {
+            let containerCost = 0;
+            
+            // 용기 내 식재료 원가 계산
+            containerItems.forEach(item => {
+              const ingredient = ingredientsData.find((i: SelectedIngredient) => i.ingredient_id === item.ingredient_id)?.ingredient;
+              if (ingredient) {
+                containerCost += (item.amount * ingredient.price / ingredient.package_amount);
+              }
+            });
+            
+            newContainerCosts[containerId] = containerCost;
+            totalCost += containerCost;
+          });
+          
+          // 용기별 원가와 총 원가 업데이트
+          setContainerCosts(newContainerCosts);
+          setCost(totalCost);
+        } catch (error) {
+          console.error('메뉴 데이터 로드 오류:', error);
+          toast({
+            title: '오류 발생',
+            description: error instanceof Error ? error.message : '메뉴 데이터를 불러오는데 실패했습니다.',
+            variant: 'destructive',
+          });
+        }
+      };
+      
+      loadMenuData();
     } else {
       form.reset({
         name: '',
@@ -160,7 +226,14 @@ export default function MenuForm({
       setContainerIngredients({});
       setCost(0);
     }
-  }, [mode, menu, form]);
+  }, [mode, menu, form, companyId, toast]);
+  
+  // selectedIngredients 또는 containerIngredients가 변경될 때마다 원가 재계산
+  useEffect(() => {
+    if (selectedIngredients.length > 0 && Object.keys(containerIngredients).length > 0) {
+      updateCostFromContainers(containerIngredients, selectedIngredients);
+    }
+  }, [selectedIngredients, containerIngredients]);
 
   // 메뉴에 포함된 식재료 조회
   const fetchMenuIngredients = async (menuId: string) => {
@@ -223,18 +296,25 @@ export default function MenuForm({
     }
   };
 
-  // 용기별 원가 업데이트
-  const updateCostFromContainers = (containerIngredientsMap: Record<string, ContainerIngredient[]>) => {
+  // 용기별 원가 업데이트 함수
+  const updateCostFromContainers = (
+    containerIngredientsMap: Record<string, ContainerIngredient[]>,
+    ingredients: SelectedIngredient[] = []
+  ) => {
     const newContainerCosts: Record<string, number> = {};
     let totalCost = 0;
     
     // 각 용기별로 식재료 원가 계산
-    Object.entries(containerIngredientsMap).forEach(([containerId, ingredients]) => {
+    Object.entries(containerIngredientsMap).forEach(([containerId, containerItems]) => {
       let containerCost = 0;
       
       // 용기 내 식재료 원가 계산
-      ingredients.forEach(item => {
-        const ingredient = selectedIngredients.find(i => i.ingredient_id === item.ingredient_id)?.ingredient;
+      containerItems.forEach(item => {
+        const ingredientToUse = ingredients.length > 0 
+          ? ingredients 
+          : selectedIngredients;
+          
+        const ingredient = ingredientToUse.find(i => i.ingredient_id === item.ingredient_id)?.ingredient;
         if (ingredient) {
           containerCost += (item.amount * ingredient.price / ingredient.package_amount);
         }

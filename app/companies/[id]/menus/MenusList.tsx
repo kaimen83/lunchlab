@@ -341,7 +341,7 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
 
   // 모바일 카드 아이템 렌더링 (개선된 버전)
   const renderMobileCard = (menu: Menu) => (
-    <Card className="mb-3">
+    <Card className="mb-3 flex flex-col h-full">
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
           <CardTitle className="text-lg">
@@ -387,7 +387,7 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
         </div>
       </CardHeader>
 
-      <CardContent className="pb-2 pt-0">
+      <CardContent className="pb-2 pt-0 flex-1">
         <Accordion
           type="single"
           collapsible
@@ -541,7 +541,7 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
       ) : filteredMenus.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredMenus.map((menu) => (
-            <Card key={menu.id} className="overflow-hidden">
+            <Card key={menu.id} className="overflow-hidden flex flex-col h-full">
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-start">
                   <div>
@@ -589,7 +589,7 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="p-0">
+              <CardContent className="p-0 flex-1">
                 {menu.containers && menu.containers.length > 0 ? (
                   <div className="p-4">
                     <Accordion
@@ -712,14 +712,9 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                 )}
               </CardContent>
               <CardFooter className="px-4 py-2 text-xs text-muted-foreground border-t bg-slate-50 flex justify-between">
-                <span>
-                  생성: {new Date(menu.created_at).toLocaleDateString('ko-KR')}
+                <span className="text-gray-500">
+                  {menu.containers?.length || 0}개 용기 사용
                 </span>
-                {menu.updated_at && (
-                  <span>
-                    수정: {new Date(menu.updated_at).toLocaleDateString('ko-KR')}
-                  </span>
-                )}
               </CardFooter>
             </Card>
           ))}
@@ -765,10 +760,18 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
             <DialogTitle>메뉴 상세 정보</DialogTitle>
           </DialogHeader>
           {selectedMenu && (
-            <MenuIngredientsView 
-              companyId={companyId} 
-              menuId={selectedMenu.id} 
-            />
+            <>
+              <div className="text-xs text-muted-foreground mb-4 flex justify-between border-b pb-3">
+                <span>생성: {new Date(selectedMenu.created_at).toLocaleDateString('ko-KR')}</span>
+                {selectedMenu.updated_at && (
+                  <span>수정: {new Date(selectedMenu.updated_at).toLocaleDateString('ko-KR')}</span>
+                )}
+              </div>
+              <MenuIngredientsView 
+                companyId={companyId} 
+                menuId={selectedMenu.id} 
+              />
+            </>
           )}
           <DialogFooter>
             <Button onClick={() => setIngredientsModalOpen(false)}>닫기</Button>
