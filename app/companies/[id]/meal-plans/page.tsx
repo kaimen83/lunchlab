@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar as CalendarIcon, Plus, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar as CalendarIcon, Plus, Loader2, ChevronLeft, ChevronRight, Utensils, Edit, Trash2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,6 +59,8 @@ export default function MealPlansPage() {
   const [showMealPlanDetails, setShowMealPlanDetails] = useState<boolean>(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [selectedMealTime, setSelectedMealTime] = useState<'breakfast' | 'lunch' | 'dinner'>('lunch');
+  const [selectedPlansForSlot, setSelectedPlansForSlot] = useState<MealPlan[] | null>(null);
+  const [showMealPlanListModal, setShowMealPlanListModal] = useState<boolean>(false);
 
   // 페이지 로드 시 식단 목록 가져오기
   useEffect(() => {
@@ -503,30 +505,32 @@ export default function MealPlansPage() {
                         
                         // 이 시간대의 첫 번째 식단 정보 (표시용)
                         const firstPlan = plans[0];
-                        const totalCostForTime = plans.reduce((sum, plan) => sum + calculateMealPlanCost(plan), 0);
+                        // 월간 뷰에서는 합산 원가를 표시하지 않음
+                        // const totalCostForTime = plans.reduce((sum, plan) => sum + calculateMealPlanCost(plan), 0);
                         
                         return (
                           <div 
                             key={mealTime}
-                            className="flex items-center justify-between cursor-pointer text-gray-700 hover:text-blue-600"
+                            className="flex items-center justify-between cursor-pointer text-gray-700 hover:text-blue-600 group"
                             onClick={() => {
-                              setSelectedDate(day);
-                              if (firstPlan) {
-                                handleViewMealPlan(firstPlan);
-                              }
+                              setSelectedDate(day); // 날짜 설정
+                              setSelectedMealTime(mealTime); // 시간대 설정
+                              setSelectedPlansForSlot(plans); // 해당 슬롯의 모든 식단 설정
+                              setShowMealPlanListModal(true); // 목록 모달 표시
                             }}
                           >
                             <div className="flex items-center truncate">
                               <span className={`w-3 h-3 rounded-full mr-1.5 flex-shrink-0 ${ 
                                 mealTime === 'breakfast' ? 'bg-yellow-400' : mealTime === 'lunch' ? 'bg-green-400' : 'bg-red-400'
                               }`}></span>
-                              <span className="truncate text-xs">
+                              <span className="truncate text-xs group-hover:underline">
                                 {`${firstPlan.name}${plans.length > 1 ? ` 외 ${plans.length - 1}` : ''}`}
                               </span>
                             </div>
-                            <span className="text-xs font-medium text-blue-600 whitespace-nowrap ml-1">
+                            {/* 월간 뷰에서는 원가 표시 제거 */}
+                            {/* <span className="text-xs font-medium text-blue-600 whitespace-nowrap ml-1">
                               {formatCurrency(totalCostForTime)}
-                            </span>
+                            </span> */}
                           </div>
                         );
                       })}
@@ -659,6 +663,83 @@ export default function MealPlansPage() {
               }}
               onDelete={() => handleDeleteMealPlan(selectedMealPlan.id)}
             />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 식단 목록 모달 */}
+      <Dialog open={showMealPlanListModal} onOpenChange={setShowMealPlanListModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <Utensils className="h-5 w-5 mr-2 text-primary" />
+              식단 목록 ({selectedPlansForSlot?.length || 0}개)
+            </DialogTitle>
+            <DialogDescription>
+              {selectedDate && selectedMealTime
+                ? `${format(selectedDate, 'yyyy년 MM월 dd일')} ${getMealTimeName(selectedMealTime)} 식단`
+                : '선택된 시간대의 식단 목록'}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedPlansForSlot && selectedPlansForSlot.length > 0 ? (
+            <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-3 py-4">
+              {selectedPlansForSlot.map(plan => (
+                <Card 
+                  key={plan.id} 
+                  className="transition-all hover:shadow-md"
+                >
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div className="flex-1 mr-4 cursor-pointer" onClick={() => {setShowMealPlanListModal(false); handleViewMealPlan(plan);}}>
+                      <p className="font-semibold text-sm mb-1 truncate">{plan.name}</p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {renderMenuNames(plan)}
+                      </p>
+                      <p className="text-xs font-medium text-blue-600 mt-1">
+                        {formatCurrency(calculateMealPlanCost(plan))}
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => {setShowMealPlanListModal(false); handleViewMealPlan(plan);}}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => {
+                          setShowMealPlanListModal(false); // 목록 모달 닫기
+                          handleEditMealPlan(plan); // 수정 모달 열기
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+                        onClick={() => {
+                          setShowMealPlanListModal(false); // 목록 모달 닫기
+                          setSelectedMealPlan(plan); // 삭제할 식단 설정
+                          // TODO: 삭제 확인 모달 띄우기 (별도 구현 필요)
+                          handleDeleteMealPlan(plan.id); // 우선 바로 삭제
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              해당 시간대에 등록된 식단이 없습니다.
+            </div>
           )}
         </DialogContent>
       </Dialog>
