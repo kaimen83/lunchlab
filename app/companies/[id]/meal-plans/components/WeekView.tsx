@@ -5,6 +5,12 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { MealPlan } from '../types';
 import { calculateMealPlanCost, formatCurrency, getMealPlansByDate, getMenuNames } from '../utils';
+import { 
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger 
+} from '@/components/ui/accordion';
 
 interface WeekViewProps {
   daysOfWeek: Date[];
@@ -38,8 +44,9 @@ const WeekView: React.FC<WeekViewProps> = ({
     </div>
   );
 
-  return (
-    <div className="grid grid-cols-8 border-t border-l border-gray-200">
+  // PC 버전 렌더링
+  const renderDesktopView = () => (
+    <div className="hidden md:grid grid-cols-8 border-t border-l border-gray-200">
       {/* 첫 번째 열: 시간대 */}
       <div className="col-span-1 border-r border-gray-200">
         <div className="h-16 border-b border-gray-200"></div> {/* 날짜 헤더 높이 맞춤 */} 
@@ -103,6 +110,111 @@ const WeekView: React.FC<WeekViewProps> = ({
         </div>
       ))}
     </div>
+  );
+
+  // 모바일 버전 렌더링
+  const renderMobileView = () => (
+    <div className="md:hidden space-y-4">
+      <Accordion type="single" collapsible className="w-full">
+        {daysOfWeek.map((day, index) => (
+          <AccordionItem key={index} value={`day-${index}`}>
+            <AccordionTrigger className="py-3 px-4 bg-gray-50 rounded-t-md">
+              <div className="flex items-center space-x-3">
+                <div className="bg-blue-100 rounded-full w-10 h-10 flex items-center justify-center">
+                  <span className="text-lg font-bold text-blue-700">{format(day, 'd')}</span>
+                </div>
+                <div className="text-left">
+                  <div className="font-semibold">{format(day, 'E', { locale: ko })}</div>
+                  <div className="text-xs text-gray-500">{format(day, 'yyyy년 MM월 dd일')}</div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="px-2 py-1 space-y-3">
+                {/* 아침 식단 */}
+                <div className="border rounded-md overflow-hidden">
+                  <div className="bg-yellow-50 px-4 py-2 border-b flex justify-between items-center">
+                    <div className="font-medium text-sm flex items-center">
+                      <div className="w-2 h-2 rounded-full bg-yellow-400 mr-2"></div>
+                      아침
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 text-xs"
+                      onClick={() => onAddMealPlan(day, 'breakfast')}
+                    >
+                      <Plus className="h-3 w-3 mr-1" /> 추가
+                    </Button>
+                  </div>
+                  <div className="p-2 space-y-1 min-h-[50px]">
+                    {getMealPlansByDate(mealPlans, day, 'breakfast').length > 0 ? 
+                      getMealPlansByDate(mealPlans, day, 'breakfast').map(renderMealPlanCard) : 
+                      <div className="p-2 text-xs text-gray-400 italic">등록된 식단이 없습니다.</div>
+                    }
+                  </div>
+                </div>
+                
+                {/* 점심 식단 */}
+                <div className="border rounded-md overflow-hidden">
+                  <div className="bg-green-50 px-4 py-2 border-b flex justify-between items-center">
+                    <div className="font-medium text-sm flex items-center">
+                      <div className="w-2 h-2 rounded-full bg-green-400 mr-2"></div>
+                      점심
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 text-xs"
+                      onClick={() => onAddMealPlan(day, 'lunch')}
+                    >
+                      <Plus className="h-3 w-3 mr-1" /> 추가
+                    </Button>
+                  </div>
+                  <div className="p-2 space-y-1 min-h-[50px]">
+                    {getMealPlansByDate(mealPlans, day, 'lunch').length > 0 ? 
+                      getMealPlansByDate(mealPlans, day, 'lunch').map(renderMealPlanCard) : 
+                      <div className="p-2 text-xs text-gray-400 italic">등록된 식단이 없습니다.</div>
+                    }
+                  </div>
+                </div>
+                
+                {/* 저녁 식단 */}
+                <div className="border rounded-md overflow-hidden">
+                  <div className="bg-red-50 px-4 py-2 border-b flex justify-between items-center">
+                    <div className="font-medium text-sm flex items-center">
+                      <div className="w-2 h-2 rounded-full bg-red-400 mr-2"></div>
+                      저녁
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 text-xs"
+                      onClick={() => onAddMealPlan(day, 'dinner')}
+                    >
+                      <Plus className="h-3 w-3 mr-1" /> 추가
+                    </Button>
+                  </div>
+                  <div className="p-2 space-y-1 min-h-[50px]">
+                    {getMealPlansByDate(mealPlans, day, 'dinner').length > 0 ? 
+                      getMealPlansByDate(mealPlans, day, 'dinner').map(renderMealPlanCard) : 
+                      <div className="p-2 text-xs text-gray-400 italic">등록된 식단이 없습니다.</div>
+                    }
+                  </div>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+    </div>
+  );
+
+  return (
+    <>
+      {renderDesktopView()}
+      {renderMobileView()}
+    </>
   );
 };
 

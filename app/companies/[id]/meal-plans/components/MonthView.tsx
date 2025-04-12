@@ -1,7 +1,9 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
-import { format, isSameDay } from 'date-fns';
+import { Plus, Calendar } from 'lucide-react';
+import { format, isSameDay, isSameMonth } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import { Badge } from '@/components/ui/badge';
 import { MealPlan } from '../types';
 import { getMealPlansByDate } from '../utils';
 
@@ -20,8 +22,31 @@ const MonthView: React.FC<MonthViewProps> = ({
   onViewMealTimeSlot,
   onAddMealPlan
 }) => {
-  return (
-    <div className="border-t border-gray-200">
+  // 모든 날짜를 1차원 배열로 변환
+  const allDays = weeks.flat().filter(day => day.getMonth() === currentMonth);
+  
+  // 날짜별 식단 개수를 가져오는 함수
+  const getMealCountByDate = (date: Date): { 
+    breakfast: number, 
+    lunch: number, 
+    dinner: number, 
+    total: number 
+  } => {
+    const breakfastPlans = getMealPlansByDate(mealPlans, date, 'breakfast');
+    const lunchPlans = getMealPlansByDate(mealPlans, date, 'lunch');
+    const dinnerPlans = getMealPlansByDate(mealPlans, date, 'dinner');
+    
+    return {
+      breakfast: breakfastPlans.length,
+      lunch: lunchPlans.length,
+      dinner: dinnerPlans.length,
+      total: breakfastPlans.length + lunchPlans.length + dinnerPlans.length
+    };
+  };
+
+  // PC 버전 렌더링
+  const renderDesktopView = () => (
+    <div className="hidden md:block border-t border-gray-200">
       <div className="grid grid-cols-7 border-l border-gray-200">
         {['월', '화', '수', '목', '금', '토', '일'].map((day) => (
           <div key={day} className="text-center py-3 font-semibold text-sm border-r border-b border-gray-200 bg-gray-50">
@@ -93,6 +118,119 @@ const MonthView: React.FC<MonthViewProps> = ({
         ))}
       </div>
     </div>
+  );
+
+  // 모바일 버전 렌더링
+  const renderMobileView = () => (
+    <div className="md:hidden space-y-3">
+      {allDays.map((day, index) => {
+        const isToday = isSameDay(day, new Date());
+        const mealCounts = getMealCountByDate(day);
+        const hasAnyMeal = mealCounts.total > 0;
+        
+        return (
+          <div 
+            key={`mobile-day-${index}`} 
+            className={`border rounded-md overflow-hidden ${isToday ? 'border-blue-300 bg-blue-50' : ''}`}
+          >
+            <div className="px-4 py-3 flex justify-between items-center">
+              <div className="flex items-center">
+                <div className={`rounded-full w-10 h-10 flex items-center justify-center mr-3 ${
+                  isToday ? 'bg-blue-500 text-white' : 'bg-gray-100'
+                }`}>
+                  {format(day, 'd')}
+                </div>
+                <div>
+                  <div className="font-medium">{format(day, 'E', { locale: ko })}</div>
+                  <div className="text-xs text-gray-500">{format(day, 'yyyy년 MM월 dd일')}</div>
+                </div>
+              </div>
+              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="text-xs h-8"
+                onClick={() => onAddMealPlan(day)}
+              >
+                <Plus className="h-3 w-3 mr-1" /> 식단 추가
+              </Button>
+            </div>
+            
+            {hasAnyMeal ? (
+              <div className="px-4 py-2 space-y-2 border-t bg-gray-50">
+                {/* 아침 */}
+                {mealCounts.breakfast > 0 && (
+                  <div 
+                    className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors"
+                    onClick={() => onViewMealTimeSlot(
+                      day, 
+                      'breakfast', 
+                      getMealPlansByDate(mealPlans, day, 'breakfast')
+                    )}
+                  >
+                    <div className="w-2 h-2 rounded-full bg-yellow-400 mr-2"></div>
+                    <div className="text-sm font-medium mr-2">아침</div>
+                    <Badge variant="secondary" className="text-xs mr-auto">
+                      {mealCounts.breakfast}개
+                    </Badge>
+                    <span className="text-xs text-blue-600">자세히 &rarr;</span>
+                  </div>
+                )}
+                
+                {/* 점심 */}
+                {mealCounts.lunch > 0 && (
+                  <div 
+                    className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors"
+                    onClick={() => onViewMealTimeSlot(
+                      day, 
+                      'lunch', 
+                      getMealPlansByDate(mealPlans, day, 'lunch')
+                    )}
+                  >
+                    <div className="w-2 h-2 rounded-full bg-green-400 mr-2"></div>
+                    <div className="text-sm font-medium mr-2">점심</div>
+                    <Badge variant="secondary" className="text-xs mr-auto">
+                      {mealCounts.lunch}개
+                    </Badge>
+                    <span className="text-xs text-blue-600">자세히 &rarr;</span>
+                  </div>
+                )}
+                
+                {/* 저녁 */}
+                {mealCounts.dinner > 0 && (
+                  <div 
+                    className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors"
+                    onClick={() => onViewMealTimeSlot(
+                      day, 
+                      'dinner', 
+                      getMealPlansByDate(mealPlans, day, 'dinner')
+                    )}
+                  >
+                    <div className="w-2 h-2 rounded-full bg-red-400 mr-2"></div>
+                    <div className="text-sm font-medium mr-2">저녁</div>
+                    <Badge variant="secondary" className="text-xs mr-auto">
+                      {mealCounts.dinner}개
+                    </Badge>
+                    <span className="text-xs text-blue-600">자세히 &rarr;</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="px-4 py-3 border-t text-xs text-gray-400 italic">
+                등록된 식단이 없습니다.
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <>
+      {renderDesktopView()}
+      {renderMobileView()}
+    </>
   );
 };
 
