@@ -142,13 +142,12 @@ export function CompanyFeaturesSection({ companyId, initialFeatures }: CompanyFe
                     let path: string;
                     
                     // 기능명에 따라 경로 명확하게 지정
-                    if (feature.name === 'mealPlanning') {
-                      path = `/companies/${companyId}/meal-plans`;
-                      console.log(`식단 관리 경로로 이동: ${path}`);
-                    } else if (feature.name === 'ingredients') {
+                    if (feature.name === 'ingredients') {
                       path = `/companies/${companyId}/ingredients`;
                     } else if (feature.name === 'menus') {
                       path = `/companies/${companyId}/menus`;
+                    } else if (feature.name === 'mealPlanning') {
+                      path = `/companies/${companyId}/meal-plans`;
                     } else {
                       path = `/companies/${companyId}/${feature.name}`;
                     }

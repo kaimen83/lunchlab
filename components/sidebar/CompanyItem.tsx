@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building, ChevronDown, ChevronRight, Users, ClipboardList, CalendarDays, Settings } from 'lucide-react';
+import { Building, ChevronDown, ChevronRight, Users, ClipboardList, Settings, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { CompanyWithFeatures } from './types';
@@ -29,7 +29,7 @@ export function CompanyItem({ company, toggleCompany, handleLinkClick }: Company
   console.log(`회사 ${name}(${id}) 기능 상태:`, {
     ingredients: hasIngredientsFeature,
     menus: hasMenusFeature,
-    mealPlanning: hasMealPlanningFeature,
+    mealPlanning: hasMealPlanningFeature
   });
 
   return (

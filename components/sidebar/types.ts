@@ -10,7 +10,7 @@ export interface CompanySidebarProps {
 }
 
 // 회사 기능 관련 타입
-export type CompanyFeature = 'ingredients' | 'menus' | 'mealPlanning' | 'settings';
+export type CompanyFeature = 'ingredients' | 'menus' | 'settings' | 'mealPlanning';
 
 // 사이드바 메뉴 항목 타입
 export interface SidebarMenuItem {
