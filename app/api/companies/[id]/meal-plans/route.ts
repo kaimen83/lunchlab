@@ -30,7 +30,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
             id,
             name,
             description,
-            menu_price_history(cost_price)
+            menu_price_history(cost_price, recorded_at),
+            menu_containers(
+              id,
+              menu_id,
+              container_id,
+              ingredients_cost
+            )
           ),
           container:containers(
             id,
@@ -42,7 +48,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
       `)
       .eq('company_id', companyId)
       .order('date', { ascending: true })
-      .order('meal_time', { ascending: true });
+      .order('meal_time', { ascending: true })
+      .order('recorded_at', { foreignTable: 'meal_plan_menus.menu.menu_price_history', ascending: false });
     
     // 날짜 범위가 제공된 경우 필터링 추가
     if (startDate && endDate) {
@@ -151,7 +158,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
             id,
             name,
             description,
-            menu_price_history(cost_price)
+            menu_price_history(cost_price, recorded_at),
+            menu_containers(
+              id,
+              menu_id,
+              container_id,
+              ingredients_cost
+            )
           ),
           container:containers(
             id,
@@ -162,6 +175,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         )
       `)
       .eq('id', mealPlan.id)
+      .order('recorded_at', { foreignTable: 'meal_plan_menus.menu.menu_price_history', ascending: false })
       .single();
     
     if (fetchError) {

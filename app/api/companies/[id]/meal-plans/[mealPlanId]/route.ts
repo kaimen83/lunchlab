@@ -28,7 +28,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
             id,
             name,
             description,
-            menu_price_history(cost_price)
+            menu_price_history(cost_price, recorded_at),
+            menu_containers(
+              id,
+              menu_id,
+              container_id,
+              ingredients_cost
+            )
           ),
           container:containers(
             id,
@@ -40,6 +46,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       `)
       .eq('id', mealPlanId)
       .eq('company_id', companyId)
+      .order('recorded_at', { foreignTable: 'meal_plan_menus.menu.menu_price_history', ascending: false })
       .single();
     
     if (error) {
@@ -163,7 +170,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
             id,
             name,
             description,
-            menu_price_history(cost_price)
+            menu_price_history(cost_price, recorded_at),
+            menu_containers(
+              id,
+              menu_id,
+              container_id,
+              ingredients_cost
+            )
           ),
           container:containers(
             id,
@@ -174,6 +187,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         )
       `)
       .eq('id', mealPlanId)
+      .order('recorded_at', { foreignTable: 'meal_plan_menus.menu.menu_price_history', ascending: false })
       .single();
     
     if (fetchUpdatedError) {

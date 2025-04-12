@@ -24,17 +24,40 @@ export const calculateMealPlanCost = (mealPlan: MealPlan): number => {
   return mealPlan.meal_plan_menus.reduce((totalCost, item) => {
     let itemCost = 0;
     
-    // 메뉴 비용 계산 - menu_price_history에서 가장 최근 가격 가져오기
-    if (item.menu && item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
-      // 가장 최근 가격 기록 사용 (배열의 첫 번째 요소)
-      const latestPrice = item.menu.menu_price_history[0].cost_price;
-      itemCost += typeof latestPrice === 'number' ? latestPrice : 0;
-    }
+    // 용기 ID 확인
+    const containerId = item.container_id;
     
-    // 용기 비용 추가하지 않음 (원가에서 제외)
-    // if (item.container && typeof item.container.price === 'number') {
-    //   itemCost += item.container.price;
-    // }
+    if (containerId && item.menu.menu_containers) {
+      // 현재 메뉴와 용기에 해당하는 원가 정보 찾기
+      const menuContainer = item.menu.menu_containers.find(
+        mc => mc.menu_id === item.menu_id && mc.container_id === containerId
+      );
+      
+      if (menuContainer) {
+        // 특정 메뉴-용기 조합에 대한 원가 사용
+        itemCost = menuContainer.ingredients_cost || 0;
+      } else {
+        // 메뉴-용기 조합 정보가 없는 경우 menu_price_history에서 가져옴
+        if (item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
+          const sortedHistory = [...item.menu.menu_price_history].sort((a, b) => {
+            if (!a.recorded_at || !b.recorded_at) return 0;
+            return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
+          });
+          itemCost = sortedHistory[0].cost_price || 0;
+        }
+      }
+    } else {
+      // 용기 ID가 없거나 menu_containers가 없는 경우 menu_price_history에서 가져옴
+      if (item.menu && item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
+        const sortedHistory = [...item.menu.menu_price_history].sort((a, b) => {
+          if (!a.recorded_at || !b.recorded_at) return 0;
+          return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
+        });
+        
+        const latestPrice = sortedHistory[0].cost_price;
+        itemCost = typeof latestPrice === 'number' ? latestPrice : 0;
+      }
+    }
     
     return totalCost + itemCost;
   }, 0);

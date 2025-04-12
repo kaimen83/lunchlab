@@ -44,10 +44,42 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
         ) : (
           <ul className="space-y-3">
             {mealPlan.meal_plan_menus.map((item) => {
-              // 메뉴와 용기 비용 계산 - 용기 가격을 원가에 포함하지 않음
-              const menuCost = item.menu.menu_price_history && item.menu.menu_price_history.length > 0 
-                ? item.menu.menu_price_history[0].cost_price || 0 
-                : 0;
+              // 메뉴의 원가 계산 - 특정 용기와 메뉴 조합에 대한 원가 사용
+              let menuCost = 0;
+              
+              // 용기 ID 확인
+              const containerId = item.container_id;
+              
+              if (containerId && item.menu.menu_containers) {
+                // 현재 메뉴와 용기에 해당하는 원가 정보 찾기
+                const menuContainer = item.menu.menu_containers.find(
+                  mc => mc.menu_id === item.menu_id && mc.container_id === containerId
+                );
+                
+                if (menuContainer) {
+                  // 특정 메뉴-용기 조합에 대한 원가 사용
+                  menuCost = menuContainer.ingredients_cost || 0;
+                } else {
+                  // 메뉴-용기 조합 정보가 없는 경우 menu_price_history에서 가져옴
+                  if (item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
+                    const sortedHistory = [...item.menu.menu_price_history].sort((a, b) => {
+                      if (!a.recorded_at || !b.recorded_at) return 0;
+                      return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
+                    });
+                    menuCost = sortedHistory[0].cost_price || 0;
+                  }
+                }
+              } else {
+                // 용기 ID가 없거나 menu_containers가 없는 경우 menu_price_history에서 가져옴
+                if (item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
+                  const sortedHistory = [...item.menu.menu_price_history].sort((a, b) => {
+                    if (!a.recorded_at || !b.recorded_at) return 0;
+                    return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
+                  });
+                  menuCost = sortedHistory[0].cost_price || 0;
+                }
+              }
+              
               // 용기 가격은 표시하되 총액에 포함하지 않음
               const containerCost = item.container?.price || 0;
               const totalCost = menuCost; // 용기 가격 제외

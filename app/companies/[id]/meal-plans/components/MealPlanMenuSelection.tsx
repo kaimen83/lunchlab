@@ -4,7 +4,6 @@ import { Dispatch, SetStateAction } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { DialogTrigger } from '@/components/ui/dialog';
 import { Container, Menu, MenuContainer } from './types';
 import { formatPrice, getCostInfoForMenuAndContainer } from './utils';
 import MenuSelection from './MenuSelection';
@@ -102,19 +101,17 @@ export default function MealPlanMenuSelection({
                     )}
                   </div>
                   
-                  <DialogTrigger asChild>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => {
-                        setSelectedContainerForMenu(containerId);
-                        setIsMenuSelectOpen(true);
-                        setMenuSearchTerm('');
-                      }}
-                    >
-                      {selectedMenuId ? '메뉴 변경' : '메뉴 선택'}
-                    </Button>
-                  </DialogTrigger>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setSelectedContainerForMenu(containerId);
+                      setIsMenuSelectOpen(true);
+                      setMenuSearchTerm('');
+                    }}
+                  >
+                    {selectedMenuId ? '메뉴 변경' : '메뉴 선택'}
+                  </Button>
                 </div>
               );
             })}

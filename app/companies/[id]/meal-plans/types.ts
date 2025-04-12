@@ -9,6 +9,13 @@ export interface MealPlanMenu {
     description: string | null;
     menu_price_history: {
       cost_price: number;
+      recorded_at?: string;
+    }[];
+    menu_containers?: {
+      id: string;
+      menu_id: string;
+      container_id: string;
+      ingredients_cost: number;
     }[];
   };
   container?: {
