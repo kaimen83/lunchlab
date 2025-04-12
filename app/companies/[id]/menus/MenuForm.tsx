@@ -102,6 +102,7 @@ export default function MenuForm({
   const [containerIngredients, setContainerIngredients] = useState<Record<string, ContainerIngredient[]>>({});
   const [cost, setCost] = useState(0);
   const [containers, setContainers] = useState<Container[]>([]);
+  const [containerCosts, setContainerCosts] = useState<Record<string, number>>({});
 
   // 폼 초기화
   const form = useForm<MenuFormValues>({
@@ -224,18 +225,27 @@ export default function MenuForm({
 
   // 용기별 원가 업데이트
   const updateCostFromContainers = (containerIngredientsMap: Record<string, ContainerIngredient[]>) => {
+    const newContainerCosts: Record<string, number> = {};
     let totalCost = 0;
     
-    // 모든 용기의 식재료 합산
-    Object.values(containerIngredientsMap).forEach(ingredients => {
+    // 각 용기별로 식재료 원가 계산
+    Object.entries(containerIngredientsMap).forEach(([containerId, ingredients]) => {
+      let containerCost = 0;
+      
+      // 용기 내 식재료 원가 계산
       ingredients.forEach(item => {
         const ingredient = selectedIngredients.find(i => i.ingredient_id === item.ingredient_id)?.ingredient;
         if (ingredient) {
-          totalCost += (item.amount * ingredient.price / ingredient.package_amount);
+          containerCost += (item.amount * ingredient.price / ingredient.package_amount);
         }
       });
+      
+      newContainerCosts[containerId] = containerCost;
+      totalCost += containerCost;
     });
     
+    // 용기별 원가와 총 원가 업데이트
+    setContainerCosts(newContainerCosts);
     setCost(totalCost);
   };
 
@@ -557,16 +567,6 @@ export default function MenuForm({
         </div>
         
         <div className="md:col-span-8">
-          <div className="bg-blue-50 p-4 rounded-md border border-blue-100 mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <Label className="text-blue-800">총 원가 계산</Label>
-              <div className="text-lg font-semibold text-blue-800">
-                {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(cost)}
-              </div>
-            </div>
-            <p className="text-xs text-blue-600">각 용기별 식재료 양에 따라 자동으로 계산됩니다.</p>
-          </div>
-          
           <h3 className="font-semibold mb-2">선택한 용기별 식재료 양 설정</h3>
           {selectedContainers.length === 0 ? (
             <div className="bg-slate-100 p-4 rounded-md text-center text-slate-500">
@@ -578,7 +578,12 @@ export default function MenuForm({
                 <Card key={container.id} className="border border-slate-200">
                   <CardHeader className="pb-2">
                     <div className="flex justify-between items-center">
-                      <CardTitle className="text-md">{container.name}</CardTitle>
+                      <div>
+                        <CardTitle className="text-md">{container.name}</CardTitle>
+                        <p className="text-sm text-blue-600 font-medium">
+                          원가: {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(containerCosts[container.id] || 0)}
+                        </p>
+                      </div>
                       <Button 
                         variant="ghost" 
                         size="sm" 

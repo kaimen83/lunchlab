@@ -284,14 +284,9 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
 
   // 메뉴 저장 후 처리
   const handleSaveMenu = (savedMenu: Menu) => {
-    if (modalMode === "create") {
-      setMenus((prev) => [...prev, savedMenu]);
-    } else {
-      setMenus((prev) =>
-        prev.map((i) => (i.id === savedMenu.id ? savedMenu : i)),
-      );
-    }
-
+    // 메뉴가 저장된 후 전체 메뉴 목록을 다시 로드하여 최신 정보를 표시
+    loadMenus();
+    
     setModalOpen(false);
     setSelectedMenu(null);
   };

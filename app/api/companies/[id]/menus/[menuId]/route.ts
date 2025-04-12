@@ -391,7 +391,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     
     // 메뉴가 식단 계획에서 사용 중인지 확인
     const { data: mealPlans, error: mealPlansError } = await supabase
-      .from('meal_plans')
+      .from('meal_plan_menus')
       .select('id')
       .eq('menu_id', menuId)
       .limit(1);
