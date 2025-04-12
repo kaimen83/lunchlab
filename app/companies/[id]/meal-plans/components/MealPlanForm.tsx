@@ -228,11 +228,16 @@ export default function MealPlanForm({
 
   // 용기에 메뉴 할당
   const handleMenuSelection = (containerId: string, menuId: string) => {
+    // 메뉴 선택 정보 업데이트
     setContainerMenuSelections(prev => ({
       ...prev,
       [containerId]: menuId
     }));
-    setIsMenuSelectOpen(false);
+    
+    // 선택 후 모달을 안전하게 닫기 위해 지연 처리
+    setTimeout(() => {
+      setIsMenuSelectOpen(false);
+    }, 50);
   };
   
   // 용기 검색

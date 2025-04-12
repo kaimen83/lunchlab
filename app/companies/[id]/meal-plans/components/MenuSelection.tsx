@@ -1,6 +1,6 @@
 'use client';
 
-import { Dispatch, SetStateAction } from 'react';
+import { Dispatch, SetStateAction, useState, MouseEvent } from 'react';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -41,10 +41,38 @@ export default function MenuSelection({
   menuContainers
 }: MenuSelectionProps) {
   if (!containerId) return null;
+  
+  // 메뉴 선택 중인지 추적하는 상태 추가
+  const [isSelecting, setIsSelecting] = useState(false);
+
+  // 메뉴 선택 핸들러
+  const handleMenuSelect = (e: MouseEvent, menuId: string) => {
+    e.preventDefault();
+    e.stopPropagation(); // 이벤트 버블링 방지
+    
+    setIsSelecting(true);
+    // setTimeout을 사용하여 이벤트 루프의 다음 틱에서 선택 처리
+    setTimeout(() => {
+      onMenuSelect(containerId, menuId);
+      setIsSelecting(false);
+    }, 10);
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog 
+      open={isOpen} 
+      onOpenChange={(open) => {
+        // 메뉴 선택 중이면 모달 닫기 이벤트 무시
+        if (isSelecting) return;
+        setIsOpen(open);
+      }}
+    >
+      <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => {
+        // 메뉴 선택 중이면 외부 클릭 이벤트 방지
+        if (isSelecting) {
+          e.preventDefault();
+        }
+      }}>
         <DialogHeader>
           <DialogTitle>
             {containerName}에 담을 메뉴 선택
@@ -75,7 +103,7 @@ export default function MenuSelection({
                         "flex flex-col p-3 border-b last:border-0 cursor-pointer hover:bg-accent/20",
                         selectedMenuId === menu.id && "bg-accent/30"
                       )}
-                      onClick={() => onMenuSelect(containerId, menu.id)}
+                      onClick={(e) => handleMenuSelect(e, menu.id)}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">

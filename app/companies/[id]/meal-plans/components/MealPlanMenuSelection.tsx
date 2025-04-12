@@ -1,6 +1,6 @@
 'use client';
 
-import { Dispatch, SetStateAction } from 'react';
+import { Dispatch, SetStateAction, MouseEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -59,6 +59,22 @@ export default function MealPlanMenuSelection({
   handleMenuSelection,
   initialData
 }: MealPlanMenuSelectionProps) {
+
+  // 메뉴 선택 버튼 클릭 핸들러
+  const handleOpenMenuSelect = (e: MouseEvent, containerId: string) => {
+    e.preventDefault();
+    e.stopPropagation(); // 이벤트 버블링 방지
+
+    // 먼저 컨테이너 ID 설정
+    setSelectedContainerForMenu(containerId);
+    // 검색어 초기화
+    setMenuSearchTerm('');
+    // 마지막으로 모달 열기
+    setTimeout(() => {
+      setIsMenuSelectOpen(true);
+    }, 0);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -104,11 +120,7 @@ export default function MealPlanMenuSelection({
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => {
-                      setSelectedContainerForMenu(containerId);
-                      setIsMenuSelectOpen(true);
-                      setMenuSearchTerm('');
-                    }}
+                    onClick={(e) => handleOpenMenuSelect(e as MouseEvent, containerId)}
                   >
                     {selectedMenuId ? '메뉴 변경' : '메뉴 선택'}
                   </Button>
