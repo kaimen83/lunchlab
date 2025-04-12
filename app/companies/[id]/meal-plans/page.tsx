@@ -98,7 +98,7 @@ export default function MealPlansPage() {
         variant: 'destructive',
       });
     } finally {
-      setIsLoading(false);
+    setIsLoading(false);
     }
   };
 
@@ -269,6 +269,21 @@ export default function MealPlansPage() {
     }
   };
 
+  // 식단 총 원가 계산 함수
+  const calculateMealPlanCost = (mealPlan: MealPlan): number => {
+    if (!mealPlan.meal_plan_menus) {
+      return 0;
+    }
+    
+    return mealPlan.meal_plan_menus.reduce((totalCost, item) => {
+      // 메뉴 데이터가 있고, cost_price가 숫자인 경우에만 합산
+      if (item.menu && typeof item.menu.cost_price === 'number') {
+        return totalCost + item.menu.cost_price;
+      }
+      return totalCost;
+    }, 0);
+  };
+
   // 식단에 포함된 메뉴 이름 렌더링
   const renderMenuNames = (mealPlan: MealPlan) => {
     if (!mealPlan.meal_plan_menus || mealPlan.meal_plan_menus.length === 0) {
@@ -282,46 +297,63 @@ export default function MealPlansPage() {
     return `${menuNames[0]}, ${menuNames[1]} 외 ${menuNames.length - 2}개`;
   };
 
+  // 통화 형식 변환 함수
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('ko-KR', { 
+      style: 'currency', 
+      currency: 'KRW' 
+    }).format(amount);
+  };
+
   // 식단 카드 렌더링
   const renderMealPlanCard = (mealPlan: MealPlan) => (
-    <Card 
+    <div 
       key={mealPlan.id} 
-      className="mb-2 cursor-pointer hover:bg-gray-50 transition-colors"
+      className="p-2 rounded-md cursor-pointer hover:bg-blue-50 border border-transparent hover:border-blue-200 transition-all duration-150"
       onClick={() => handleViewMealPlan(mealPlan)}
     >
-      <CardContent className="p-3">
-        <div className="font-medium">{mealPlan.name}</div>
-        <div className="text-sm text-gray-500">{renderMenuNames(mealPlan)}</div>
-      </CardContent>
-    </Card>
+      <div className="flex justify-between items-center mb-0.5">
+        <div className="font-medium text-xs truncate mr-2">{mealPlan.name}</div>
+        <div className="text-xs font-semibold text-blue-600 whitespace-nowrap">
+          {formatCurrency(calculateMealPlanCost(mealPlan))}
+        </div>
+      </div>
+      <div className="text-xs text-gray-500 truncate">{renderMenuNames(mealPlan)}</div>
+    </div>
   );
 
   // 주간 뷰 렌더링
   const renderWeekView = () => (
-    <div className="grid grid-cols-8 gap-4 mt-4">
+    <div className="grid grid-cols-8 border-t border-l border-gray-200">
       {/* 첫 번째 열: 시간대 */}
-      <div className="col-span-1">
-        <div className="h-12"></div>
-        <div className="h-40 flex items-center justify-center font-medium">아침</div>
-        <div className="h-40 flex items-center justify-center font-medium">점심</div>
-        <div className="h-40 flex items-center justify-center font-medium">저녁</div>
+      <div className="col-span-1 border-r border-gray-200">
+        <div className="h-16 border-b border-gray-200"></div> {/* 날짜 헤더 높이 맞춤 */} 
+        <div className="h-48 flex items-center justify-center font-semibold text-sm text-gray-500 border-b border-gray-200">
+          아침
+        </div>
+        <div className="h-48 flex items-center justify-center font-semibold text-sm text-gray-500 border-b border-gray-200">
+          점심
+        </div>
+        <div className="h-48 flex items-center justify-center font-semibold text-sm text-gray-500 border-b border-gray-200">
+          저녁
+        </div>
       </div>
       
-      {/* 나머지 열: 요일별 식단 */}
+      {/* 나머지 열: 요일별 식단 */} 
       {daysOfWeek.map((day, index) => (
-        <div key={index} className="col-span-1">
-          <div className="h-12 text-center py-2 font-medium">
-            {format(day, 'E', { locale: ko })}
-            <div className="text-sm">{format(day, 'd')}</div>
+        <div key={index} className="col-span-1 border-r border-gray-200">
+          <div className="h-16 text-center py-3 border-b border-gray-200 bg-gray-50">
+            <div className="font-semibold text-sm">{format(day, 'E', { locale: ko })}</div>
+            <div className="text-lg font-bold mt-1">{format(day, 'd')}</div>
           </div>
           
           {/* 아침 식단 */}
-          <div className="h-40 border p-2 overflow-y-auto">
+          <div className="h-48 border-b border-gray-200 p-2 space-y-2 overflow-y-auto relative group">
             {getMealPlansByDate(day, 'breakfast').map(renderMealPlanCard)}
             <Button 
               variant="ghost" 
               size="sm" 
-              className="w-full mt-1" 
+              className="absolute bottom-2 right-2 w-full max-w-[calc(100%-1rem)] opacity-40 hover:opacity-100 transition-opacity text-xs"
               onClick={() => {
                 setSelectedDate(day);
                 setFormMode('create');
@@ -339,17 +371,17 @@ export default function MealPlansPage() {
                 setShowMealPlanForm(true);
               }}
             >
-              <Plus className="h-4 w-4 mr-1" /> 추가
+              <Plus className="h-3 w-3 mr-1" /> 추가
             </Button>
           </div>
           
-          {/* 점심 식단 */}
-          <div className="h-40 border p-2 overflow-y-auto">
+          {/* 점심 식단 */} 
+          <div className="h-48 border-b border-gray-200 p-2 space-y-2 overflow-y-auto relative group">
             {getMealPlansByDate(day, 'lunch').map(renderMealPlanCard)}
             <Button 
               variant="ghost" 
               size="sm" 
-              className="w-full mt-1" 
+              className="absolute bottom-2 right-2 w-full max-w-[calc(100%-1rem)] opacity-40 hover:opacity-100 transition-opacity text-xs"
               onClick={() => {
                 setSelectedDate(day);
                 setFormMode('create');
@@ -367,17 +399,17 @@ export default function MealPlansPage() {
                 setShowMealPlanForm(true);
               }}
             >
-              <Plus className="h-4 w-4 mr-1" /> 추가
+              <Plus className="h-3 w-3 mr-1" /> 추가
             </Button>
           </div>
           
-          {/* 저녁 식단 */}
-          <div className="h-40 border p-2 overflow-y-auto">
+          {/* 저녁 식단 */} 
+          <div className="h-48 border-b border-gray-200 p-2 space-y-2 overflow-y-auto relative group">
             {getMealPlansByDate(day, 'dinner').map(renderMealPlanCard)}
             <Button 
               variant="ghost" 
               size="sm" 
-              className="w-full mt-1" 
+              className="absolute bottom-2 right-2 w-full max-w-[calc(100%-1rem)] opacity-40 hover:opacity-100 transition-opacity text-xs"
               onClick={() => {
                 setSelectedDate(day);
                 setFormMode('create');
@@ -395,7 +427,7 @@ export default function MealPlansPage() {
                 setShowMealPlanForm(true);
               }}
             >
-              <Plus className="h-4 w-4 mr-1" /> 추가
+              <Plus className="h-3 w-3 mr-1" /> 추가
             </Button>
           </div>
         </div>
@@ -437,53 +469,63 @@ export default function MealPlansPage() {
     });
     
     return (
-      <div className="mt-4">
-        <div className="grid grid-cols-7 gap-0">
+      <div className="border-t border-gray-200">
+        <div className="grid grid-cols-7 border-l border-gray-200">
           {['월', '화', '수', '목', '금', '토', '일'].map((day) => (
-            <div key={day} className="text-center py-2 font-medium border">
+            <div key={day} className="text-center py-3 font-semibold text-sm border-r border-b border-gray-200 bg-gray-50">
               {day}
             </div>
           ))}
-          
+        </div>
+        <div className="grid grid-cols-7 border-l border-gray-200">
           {weeks.map((week, weekIndex) => (
             <React.Fragment key={`week-${weekIndex}`}>
               {week.map((day, dayIndex) => {
                 const isCurrentMonth = day.getMonth() === month;
+                const isToday = isSameDay(day, new Date());
                 
                 return (
                   <div
                     key={`day-${weekIndex}-${dayIndex}`}
-                    className={`min-h-[100px] border p-1 overflow-hidden relative ${
-                      !isCurrentMonth ? 'bg-gray-100' : ''
+                    className={`min-h-[120px] border-r border-b border-gray-200 p-2 overflow-hidden relative group ${ 
+                      !isCurrentMonth ? 'bg-gray-50 text-gray-400' : isToday ? 'bg-blue-50' : 'bg-white'
                     }`}
                   >
-                    <div className="text-right text-sm font-medium mb-1">
+                    <div className={`text-right text-sm font-semibold mb-1 ${isToday ? 'text-blue-600' : ''}`}>
                       {format(day, 'd')}
                     </div>
                     
                     <div className="space-y-1 text-xs">
-                      {/* 아침, 점심, 저녁 아이콘 및 식단 수 표시 */}
+                      {/* 아침, 점심, 저녁 식단 요약 표시 */}
                       {(['breakfast', 'lunch', 'dinner'] as const).map((mealTime) => {
                         const plans = getMealPlansByDate(day, mealTime);
                         if (plans.length === 0) return null;
                         
+                        // 이 시간대의 첫 번째 식단 정보 (표시용)
+                        const firstPlan = plans[0];
+                        const totalCostForTime = plans.reduce((sum, plan) => sum + calculateMealPlanCost(plan), 0);
+                        
                         return (
                           <div 
                             key={mealTime}
-                            className="flex items-center cursor-pointer"
+                            className="flex items-center justify-between cursor-pointer text-gray-700 hover:text-blue-600"
                             onClick={() => {
                               setSelectedDate(day);
-                              const firstPlan = plans[0];
                               if (firstPlan) {
                                 handleViewMealPlan(firstPlan);
                               }
                             }}
                           >
-                            <span className="w-4 text-center font-bold">
-                              {mealTime === 'breakfast' ? '아' : mealTime === 'lunch' ? '점' : '저'}
-                            </span>
-                            <span className="ml-1 truncate">
-                              {plans.length > 0 && `${plans[0].name} ${plans.length > 1 ? `외 ${plans.length - 1}개` : ''}`}
+                            <div className="flex items-center truncate">
+                              <span className={`w-3 h-3 rounded-full mr-1.5 flex-shrink-0 ${ 
+                                mealTime === 'breakfast' ? 'bg-yellow-400' : mealTime === 'lunch' ? 'bg-green-400' : 'bg-red-400'
+                              }`}></span>
+                              <span className="truncate text-xs">
+                                {`${firstPlan.name}${plans.length > 1 ? ` 외 ${plans.length - 1}` : ''}`}
+                              </span>
+                            </div>
+                            <span className="text-xs font-medium text-blue-600 whitespace-nowrap ml-1">
+                              {formatCurrency(totalCostForTime)}
                             </span>
                           </div>
                         );
@@ -491,34 +533,36 @@ export default function MealPlansPage() {
                     </div>
                     
                     {/* 식단 추가 버튼 */}
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="absolute bottom-0 right-0 w-6 h-6 p-0 m-1 opacity-50 hover:opacity-100" 
-                      onClick={() => {
-                        // 현재 시간에 따라 식사 시간 선택
-                        const now = new Date();
-                        const hour = now.getHours();
-                        
-                        let mealTime: 'breakfast' | 'lunch' | 'dinner';
-                        
-                        // 시간대별 식사 시간 설정
-                        if (hour < 10) {
-                          mealTime = 'breakfast'; // 10시 이전은 아침
-                        } else if (hour < 15) {
-                          mealTime = 'lunch'; // 10시 ~ 15시는 점심
-                        } else {
-                          mealTime = 'dinner'; // 15시 이후는 저녁
-                        }
-                        
-                        setSelectedMealTime(mealTime);
-                        setSelectedDate(day);
-                        setFormMode('create');
-                        setShowMealPlanForm(true);
-                      }}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
+                    {isCurrentMonth && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="absolute bottom-1 right-1 w-6 h-6 p-0 opacity-40 hover:opacity-100 transition-opacity"
+                        onClick={() => {
+                          // 현재 시간에 따라 식사 시간 선택
+                          const now = new Date();
+                          const hour = now.getHours();
+                          
+                          let mealTime: 'breakfast' | 'lunch' | 'dinner';
+                          
+                          // 시간대별 식사 시간 설정
+                          if (hour < 10) {
+                            mealTime = 'breakfast'; // 10시 이전은 아침
+                          } else if (hour < 15) {
+                            mealTime = 'lunch'; // 10시 ~ 15시는 점심
+                          } else {
+                            mealTime = 'dinner'; // 15시 이후는 저녁
+                          }
+                          
+                          setSelectedMealTime(mealTime);
+                          setSelectedDate(day);
+                          setFormMode('create');
+                          setShowMealPlanForm(true);
+                        }}
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
                 );
               })}
@@ -530,38 +574,38 @@ export default function MealPlansPage() {
   };
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">식단 관리</h1>
+    <div className="container mx-auto py-8 px-4 md:px-6 lg:px-8">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <h1 className="text-3xl font-bold tracking-tight">식단 관리</h1>
         
         <div className="flex items-center gap-4">
           <Tabs value={viewType} onValueChange={(value) => setViewType(value as 'week' | 'month')}>
             <TabsList>
-              <TabsTrigger value="week">주간 뷰</TabsTrigger>
-              <TabsTrigger value="month">월간 뷰</TabsTrigger>
+              <TabsTrigger value="week">주간</TabsTrigger>
+              <TabsTrigger value="month">월간</TabsTrigger>
             </TabsList>
           </Tabs>
-        </div>
-      </div>
-      
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle>
-            {viewType === 'week'
-              ? `${format(weekStart, 'yyyy년 MM월 dd일')} - ${format(weekEnd, 'yyyy년 MM월 dd일')}`
-              : format(currentWeek, 'yyyy년 MM월')}
-          </CardTitle>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={handlePreviousWeek}>
+            <Button variant="outline" size="icon" onClick={handlePreviousWeek} aria-label="Previous period">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" onClick={() => setCurrentWeek(new Date())}>
+            <Button variant="outline" size="icon" onClick={() => setCurrentWeek(new Date())} aria-label="Today">
               <CalendarIcon className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" onClick={handleNextWeek}>
+            <Button variant="outline" size="icon" onClick={handleNextWeek} aria-label="Next period">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
+        </div>
+      </div>
+      
+      <Card className="shadow-sm">
+        <CardHeader className="border-b px-6 py-4">
+          <CardTitle className="text-lg font-medium">
+            {viewType === 'week'
+              ? `${format(weekStart, 'yyyy년 MM월 dd일')} - ${format(weekEnd, 'MM월 dd일')}`
+              : format(currentWeek, 'yyyy년 MM월')}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
