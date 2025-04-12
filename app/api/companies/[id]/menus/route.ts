@@ -191,6 +191,9 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
     
+    // 빈 코드 문자열을 null로 변환 (유니크 제약 조건 충돌 방지)
+    const processedCode = code === '' ? null : code;
+    
     const supabase = createServerSupabaseClient();
     
     // 사용자가 해당 회사의 멤버인지 확인
@@ -231,12 +234,12 @@ export async function POST(request: Request, context: RouteContext) {
     }
     
     // 코드가 제공된 경우 중복 확인
-    if (code) {
+    if (processedCode) {
       const { data: existingMenu, error: codeCheckError } = await supabase
         .from('menus')
         .select('id')
         .eq('company_id', companyId)
-        .eq('code', code)
+        .eq('code', processedCode)
         .maybeSingle();
       
       if (codeCheckError) {
@@ -258,7 +261,7 @@ export async function POST(request: Request, context: RouteContext) {
         name,
         description,
         recipe,
-        code, // 코드 필드 추가
+        code: processedCode, // 빈 문자열이면 null 사용
         cost_price: 0 // 초기값 설정, 나중에 업데이트
       })
       .select()

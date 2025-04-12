@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Loader2 } from 'lucide-react';
+import { CalendarIcon, Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -56,6 +56,7 @@ export default function MealPlanForm({
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [mealTime, setMealTime] = useState<'breakfast' | 'lunch' | 'dinner'>(defaultMealTime);
   const [menus, setMenus] = useState<Menu[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedMenuIds, setSelectedMenuIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isLoadingMenus, setIsLoadingMenus] = useState<boolean>(true);
@@ -167,6 +168,15 @@ export default function MealPlanForm({
     });
   };
   
+  // 메뉴 검색 처리
+  const filteredMenus = menus.filter(menu => 
+    menu.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (menu.description && menu.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+  
+  // 선택된 메뉴 카운트
+  const selectedMenuCount = selectedMenuIds.length;
+  
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
@@ -228,7 +238,13 @@ export default function MealPlanForm({
       </div>
       
       <div className="space-y-2">
-        <Label>메뉴 선택</Label>
+        <div className="flex items-center justify-between">
+          <Label>메뉴 선택</Label>
+          {selectedMenuCount > 0 && (
+            <span className="text-xs text-blue-600 font-medium">{selectedMenuCount}개 선택됨</span>
+          )}
+        </div>
+        
         {isLoadingMenus ? (
           <div className="flex justify-center items-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
@@ -238,32 +254,50 @@ export default function MealPlanForm({
             등록된 메뉴가 없습니다. 먼저 메뉴를 등록해주세요.
           </div>
         ) : (
-          <ScrollArea className="h-[200px] border rounded-md p-2">
-            <div className="space-y-2">
-              {menus.map((menu) => (
-                <div key={menu.id} className="flex items-center space-x-2">
-                  <Checkbox 
-                    id={`menu-${menu.id}`}
-                    checked={selectedMenuIds.includes(menu.id)}
-                    onCheckedChange={() => toggleMenuSelection(menu.id)}
-                    disabled={isLoading}
-                  />
-                  <Label 
-                    htmlFor={`menu-${menu.id}`}
-                    className="flex-1 cursor-pointer text-sm"
-                  >
-                    <div className="font-medium">{menu.name}</div>
-                    {menu.description && (
-                      <div className="text-xs text-gray-500 truncate">{menu.description}</div>
-                    )}
-                  </Label>
-                  <div className="text-sm text-gray-500">
-                    {new Intl.NumberFormat('ko-KR').format(menu.cost_price)}원
-                  </div>
-                </div>
-              ))}
+          <>
+            <div className="relative mb-2">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+              <Input 
+                type="text" 
+                placeholder="메뉴 검색..."
+                className="pl-9"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-          </ScrollArea>
+            <ScrollArea className="h-[200px] border rounded-md p-2">
+              {filteredMenus.length > 0 ? (
+                <div className="space-y-2">
+                  {filteredMenus.map((menu) => (
+                    <div key={menu.id} className="flex items-center space-x-2 p-1 hover:bg-gray-50 rounded">
+                      <Checkbox 
+                        id={`menu-${menu.id}`}
+                        checked={selectedMenuIds.includes(menu.id)}
+                        onCheckedChange={() => toggleMenuSelection(menu.id)}
+                        disabled={isLoading}
+                      />
+                      <Label 
+                        htmlFor={`menu-${menu.id}`}
+                        className="flex-1 cursor-pointer text-sm"
+                      >
+                        <div className="font-medium">{menu.name}</div>
+                        {menu.description && (
+                          <div className="text-xs text-gray-500 truncate">{menu.description}</div>
+                        )}
+                      </Label>
+                      <div className="text-sm text-gray-500">
+                        {new Intl.NumberFormat('ko-KR').format(menu.cost_price)}원
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-gray-500 py-8">
+                  <p className="text-sm">"{searchTerm}"에 대한 검색 결과가 없습니다.</p>
+                </div>
+              )}
+            </ScrollArea>
+          </>
         )}
       </div>
       

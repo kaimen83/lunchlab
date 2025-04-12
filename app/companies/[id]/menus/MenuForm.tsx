@@ -443,7 +443,7 @@ export default function MenuForm({
 
   // 1단계 렌더링
   const renderStep1 = () => (
-    <form onSubmit={form.handleSubmit(goToNextStep)} className="space-y-6">
+    <div className="space-y-6">
       <div className="space-y-4">
         <FormField
           control={form.control}
@@ -536,13 +536,14 @@ export default function MenuForm({
           취소
         </Button>
         <Button 
-          type="submit"
+          type="button"
+          onClick={() => form.handleSubmit(goToNextStep)()}
           disabled={isSubmitting}
         >
-          {isSubmitting ? '저장 중...' : mode === 'create' ? '추가' : '수정'}
+          다음 단계
         </Button>
       </div>
-    </form>
+    </div>
   );
 
   // 2단계 렌더링
@@ -672,7 +673,8 @@ export default function MenuForm({
             취소
           </Button>
           <Button 
-            type="submit"
+            type="button"
+            onClick={() => form.handleSubmit(onSubmit)()}
             disabled={isSubmitting}
           >
             {isSubmitting ? '저장 중...' : mode === 'create' ? '추가' : '수정'}

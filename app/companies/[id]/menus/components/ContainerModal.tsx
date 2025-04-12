@@ -129,8 +129,49 @@ export default function ContainerModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      if (!isOpen) {
+        // 이슈 #1241 해결: pointer-events 스타일이 남아있는 문제 해결
+        setTimeout(() => {
+          onOpenChange(false);
+          // 핵심 수정: 모달 닫힌 후 남아있는 스타일 속성 제거 및 DOM 정리
+          document.body.style.pointerEvents = '';
+          document.body.style.touchAction = '';
+          
+          try {
+            // aria-hidden 속성 제거 - 안전하게 처리
+            document.querySelectorAll('[aria-hidden="true"]').forEach(el => {
+              try {
+                if (el instanceof HTMLElement && !el.dataset.permanent && document.body.contains(el)) {
+                  el.removeAttribute('aria-hidden');
+                }
+              } catch (e) {
+                // 속성 제거 중 오류 시 무시
+              }
+            });
+          } catch (e) {
+            // 오류 발생 시 조용히 처리
+            console.warn("모달 닫기 처리 중 오류:", e);
+          }
+        }, 100);
+      } else {
+        onOpenChange(true);
+      }
+    }}>
+      <DialogContent className="sm:max-w-[500px]" onCloseAutoFocus={(event: Event) => {
+        event.preventDefault();
+        document.body.focus();
+        
+        // 이슈 #1236 해결: 터치 이벤트 차단 문제
+        document.body.style.pointerEvents = '';
+        document.body.style.touchAction = '';
+        document.documentElement.style.touchAction = '';
+        
+        // 모든 포커스 제거
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+      }}>
         <DialogHeader>
           <DialogTitle>{isEditMode ? '용기 수정' : '새 용기 추가'}</DialogTitle>
           <DialogDescription>

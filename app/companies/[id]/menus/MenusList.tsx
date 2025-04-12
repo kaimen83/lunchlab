@@ -652,8 +652,59 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
       ) : renderTableView()}
 
       {/* 메뉴 추가/수정 모달 */}
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <Dialog 
+        open={modalOpen} 
+        onOpenChange={(open) => {
+          if (!open) {
+            // 이슈 #1241 해결: pointer-events 스타일이 남아있는 문제 해결
+            // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
+            setTimeout(() => {
+              setModalOpen(false);
+              setSelectedMenu(null);
+              
+              // 핵심 수정: 모달 닫힌 후 남아있는 스타일 속성 제거 및 DOM 정리
+              document.body.style.pointerEvents = '';
+              document.body.style.touchAction = '';
+              
+              // Note: DOM 요소 직접 제거는 안전하게 처리 - React와의 충돌 방지
+              try {
+                // aria-hidden 속성 제거 - 안전하게 처리
+                document.querySelectorAll('[aria-hidden="true"]').forEach(el => {
+                  try {
+                    if (el instanceof HTMLElement && !el.dataset.permanent && document.body.contains(el)) {
+                      el.removeAttribute('aria-hidden');
+                    }
+                  } catch (e) {
+                    // 속성 제거 중 오류 시 무시
+                  }
+                });
+              } catch (e) {
+                // 오류 발생 시 조용히 처리
+                console.warn("모달 닫기 처리 중 오류:", e);
+              }
+            }, 100); // 시간을 100ms로 설정
+          } else {
+            setModalOpen(open);
+          }
+        }}
+      >
+        <DialogContent 
+          className="max-w-4xl max-h-[90vh] overflow-y-auto"
+          onCloseAutoFocus={(event: Event) => {
+            event.preventDefault();
+            document.body.focus();
+            
+            // 이슈 #1236 해결: 터치 이벤트 차단 문제
+            document.body.style.pointerEvents = '';
+            document.body.style.touchAction = '';
+            document.documentElement.style.touchAction = '';
+            
+            // 모든 포커스 제거
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>
               {modalMode === "create" ? "새 메뉴 추가" : "메뉴 수정"}
@@ -670,8 +721,59 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
       </Dialog>
 
       {/* 메뉴 재료 보기 모달 */}
-      <Dialog open={ingredientsModalOpen} onOpenChange={setIngredientsModalOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <Dialog 
+        open={ingredientsModalOpen} 
+        onOpenChange={(open) => {
+          if (!open) {
+            // 이슈 #1241 해결: pointer-events 스타일이 남아있는 문제 해결
+            // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
+            setTimeout(() => {
+              setIngredientsModalOpen(false);
+              setSelectedMenu(null);
+              
+              // 핵심 수정: 모달 닫힌 후 남아있는 스타일 속성 제거 및 DOM 정리
+              document.body.style.pointerEvents = '';
+              document.body.style.touchAction = '';
+              
+              // Note: DOM 요소 직접 제거는 안전하게 처리 - React와의 충돌 방지
+              try {
+                // aria-hidden 속성 제거 - 안전하게 처리
+                document.querySelectorAll('[aria-hidden="true"]').forEach(el => {
+                  try {
+                    if (el instanceof HTMLElement && !el.dataset.permanent && document.body.contains(el)) {
+                      el.removeAttribute('aria-hidden');
+                    }
+                  } catch (e) {
+                    // 속성 제거 중 오류 시 무시
+                  }
+                });
+              } catch (e) {
+                // 오류 발생 시 조용히 처리
+                console.warn("모달 닫기 처리 중 오류:", e);
+              }
+            }, 100); // 시간을 100ms로 설정
+          } else {
+            setIngredientsModalOpen(open);
+          }
+        }}
+      >
+        <DialogContent 
+          className="max-w-3xl max-h-[90vh] overflow-y-auto"
+          onCloseAutoFocus={(event: Event) => {
+            event.preventDefault();
+            document.body.focus();
+            
+            // 이슈 #1236 해결: 터치 이벤트 차단 문제
+            document.body.style.pointerEvents = '';
+            document.body.style.touchAction = '';
+            document.documentElement.style.touchAction = '';
+            
+            // 모든 포커스 제거
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>메뉴 상세 정보</DialogTitle>
           </DialogHeader>
@@ -688,8 +790,58 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
       </Dialog>
 
       {/* 메뉴 삭제 확인 다이얼로그 */}
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
+      <AlertDialog 
+        open={deleteConfirmOpen} 
+        onOpenChange={(open) => {
+          if (!open) {
+            // 이슈 #1241 해결: pointer-events 스타일이 남아있는 문제 해결
+            // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
+            setTimeout(() => {
+              setDeleteConfirmOpen(false);
+              setMenuToDelete(null);
+              
+              // 핵심 수정: 모달 닫힌 후 남아있는 스타일 속성 제거 및 DOM 정리
+              document.body.style.pointerEvents = '';
+              document.body.style.touchAction = '';
+              
+              // Note: DOM 요소 직접 제거는 안전하게 처리 - React와의 충돌 방지
+              try {
+                // aria-hidden 속성 제거 - 안전하게 처리
+                document.querySelectorAll('[aria-hidden="true"]').forEach(el => {
+                  try {
+                    if (el instanceof HTMLElement && !el.dataset.permanent && document.body.contains(el)) {
+                      el.removeAttribute('aria-hidden');
+                    }
+                  } catch (e) {
+                    // 속성 제거 중 오류 시 무시
+                  }
+                });
+              } catch (e) {
+                // 오류 발생 시 조용히 처리
+                console.warn("모달 닫기 처리 중 오류:", e);
+              }
+            }, 100); // 시간을 100ms로 설정
+          } else {
+            setDeleteConfirmOpen(open);
+          }
+        }}
+      >
+        <AlertDialogContent
+          onCloseAutoFocus={(event: Event) => {
+            event.preventDefault();
+            document.body.focus();
+            
+            // 이슈 #1236 해결: 터치 이벤트 차단 문제
+            document.body.style.pointerEvents = '';
+            document.body.style.touchAction = '';
+            document.documentElement.style.touchAction = '';
+            
+            // 모든 포커스 제거
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur();
+            }
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>메뉴 삭제</AlertDialogTitle>
             <AlertDialogDescription>
