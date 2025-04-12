@@ -110,6 +110,7 @@ interface Menu {
   cost_price: number;
   description?: string;
   recipe?: string;
+  code?: string;
   created_at: string;
   updated_at?: string;
   containers?: Container[];
@@ -187,7 +188,9 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
       (menu) =>
         menu.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (menu.description &&
-          menu.description.toLowerCase().includes(searchQuery.toLowerCase())),
+          menu.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (menu.code && 
+          menu.code.toLowerCase().includes(searchQuery.toLowerCase()))
     )
     .sort((a, b) => {
       const aValue = a[sortField];
@@ -518,6 +521,109 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
     </Card>
   );
 
+  // 테이블 뷰 렌더링
+  const renderTableView = () => (
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead
+              className="w-[240px] cursor-pointer"
+              onClick={() => toggleSort("name")}
+            >
+              메뉴명
+              {sortField === "name" &&
+                (sortDirection === "asc" ? (
+                  <ChevronUp className="ml-1 inline h-4 w-4" />
+                ) : (
+                  <ChevronDown className="ml-1 inline h-4 w-4" />
+                ))}
+            </TableHead>
+            <TableHead className="w-[120px]">코드</TableHead>
+            <TableHead
+              className="w-[120px] cursor-pointer text-right"
+              onClick={() => toggleSort("cost_price")}
+            >
+              원가
+              {sortField === "cost_price" &&
+                (sortDirection === "asc" ? (
+                  <ChevronUp className="ml-1 inline h-4 w-4" />
+                ) : (
+                  <ChevronDown className="ml-1 inline h-4 w-4" />
+                ))}
+            </TableHead>
+            <TableHead className="text-right">작업</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredMenus.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                {searchQuery ? "검색 결과가 없습니다." : "등록된 메뉴가 없습니다."}
+              </TableCell>
+            </TableRow>
+          ) : (
+            filteredMenus.map((menu) => (
+              <TableRow key={menu.id}>
+                <TableCell className="font-medium">
+                  <div className="flex flex-col">
+                    <span>{menu.name}</span>
+                    {menu.description && (
+                      <span className="text-xs text-muted-foreground line-clamp-1">
+                        {menu.description}
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {menu.code ? (
+                    <Badge variant="outline">{menu.code}</Badge>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">-</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  {formatCurrency(menu.cost_price)}
+                </TableCell>
+                <TableCell className="text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleViewIngredients(menu)}>
+                        <PackageOpen className="h-4 w-4 mr-2" />
+                        <span>식자재 보기</span>
+                      </DropdownMenuItem>
+                      {isOwnerOrAdmin && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleEditMenu(menu)}>
+                            <FilePen className="h-4 w-4 mr-2" />
+                            <span>수정</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-500"
+                            onClick={() => handleDeleteConfirm(menu)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            <span>삭제</span>
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* 검색 및 필터 영역 */}
@@ -543,207 +649,7 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
       {/* 메뉴 목록 */}
       {isLoading ? (
         <div className="py-12 text-center text-muted-foreground">로딩 중...</div>
-      ) : filteredMenus.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredMenus.map((menu) => (
-            <Card key={menu.id} className="overflow-hidden">
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg">
-                      <div className="flex items-center">
-                        <CookingPot className="h-4 w-4 mr-2 text-primary" />
-                        {menu.name}
-                      </div>
-                      {menu.description && (
-                        <div className="text-xs font-normal text-gray-500 mt-1">
-                          {menu.description}
-                        </div>
-                      )}
-                    </CardTitle>
-                  </div>
-                  <div className="flex space-x-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleViewIngredients(menu)}
-                      className="h-8 w-8"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    {isOwnerOrAdmin && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditMenu(menu)}
-                          className="h-8 w-8"
-                        >
-                          <FilePen className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteConfirm(menu)}
-                          className="h-8 w-8 text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                {menu.containers && menu.containers.length > 0 ? (
-                  <div className="p-4">
-                    <Accordion
-                      type="single"
-                      collapsible
-                      className="w-full"
-                    >
-                      <AccordionItem value="containers" className="border-b-0">
-                        <AccordionTrigger className="py-1 text-sm">
-                          <div className="flex items-center">
-                            <Package className="h-4 w-4 mr-2 text-slate-500" />
-                            <span>용기 및 식자재 정보</span>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <div className="space-y-4 mt-2">
-                            {menu.containers.map((container) => (
-                              <div
-                                key={container.id}
-                                className="rounded-md overflow-hidden shadow-sm border"
-                              >
-                                <div className="flex items-center justify-between bg-blue-50 p-2 border-b">
-                                  <div className="flex items-center">
-                                    <div className="mr-2 bg-white p-1 rounded-full w-6 h-6 flex items-center justify-center shadow-sm">
-                                      <Package className="h-3 w-3 text-blue-500" />
-                                    </div>
-                                    <span className="font-medium text-sm">
-                                      {container.container.name}
-                                    </span>
-                                  </div>
-                                  <Badge variant="secondary" className="bg-white">
-                                    {formatCurrency(container.ingredients_cost)}
-                                  </Badge>
-                                </div>
-
-                                {container.ingredients.length > 0 && (
-                                  <div className="p-2 text-xs bg-white">
-                                    <div className="text-gray-500 mb-2 text-[10px] flex justify-between px-1">
-                                      <span>식자재</span>
-                                      <div className="flex space-x-3">
-                                        <span>사용량</span>
-                                        <span>원가</span>
-                                      </div>
-                                    </div>
-                                    <div className="space-y-2 ml-1">
-                                      {container.ingredients
-                                        .sort((a, b) => {
-                                          const aCost =
-                                            (a.ingredient.price /
-                                              a.ingredient.package_amount) *
-                                            a.amount;
-                                          const bCost =
-                                            (b.ingredient.price /
-                                              b.ingredient.package_amount) *
-                                            b.amount;
-                                          return bCost - aCost;
-                                        })
-                                        .slice(0, expandedContainers.includes(container.id) ? container.ingredients.length : 3)
-                                        .map((item) => {
-                                          const unitPrice = item.ingredient.price / item.ingredient.package_amount;
-                                          const itemCost = unitPrice * item.amount;
-                                          return (
-                                            <div
-                                              key={item.id}
-                                              className="flex items-center justify-between border-b border-gray-100 pb-1"
-                                            >
-                                              <div className="flex items-center">
-                                                <div className="h-1 w-1 rounded-full bg-slate-300 mr-2"></div>
-                                                <span>{item.ingredient.name}</span>
-                                              </div>
-                                              <div className="flex items-center gap-4">
-                                                <span className="text-gray-600 tabular-nums">
-                                                  {item.amount} {item.ingredient.unit}
-                                                </span>
-                                                <span className="text-blue-600 tabular-nums w-14 text-right">
-                                                  {formatCurrency(itemCost)}
-                                                </span>
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                      {container.ingredients.length > 3 && !expandedContainers.includes(container.id) && (
-                                        <div 
-                                          className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            toggleContainerExpand(container.id);
-                                          }}
-                                        >
-                                          <span>+{container.ingredients.length - 3}개 더보기</span>
-                                          <ChevronDown className="h-3 w-3" />
-                                        </div>
-                                      )}
-                                      {expandedContainers.includes(container.id) && (
-                                        <div 
-                                          className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            toggleContainerExpand(container.id);
-                                          }}
-                                        >
-                                          <span>접기</span>
-                                          <ChevronUp className="h-3 w-3" />
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
-                  </div>
-                ) : (
-                  <div className="px-4 py-3 text-sm text-center text-gray-500">
-                    등록된 용기가 없습니다
-                  </div>
-                )}
-              </CardContent>
-              <CardFooter className="px-4 py-2 text-xs text-muted-foreground border-t bg-slate-50 flex justify-between">
-                <span>
-                  생성: {new Date(menu.created_at).toLocaleDateString('ko-KR')}
-                </span>
-                {menu.updated_at && (
-                  <span>
-                    수정: {new Date(menu.updated_at).toLocaleDateString('ko-KR')}
-                  </span>
-                )}
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="py-12 text-center border rounded-md">
-          <CookingPot className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-          <h3 className="text-lg font-medium mb-1">등록된 메뉴가 없습니다</h3>
-          <p className="text-muted-foreground mb-4">
-            '메뉴 추가' 버튼을 클릭하여 새 메뉴를 등록하세요.
-          </p>
-          {isOwnerOrAdmin && (
-            <Button onClick={handleAddMenu}>
-              <Plus className="mr-2 h-4 w-4" />
-              메뉴 추가
-            </Button>
-          )}
-        </div>
-      )}
+      ) : renderTableView()}
 
       {/* 메뉴 추가/수정 모달 */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>

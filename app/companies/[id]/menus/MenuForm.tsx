@@ -16,6 +16,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 // 타입 오류를 피하기 위해 바로 import 선언
 import MenuIngredientsSelector from './MenuIngredientsSelector';
@@ -64,6 +65,7 @@ const menuSchema = z.object({
   name: z.string().min(1, { message: '메뉴 이름은 필수입니다.' }),
   description: z.string().max(500, { message: '설명은 500자 이하여야 합니다.' }).optional(),
   recipe: z.string().max(2000, { message: '조리법은 2000자 이하여야 합니다.' }).optional(),
+  code: z.string().max(50, { message: '코드는 50자 이하여야 합니다.' }).optional(),
 });
 
 // 스키마에서 자동으로 타입 추론
@@ -75,6 +77,7 @@ interface Menu {
   cost_price: number;
   description?: string;
   recipe?: string;
+  code?: string;
   created_at: string;
   updated_at?: string;
 }
@@ -110,6 +113,7 @@ export default function MenuForm({
       name: '',
       description: '',
       recipe: '',
+      code: '',
     },
   });
 
@@ -143,6 +147,7 @@ export default function MenuForm({
         name: menu.name,
         description: menu.description || '',
         recipe: menu.recipe || '',
+        code: menu.code || '',
       });
       
       // 메뉴에 포함된 식재료 및 컨테이너 조회
@@ -153,6 +158,7 @@ export default function MenuForm({
         name: '',
         description: '',
         recipe: '',
+        code: '',
       });
       setSelectedIngredients([]);
       setSelectedContainers([]);
@@ -345,166 +351,179 @@ export default function MenuForm({
 
   // 폼 제출 처리
   const onSubmit = (data: MenuFormValues) => {
-    // 2단계에서 용기가 하나도 선택되지 않았다면 경고
-    if (selectedContainers.length === 0) {
+    if (selectedIngredients.length === 0) {
       toast({
-        title: '용기 필요',
-        description: '최소 하나 이상의 용기를 선택해주세요.',
+        title: '식재료 필요',
+        description: '메뉴에는 최소 하나 이상의 식재료가 필요합니다.',
         variant: 'destructive',
       });
       return;
     }
-    
+
+    if (selectedContainers.length === 0) {
+      toast({
+        title: '용기 필요',
+        description: '메뉴에는 최소 하나 이상의 용기가 필요합니다.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     
-    // API 호출 비동기 함수
     const submitForm = async () => {
       try {
-        // 메뉴 기본 정보 및 식재료 구성 데이터
-        const menuData = {
-          ...data,
-          cost: Math.round(cost),
+        // 요청 데이터 준비
+        const requestData = {
+          name: data.name,
+          description: data.description,
+          recipe: data.recipe,
+          code: data.code,
           ingredients: selectedIngredients.map(item => ({
-            id: item.ingredient_id,
+            id: item.ingredient_id
           })),
-          containers: Object.entries(containerIngredients).map(([containerId, ingredients]) => ({
-            container_id: containerId,
-            ingredients: ingredients.map(ing => ({
-              ingredient_id: ing.ingredient_id,
-              amount: ing.amount
-            }))
-          }))
+          containers: selectedContainers.map(container => {
+            return {
+              container_id: container.id,
+              ingredients: containerIngredients[container.id]?.map(item => ({
+                ingredient_id: item.ingredient_id,
+                amount: item.amount
+              })) || []
+            };
+          })
         };
-        
-        const url = mode === 'create'
+
+        // API 요청 URL 선택 (생성 또는 수정)
+        const url = mode === 'create' 
           ? `/api/companies/${companyId}/menus`
           : `/api/companies/${companyId}/menus/${menu?.id}`;
         
-        // API는 PATCH와 PUT 메서드 모두 지원하도록 변경되었습니다
-        const method = mode === 'create' ? 'POST' : 'PATCH';
+        // 요청 메서드 (생성 또는 수정)
+        const method = mode === 'create' ? 'POST' : 'PUT';
         
-        console.log(`메뉴 ${mode === 'create' ? '생성' : '수정'} 요청 중:`, {
-          url,
-          method,
-          data: menuData
-        });
-        
+        // API 요청 전송
         const response = await fetch(url, {
           method,
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(menuData),
+          body: JSON.stringify(requestData),
+        });
+
+        // 응답 처리
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || '메뉴 저장 중 오류가 발생했습니다.');
+        }
+
+        const savedMenu = await response.json();
+        
+        // 성공 토스트 메시지
+        toast({
+          title: '성공',
+          description: mode === 'create' ? '메뉴가 추가되었습니다.' : '메뉴가 수정되었습니다.',
         });
         
-        // 응답이 정상이 아니면 에러 처리
-        if (!response.ok) {
-          // 응답 본문이 유효한 JSON인지 확인
-          try {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `요청 처리 중 오류가 발생했습니다. (${response.status})`);
-          } catch (jsonError) {
-            // JSON 파싱 오류가 발생한 경우
-            throw new Error(`요청 처리 중 오류가 발생했습니다. (${response.status}): ${response.statusText}`);
-          }
-        }
-        
-        // 응답 본문이 유효한 JSON인지 확인
-        try {
-          const savedMenu = await response.json();
-          
-          toast({
-            title: mode === 'create' ? '메뉴 추가 완료' : '메뉴 수정 완료',
-            description: `${savedMenu.name} 메뉴가 ${mode === 'create' ? '추가' : '수정'}되었습니다.`,
-            variant: 'default',
-          });
-          
-          onSave(savedMenu);
-        } catch (jsonError) {
-          console.error('응답 파싱 오류:', jsonError);
-          throw new Error('서버 응답을 처리하는 중 오류가 발생했습니다.');
-        }
+        // 콜백 호출
+        onSave(savedMenu);
       } catch (error) {
         console.error('메뉴 저장 오류:', error);
         toast({
           title: '오류 발생',
-          description: error instanceof Error ? error.message : '메뉴 저장 중 오류가 발생했습니다.',
+          description: error instanceof Error ? error.message : '메뉴를 저장하는 중 오류가 발생했습니다.',
           variant: 'destructive',
         });
       } finally {
         setIsSubmitting(false);
       }
     };
-    
-    // 비동기 함수 실행
+
     submitForm();
   };
 
   // 1단계 렌더링
   const renderStep1 = () => (
-    <>
-      <FormField
-        control={form.control}
-        name="name"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>메뉴 이름</FormLabel>
-            <FormControl>
-              <Input {...field} placeholder="메뉴 이름을 입력하세요" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <FormField
-        control={form.control}
-        name="description"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>메뉴 설명</FormLabel>
-            <FormControl>
-              <Textarea
-                {...field}
-                placeholder="메뉴에 대한 설명을 입력하세요"
-                rows={2}
-                value={field.value || ''}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <FormField
-        control={form.control}
-        name="recipe"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>조리법</FormLabel>
-            <FormControl>
-              <Textarea
-                {...field}
-                placeholder="조리 방법을 입력하세요"
-                rows={4}
-                value={field.value || ''}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <div className="p-3 bg-blue-50 rounded-md border border-blue-100">
-        <Label className="text-blue-800 mb-2 block font-semibold">식재료 선택</Label>
-        <p className="text-xs text-blue-600 mb-4">사용할 식재료를 모두 선택하세요. 양은 다음 단계에서 설정합니다.</p>
-        
-        <MenuIngredientsSelector
-          companyId={companyId}
-          selectedIngredients={selectedIngredients}
-          onChange={handleIngredientsChange}
-          amountEditable={false}
+    <form onSubmit={form.handleSubmit(goToNextStep)} className="space-y-6">
+      <div className="space-y-4">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>메뉴 이름 *</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="메뉴명을 입력하세요" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
+
+        <FormField
+          control={form.control}
+          name="code"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>메뉴 코드</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="메뉴 식별 코드 (예: M001, 스파게티-1)" />
+              </FormControl>
+              <FormMessage />
+              <FormDescription>
+                메뉴를 구분하는데 사용되는 고유 코드입니다. 선택사항입니다.
+              </FormDescription>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>메뉴 설명</FormLabel>
+              <FormControl>
+                <Textarea
+                  {...field}
+                  placeholder="메뉴에 대한 설명을 입력하세요"
+                  rows={3}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="recipe"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>조리법</FormLabel>
+              <FormControl>
+                <Textarea
+                  {...field}
+                  placeholder="조리 방법을 입력하세요"
+                  rows={4}
+                  value={field.value || ''}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="p-3 bg-blue-50 rounded-md border border-blue-100">
+          <Label className="text-blue-800 mb-2 block font-semibold">식재료 선택</Label>
+          <p className="text-xs text-blue-600 mb-4">사용할 식재료를 모두 선택하세요. 양은 다음 단계에서 설정합니다.</p>
+          
+          <MenuIngredientsSelector
+            companyId={companyId}
+            selectedIngredients={selectedIngredients}
+            onChange={handleIngredientsChange}
+            amountEditable={false}
+          />
+        </div>
       </div>
 
       <div className="flex justify-end gap-2 pt-4">
@@ -517,13 +536,13 @@ export default function MenuForm({
           취소
         </Button>
         <Button 
-          type="button"
-          onClick={goToNextStep}
+          type="submit"
+          disabled={isSubmitting}
         >
-          다음 <ChevronRight className="ml-1 h-4 w-4" />
+          {isSubmitting ? '저장 중...' : mode === 'create' ? '추가' : '수정'}
         </Button>
       </div>
-    </>
+    </form>
   );
 
   // 2단계 렌더링

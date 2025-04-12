@@ -167,7 +167,7 @@ export async function POST(request: Request, context: RouteContext) {
     }
     
     const body = await request.json();
-    const { name, description, recipe, ingredients, containers } = body;
+    const { name, description, recipe, ingredients, containers, code } = body;
     
     // 필수 입력값 검증
     if (!name) {
@@ -230,6 +230,25 @@ export async function POST(request: Request, context: RouteContext) {
       }, { status: 403 });
     }
     
+    // 코드가 제공된 경우 중복 확인
+    if (code) {
+      const { data: existingMenu, error: codeCheckError } = await supabase
+        .from('menus')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('code', code)
+        .maybeSingle();
+      
+      if (codeCheckError) {
+        console.error('코드 중복 확인 오류:', codeCheckError);
+        return NextResponse.json({ error: '코드 중복 확인 중 오류가 발생했습니다.' }, { status: 500 });
+      }
+      
+      if (existingMenu) {
+        return NextResponse.json({ error: '이미 사용 중인 메뉴 코드입니다. 다른 코드를 사용해 주세요.' }, { status: 400 });
+      }
+    }
+    
     // 트랜잭션 시작 - 트리거를 우회하기 위해 RPC 호출을 하지 않고 직접 처리
     // 1. 메뉴 생성
     const { data: menu, error: menuError } = await supabase
@@ -239,6 +258,7 @@ export async function POST(request: Request, context: RouteContext) {
         name,
         description,
         recipe,
+        code, // 코드 필드 추가
         cost_price: 0 // 초기값 설정, 나중에 업데이트
       })
       .select()
