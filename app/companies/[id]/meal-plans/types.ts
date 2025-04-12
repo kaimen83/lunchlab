@@ -7,7 +7,9 @@ export interface MealPlanMenu {
     id: string;
     name: string;
     description: string | null;
-    cost_price: number;
+    menu_price_history: {
+      cost_price: number;
+    }[];
   };
   container?: {
     id: string;

@@ -119,7 +119,7 @@ export async function GET(request: Request, context: RouteContext) {
             ...menuContainer,
             menu: menu || { id: menuContainer.menu_id, name: '알 수 없는 메뉴', description: null },
             ingredients: [],
-            total_cost: menuContainer.container?.price || 0
+            total_cost: 0
           };
         }
         
@@ -132,12 +132,11 @@ export async function GET(request: Request, context: RouteContext) {
           return total + (unitPrice * item.amount);
         }, 0);
         
-        // 용기 자체 가격
+        // 용기 자체 가격 - 원가에서 제외
         const containerData = menuContainer.container as unknown as Container;
-        const containerPrice = containerData?.price || 0;
         
-        // 총 원가 = 용기 가격 + 식재료 원가
-        const totalCost = containerPrice + ingredientsCost;
+        // 총 원가 = 식재료 원가만 포함
+        const totalCost = ingredientsCost;
         
         return {
           id: menuContainer.id,
@@ -147,7 +146,7 @@ export async function GET(request: Request, context: RouteContext) {
           container: menuContainer.container,
           ingredients: ingredients || [],
           ingredients_cost: ingredientsCost,
-          container_price: containerPrice,
+          container_price: 0, // 용기 가격은 원가에 포함하지 않음
           total_cost: totalCost
         };
       })

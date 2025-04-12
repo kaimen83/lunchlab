@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
             id,
             name,
             description,
-            cost_price
+            menu_price_history(cost_price)
           ),
           container:containers(
             id,
@@ -163,7 +163,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
             id,
             name,
             description,
-            cost_price
+            menu_price_history(cost_price)
           ),
           container:containers(
             id,

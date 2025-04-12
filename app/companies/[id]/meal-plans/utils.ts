@@ -24,9 +24,11 @@ export const calculateMealPlanCost = (mealPlan: MealPlan): number => {
   return mealPlan.meal_plan_menus.reduce((totalCost, item) => {
     let itemCost = 0;
     
-    // 메뉴 비용 계산
-    if (item.menu && typeof item.menu.cost_price === 'number') {
-      itemCost += item.menu.cost_price;
+    // 메뉴 비용 계산 - menu_price_history에서 가장 최근 가격 가져오기
+    if (item.menu && item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
+      // 가장 최근 가격 기록 사용 (배열의 첫 번째 요소)
+      const latestPrice = item.menu.menu_price_history[0].cost_price;
+      itemCost += typeof latestPrice === 'number' ? latestPrice : 0;
     }
     
     // 용기 비용 추가 (있는 경우)

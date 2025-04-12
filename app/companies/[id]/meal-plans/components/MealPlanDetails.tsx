@@ -45,7 +45,9 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
           <ul className="space-y-3">
             {mealPlan.meal_plan_menus.map((item) => {
               // 메뉴와 용기 비용 계산
-              const menuCost = item.menu.cost_price || 0;
+              const menuCost = item.menu.menu_price_history && item.menu.menu_price_history.length > 0 
+                ? item.menu.menu_price_history[0].cost_price || 0 
+                : 0;
               const containerCost = item.container?.price || 0;
               const totalCost = menuCost + containerCost;
               
