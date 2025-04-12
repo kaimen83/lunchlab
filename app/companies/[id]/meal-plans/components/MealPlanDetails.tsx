@@ -44,12 +44,13 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
         ) : (
           <ul className="space-y-3">
             {mealPlan.meal_plan_menus.map((item) => {
-              // 메뉴와 용기 비용 계산
+              // 메뉴와 용기 비용 계산 - 용기 가격을 원가에 포함하지 않음
               const menuCost = item.menu.menu_price_history && item.menu.menu_price_history.length > 0 
                 ? item.menu.menu_price_history[0].cost_price || 0 
                 : 0;
+              // 용기 가격은 표시하되 총액에 포함하지 않음
               const containerCost = item.container?.price || 0;
-              const totalCost = menuCost + containerCost;
+              const totalCost = menuCost; // 용기 가격 제외
               
               return (
                 <li key={item.id} className="border-b pb-2 last:border-0 last:pb-0">
@@ -70,7 +71,7 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
                     
                     <div className="text-right">
                       <div className="font-medium">{formatCurrency(totalCost)}</div>
-                      {item.container && (
+                      {false && item.container && (
                         <div className="text-xs text-muted-foreground">
                           메뉴: {formatCurrency(menuCost)}<br />
                           용기: {formatCurrency(containerCost)}

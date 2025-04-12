@@ -31,10 +31,10 @@ export const calculateMealPlanCost = (mealPlan: MealPlan): number => {
       itemCost += typeof latestPrice === 'number' ? latestPrice : 0;
     }
     
-    // 용기 비용 추가 (있는 경우)
-    if (item.container && typeof item.container.price === 'number') {
-      itemCost += item.container.price;
-    }
+    // 용기 비용 추가하지 않음 (원가에서 제외)
+    // if (item.container && typeof item.container.price === 'number') {
+    //   itemCost += item.container.price;
+    // }
     
     return totalCost + itemCost;
   }, 0);
