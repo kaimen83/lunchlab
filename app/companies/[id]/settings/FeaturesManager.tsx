@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, ClipboardList, BookOpen, CalendarDays } from 'lucide-react';
+import { Settings, ClipboardList, BookOpen, CalendarDays, FileText } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Feature {
@@ -45,6 +45,12 @@ export default function FeaturesManager({ companyId }: { companyId: string }) {
       display_name: '식단 관리',
       description: '식단 계획 및 일정 관리',
       icon: <CalendarDays className="w-5 h-5" />
+    },
+    'cookingPlan': {
+      name: 'cookingPlan',
+      display_name: '조리계획서',
+      description: '조리 과정 및 계획 관리',
+      icon: <FileText className="w-5 h-5" />
     }
   };
 
@@ -64,7 +70,7 @@ export default function FeaturesManager({ companyId }: { companyId: string }) {
         const missingFeatures: any[] = [];
         
         // 필수 기능 목록
-        const requiredFeatures = ['settings', 'ingredients', 'menus', 'mealPlanning'];
+        const requiredFeatures = ['settings', 'ingredients', 'menus', 'mealPlanning', 'cookingPlan'];
         
         // 누락된 기능 확인
         for (const featureName of requiredFeatures) {
@@ -275,6 +281,34 @@ export default function FeaturesManager({ companyId }: { companyId: string }) {
               checked={mealPlanningFeature.is_enabled}
               disabled={updating === 'mealPlanning'}
               onCheckedChange={(checked) => handleToggleFeature('mealPlanning', checked)}
+            />
+          </div>
+        );
+      })()}
+      
+      {/* 조리계획서 기능 */}
+      {(() => {
+        const cookingPlanFeature = features.find(f => f.name === 'cookingPlan');
+        
+        // 기능이 없으면 렌더링하지 않음
+        if (!cookingPlanFeature) return null;
+        
+        return (
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="flex items-center space-x-3">
+              <div className="bg-blue-100 p-2 rounded-md text-blue-700">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-medium">조리계획서</h3>
+                <p className="text-sm text-gray-500">조리 과정 및 계획 관리</p>
+              </div>
+            </div>
+            
+            <Switch 
+              checked={cookingPlanFeature.is_enabled}
+              disabled={updating === 'cookingPlan'}
+              onCheckedChange={(checked) => handleToggleFeature('cookingPlan', checked)}
             />
           </div>
         );

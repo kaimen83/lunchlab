@@ -52,7 +52,8 @@ export function SidebarContent({ companies, isMobile = false, isSheetOpen, setIs
                 isAdmin: company.role === 'owner' || company.role === 'admin',
                 hasIngredientsFeature: isFeatureEnabled(company.id, 'ingredients'),
                 hasMenusFeature: isFeatureEnabled(company.id, 'menus'),
-                hasMealPlanningFeature: isFeatureEnabled(company.id, 'mealPlanning')
+                hasMealPlanningFeature: isFeatureEnabled(company.id, 'mealPlanning'),
+                hasCookingPlanFeature: isFeatureEnabled(company.id, 'cookingPlan')
               };
               
               return (

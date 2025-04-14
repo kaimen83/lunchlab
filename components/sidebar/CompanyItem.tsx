@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building, ChevronDown, ChevronRight, Users, ClipboardList, Settings, CalendarDays } from 'lucide-react';
+import { Building, ChevronDown, ChevronRight, Users, ClipboardList, Settings, CalendarDays, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { CompanyWithFeatures } from './types';
@@ -22,14 +22,16 @@ export function CompanyItem({ company, toggleCompany, handleLinkClick }: Company
     isAdmin,
     hasIngredientsFeature,
     hasMenusFeature,
-    hasMealPlanningFeature
+    hasMealPlanningFeature,
+    hasCookingPlanFeature
   } = company;
   
   // 디버깅용 로그 추가
   console.log(`회사 ${name}(${id}) 기능 상태:`, {
     ingredients: hasIngredientsFeature,
     menus: hasMenusFeature,
-    mealPlanning: hasMealPlanningFeature
+    mealPlanning: hasMealPlanningFeature,
+    cookingPlan: hasCookingPlanFeature
   });
 
   return (
@@ -130,6 +132,24 @@ export function CompanyItem({ company, toggleCompany, handleLinkClick }: Company
             >
               <CalendarDays className="h-3.5 w-3.5 mr-2 text-gray-400" />
               <span>식단 관리</span>
+            </Link>
+          )}
+          
+          {/* 조리계획서 메뉴 - 모든 회원에게 표시 */}
+          {hasCookingPlanFeature && (
+            <Link 
+              href={`/companies/${id}/cooking-plans`} 
+              className={cn(
+                "flex items-center px-2 py-1.5 text-sm rounded",
+                pathname === `/companies/${id}/cooking-plans` ||
+                pathname.startsWith(`/companies/${id}/cooking-plans`)
+                  ? "bg-[#1164A3] text-white" 
+                  : "hover:bg-gray-700"
+              )}
+              onClick={handleLinkClick}
+            >
+              <FileText className="h-3.5 w-3.5 mr-2 text-gray-400" />
+              <span>조리계획서</span>
             </Link>
           )}
           

@@ -103,6 +103,7 @@ export function useSidebarState(companies: Array<Company & { role: string }>) {
           const hasIngredientsFeature = data.some((feature: any) => feature.feature_name === 'ingredients');
           const hasMenusFeature = data.some((feature: any) => feature.feature_name === 'menus');
           const hasMealPlanningFeature = data.some((feature: any) => feature.feature_name === 'mealPlanning');
+          const hasCookingPlanFeature = data.some((feature: any) => feature.feature_name === 'cookingPlan');
           
           if (!hasIngredientsFeature) {
             console.warn(`회사 ID ${expandedCompanyId}에 ingredients 기능이 누락되어 있습니다.`);
@@ -145,6 +146,42 @@ export function useSidebarState(companies: Array<Company & { role: string }>) {
               }
             } catch (error) {
               console.error('mealPlanning 기능 자동 추가 실패:', error);
+            }
+          }
+          
+          if (!hasCookingPlanFeature) {
+            console.warn(`회사 ID ${expandedCompanyId}에 cookingPlan 기능이 누락되어 있습니다.`);
+            
+            // cookingPlan 기능이 누락된 경우 자동 추가 시도
+            try {
+              console.log('cookingPlan 기능 자동 추가 시도');
+              await fetch(`/api/companies/${expandedCompanyId}/features`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  featureName: 'cookingPlan',
+                  isEnabled: true
+                })
+              });
+              
+              // 성공 시 다시 기능 목록 불러오기
+              const refreshResponse = await fetch(`/api/companies/${expandedCompanyId}/features`);
+              if (refreshResponse.ok) {
+                const refreshData = await refreshResponse.json();
+                const enabledFeatures = refreshData
+                  .filter((feature: any) => feature.is_enabled)
+                  .map((feature: any) => feature.feature_name);
+                
+                setCompanyFeatures(prev => ({
+                  ...prev,
+                  [expandedCompanyId]: enabledFeatures
+                }));
+                return; // 재호출했으므로 여기서 종료
+              }
+            } catch (error) {
+              console.error('cookingPlan 기능 자동 추가 실패:', error);
             }
           }
           
@@ -222,6 +259,14 @@ export function useSidebarState(companies: Array<Company & { role: string }>) {
     if (featureName === 'mealPlanning') {
       // companyFeatures에 해당 회사의 기능이 정의되어 있지 않거나
       // mealPlanning이 정의되지 않은 경우 true 반환 (기본 활성화)
+      if (!companyFeatures[companyId]) {
+        console.log(`${companyId} 회사의 기능 정보가 아직 로드되지 않았습니다. ${featureName} 기능 임시 활성화`);
+        return true;
+      }
+    }
+    
+    // cookingPlan 기능도 누락되었어도 기본적으로 표시
+    if (featureName === 'cookingPlan') {
       if (!companyFeatures[companyId]) {
         console.log(`${companyId} 회사의 기능 정보가 아직 로드되지 않았습니다. ${featureName} 기능 임시 활성화`);
         return true;
