@@ -149,7 +149,7 @@ export default function MealPlanBasicInfo({
                 />
               </div>
               
-              <ScrollArea className="h-40 border rounded-md">
+              <ScrollArea className="h-32 sm:h-40 border rounded-md">
                 <div className="p-2">
                   {filteredContainers.length > 0 ? (
                     filteredContainers.map(container => (
@@ -162,7 +162,7 @@ export default function MealPlanBasicInfo({
                         <div className="flex-1">
                           <label htmlFor={`container-${container.id}`} className="text-sm font-medium cursor-pointer">{container.name}</label>
                           {container.description && (
-                            <p className="text-xs text-muted-foreground">{container.description}</p>
+                            <p className="text-xs text-muted-foreground line-clamp-1">{container.description}</p>
                           )}
                         </div>
                       </div>

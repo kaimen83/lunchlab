@@ -71,12 +71,14 @@ const WeekView: React.FC<WeekViewProps> = ({
           </div>
           
           {/* 아침 식단 */}
-          <div className="h-48 border-b border-gray-200 p-2 space-y-2 overflow-y-auto relative group">
-            {getMealPlansByDate(mealPlans, day, 'breakfast').map(renderMealPlanCard)}
+          <div className="h-48 border-b border-gray-200 p-2 relative group">
+            <div className="h-[90%] overflow-y-auto pr-1 space-y-2 mb-2">
+              {getMealPlansByDate(mealPlans, day, 'breakfast').map(renderMealPlanCard)}
+            </div>
             <Button 
               variant="ghost" 
               size="sm" 
-              className="absolute bottom-2 right-2 w-full max-w-[calc(100%-1rem)] opacity-40 hover:opacity-100 transition-opacity text-xs"
+              className="absolute bottom-2 right-2 w-auto opacity-40 hover:opacity-100 transition-opacity text-xs bg-white/80 rounded-full h-7 px-2"
               onClick={() => onAddMealPlan(day, 'breakfast')}
             >
               <Plus className="h-3 w-3 mr-1" /> 추가
@@ -84,12 +86,14 @@ const WeekView: React.FC<WeekViewProps> = ({
           </div>
           
           {/* 점심 식단 */} 
-          <div className="h-48 border-b border-gray-200 p-2 space-y-2 overflow-y-auto relative group">
-            {getMealPlansByDate(mealPlans, day, 'lunch').map(renderMealPlanCard)}
+          <div className="h-48 border-b border-gray-200 p-2 relative group">
+            <div className="h-[90%] overflow-y-auto pr-1 space-y-2 mb-2">
+              {getMealPlansByDate(mealPlans, day, 'lunch').map(renderMealPlanCard)}
+            </div>
             <Button 
               variant="ghost" 
               size="sm" 
-              className="absolute bottom-2 right-2 w-full max-w-[calc(100%-1rem)] opacity-40 hover:opacity-100 transition-opacity text-xs"
+              className="absolute bottom-2 right-2 w-auto opacity-40 hover:opacity-100 transition-opacity text-xs bg-white/80 rounded-full h-7 px-2"
               onClick={() => onAddMealPlan(day, 'lunch')}
             >
               <Plus className="h-3 w-3 mr-1" /> 추가
@@ -97,12 +101,14 @@ const WeekView: React.FC<WeekViewProps> = ({
           </div>
           
           {/* 저녁 식단 */} 
-          <div className="h-48 border-b border-gray-200 p-2 space-y-2 overflow-y-auto relative group">
-            {getMealPlansByDate(mealPlans, day, 'dinner').map(renderMealPlanCard)}
+          <div className="h-48 border-b border-gray-200 p-2 relative group">
+            <div className="h-[90%] overflow-y-auto pr-1 space-y-2 mb-2">
+              {getMealPlansByDate(mealPlans, day, 'dinner').map(renderMealPlanCard)}
+            </div>
             <Button 
               variant="ghost" 
               size="sm" 
-              className="absolute bottom-2 right-2 w-full max-w-[calc(100%-1rem)] opacity-40 hover:opacity-100 transition-opacity text-xs"
+              className="absolute bottom-2 right-2 w-auto opacity-40 hover:opacity-100 transition-opacity text-xs bg-white/80 rounded-full h-7 px-2"
               onClick={() => onAddMealPlan(day, 'dinner')}
             >
               <Plus className="h-3 w-3 mr-1" /> 추가
@@ -174,18 +180,20 @@ const WeekView: React.FC<WeekViewProps> = ({
                       </Badge>
                     </div>
                     
-                    <div className="flex gap-1">
-                      {breakfastPlans.map(plan => (
-                        <Button
-                          key={plan.id}
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs px-2"
-                          onClick={() => onViewMealPlan(plan)}
-                        >
-                          {plan.name}
-                        </Button>
-                      ))}
+                    <div className="flex-1 overflow-x-auto pb-1 hide-scrollbar">
+                      <div className="flex gap-1 min-w-fit">
+                        {breakfastPlans.map(plan => (
+                          <Button
+                            key={plan.id}
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs px-2 whitespace-nowrap"
+                            onClick={() => onViewMealPlan(plan)}
+                          >
+                            {plan.name}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -201,18 +209,20 @@ const WeekView: React.FC<WeekViewProps> = ({
                       </Badge>
                     </div>
                     
-                    <div className="flex gap-1">
-                      {lunchPlans.map(plan => (
-                        <Button
-                          key={plan.id}
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs px-2"
-                          onClick={() => onViewMealPlan(plan)}
-                        >
-                          {plan.name}
-                        </Button>
-                      ))}
+                    <div className="flex-1 overflow-x-auto pb-1 hide-scrollbar">
+                      <div className="flex gap-1 min-w-fit">
+                        {lunchPlans.map(plan => (
+                          <Button
+                            key={plan.id}
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs px-2 whitespace-nowrap"
+                            onClick={() => onViewMealPlan(plan)}
+                          >
+                            {plan.name}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -228,18 +238,20 @@ const WeekView: React.FC<WeekViewProps> = ({
                       </Badge>
                     </div>
                     
-                    <div className="flex gap-1">
-                      {dinnerPlans.map(plan => (
-                        <Button
-                          key={plan.id}
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs px-2"
-                          onClick={() => onViewMealPlan(plan)}
-                        >
-                          {plan.name}
-                        </Button>
-                      ))}
+                    <div className="flex-1 overflow-x-auto pb-1 hide-scrollbar">
+                      <div className="flex gap-1 min-w-fit">
+                        {dinnerPlans.map(plan => (
+                          <Button
+                            key={plan.id}
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs px-2 whitespace-nowrap"
+                            onClick={() => onViewMealPlan(plan)}
+                          >
+                            {plan.name}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}

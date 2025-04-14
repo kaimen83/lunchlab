@@ -87,7 +87,7 @@ export default function MealPlanMenuSelection({
             <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {sortedSelectedContainers.map(containerId => {
               const containerDetails = getContainerDetailsById(containerId);
               const selectedMenuId = containerMenuSelections[containerId];
@@ -99,19 +99,19 @@ export default function MealPlanMenuSelection({
               return (
                 <div 
                   key={containerId}
-                  className="flex items-center justify-between p-3 border rounded-md hover:bg-accent/10"
+                  className="flex items-center justify-between p-2 border rounded-md hover:bg-accent/10"
                 >
-                  <div className="flex-1">
-                    <div className="font-medium text-sm">{containerDetails?.name}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm truncate">{containerDetails?.name}</div>
                     {selectedMenuId ? (
-                      <div className="text-sm text-muted-foreground flex items-center mt-1">
-                        <span className="mr-2">{menuDetails?.name}</span>
+                      <div className="text-sm text-muted-foreground flex items-center mt-0.5">
+                        <span className="mr-2 truncate">{menuDetails?.name}</span>
                         <Badge variant="outline" className="text-xs">
                           {formatPrice(costInfo.total_cost)}
                         </Badge>
                       </div>
                     ) : (
-                      <Badge variant="destructive" className="text-xs mt-1">
+                      <Badge variant="destructive" className="text-xs mt-0.5">
                         메뉴 미선택
                       </Badge>
                     )}
@@ -120,9 +120,10 @@ export default function MealPlanMenuSelection({
                   <Button 
                     variant="outline" 
                     size="sm"
+                    className="ml-2 whitespace-nowrap"
                     onClick={(e) => handleOpenMenuSelect(e as MouseEvent, containerId)}
                   >
-                    {selectedMenuId ? '메뉴 변경' : '메뉴 선택'}
+                    {selectedMenuId ? '변경' : '선택'}
                   </Button>
                 </div>
               );
@@ -157,7 +158,7 @@ export default function MealPlanMenuSelection({
         </Button>
         <Button type="submit" disabled={isLoading}>
           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {initialData ? '수정' : '추가'}
+          {initialData ? '저장' : '추가'}
         </Button>
       </CardFooter>
     </Card>

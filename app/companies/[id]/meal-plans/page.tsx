@@ -435,7 +435,7 @@ export default function MealPlansPage() {
 
       {/* 식단 폼 모달 */}
       <Dialog open={showMealPlanForm} onOpenChange={setShowMealPlanForm}>
-        <DialogContent className="max-w-md md:max-w-lg">
+        <DialogContent className="max-w-md md:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{formMode === 'create' ? '새 식단 추가' : '식단 수정'}</DialogTitle>
             <DialogDescription>

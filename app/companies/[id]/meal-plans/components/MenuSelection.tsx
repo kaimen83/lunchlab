@@ -67,18 +67,18 @@ export default function MenuSelection({
         setIsOpen(open);
       }}
     >
-      <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => {
+      <DialogContent className="sm:max-w-md py-3 sm:py-4" onPointerDownOutside={(e) => {
         // 메뉴 선택 중이면 외부 클릭 이벤트 방지
         if (isSelecting) {
           e.preventDefault();
         }
       }}>
-        <DialogHeader>
-          <DialogTitle>
+        <DialogHeader className="pb-2">
+          <DialogTitle className="text-base">
             {containerName}에 담을 메뉴 선택
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 pt-4">
+        <div className="space-y-2 pt-2">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -89,7 +89,7 @@ export default function MenuSelection({
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <ScrollArea className="h-72 border rounded-md">
+          <ScrollArea className="h-52 sm:h-72 border rounded-md">
             <div className="p-2">
               {filteredMenus.length > 0 ? (
                 filteredMenus.map(menu => {

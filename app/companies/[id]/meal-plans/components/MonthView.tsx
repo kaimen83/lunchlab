@@ -72,7 +72,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                     {format(day, 'd')}
                   </div>
                   
-                  <div className="space-y-1 text-xs">
+                  <div className="space-y-1 text-xs max-h-[70px] overflow-y-auto pr-0.5">
                     {/* 아침, 점심, 저녁 식단 요약 표시 */}
                     {(['breakfast', 'lunch', 'dinner'] as const).map((mealTime) => {
                       const plans = getMealPlansByDate(mealPlans, day, mealTime);
@@ -105,7 +105,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="absolute bottom-1 right-1 w-6 h-6 p-0 opacity-40 hover:opacity-100 transition-opacity"
+                      className="absolute bottom-1 right-1 w-6 h-6 p-0 opacity-40 hover:opacity-100 transition-opacity bg-white/80"
                       onClick={() => onAddMealPlan(day)}
                     >
                       <Plus className="h-3 w-3" />
@@ -169,18 +169,20 @@ const MonthView: React.FC<MonthViewProps> = ({
                       </Badge>
                     </div>
                     
-                    <div className="flex gap-1">
-                      {getMealPlansByDate(mealPlans, day, 'breakfast').map(plan => (
-                        <Button
-                          key={plan.id}
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs px-2"
-                          onClick={() => onViewMealTimeSlot(day, 'breakfast', [plan])}
-                        >
-                          {plan.name}
-                        </Button>
-                      ))}
+                    <div className="flex-1 overflow-x-auto pb-1 hide-scrollbar">
+                      <div className="flex gap-1 min-w-fit">
+                        {getMealPlansByDate(mealPlans, day, 'breakfast').map(plan => (
+                          <Button
+                            key={plan.id}
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs px-2 whitespace-nowrap"
+                            onClick={() => onViewMealTimeSlot(day, 'breakfast', [plan])}
+                          >
+                            {plan.name}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -196,18 +198,20 @@ const MonthView: React.FC<MonthViewProps> = ({
                       </Badge>
                     </div>
                     
-                    <div className="flex gap-1">
-                      {getMealPlansByDate(mealPlans, day, 'lunch').map(plan => (
-                        <Button
-                          key={plan.id}
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs px-2"
-                          onClick={() => onViewMealTimeSlot(day, 'lunch', [plan])}
-                        >
-                          {plan.name}
-                        </Button>
-                      ))}
+                    <div className="flex-1 overflow-x-auto pb-1 hide-scrollbar">
+                      <div className="flex gap-1 min-w-fit">
+                        {getMealPlansByDate(mealPlans, day, 'lunch').map(plan => (
+                          <Button
+                            key={plan.id}
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs px-2 whitespace-nowrap"
+                            onClick={() => onViewMealTimeSlot(day, 'lunch', [plan])}
+                          >
+                            {plan.name}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -223,18 +227,20 @@ const MonthView: React.FC<MonthViewProps> = ({
                       </Badge>
                     </div>
                     
-                    <div className="flex gap-1">
-                      {getMealPlansByDate(mealPlans, day, 'dinner').map(plan => (
-                        <Button
-                          key={plan.id}
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs px-2"
-                          onClick={() => onViewMealTimeSlot(day, 'dinner', [plan])}
-                        >
-                          {plan.name}
-                        </Button>
-                      ))}
+                    <div className="flex-1 overflow-x-auto pb-1 hide-scrollbar">
+                      <div className="flex gap-1 min-w-fit">
+                        {getMealPlansByDate(mealPlans, day, 'dinner').map(plan => (
+                          <Button
+                            key={plan.id}
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs px-2 whitespace-nowrap"
+                            onClick={() => onViewMealTimeSlot(day, 'dinner', [plan])}
+                          >
+                            {plan.name}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}

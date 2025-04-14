@@ -268,18 +268,18 @@ export default function MealPlanForm({
   };
   
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-3">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="basic">기본 정보</TabsTrigger>
+          <TabsTrigger value="basic" className="text-sm py-1.5">기본 정보</TabsTrigger>
           <TabsTrigger 
             value="menus" 
             disabled={selectedContainers.length === 0}
-            className="relative"
+            className="relative text-sm py-1.5"
           >
             용기/메뉴 선택
             {selectedContainers.length > 0 && (
-              <Badge className="ml-2 bg-primary text-white">{selectedContainers.length}</Badge>
+              <Badge className="ml-1.5 bg-primary text-white text-xs">{selectedContainers.length}</Badge>
             )}
           </TabsTrigger>
         </TabsList>
