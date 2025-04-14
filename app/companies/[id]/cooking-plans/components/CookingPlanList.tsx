@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CalendarIcon, FileText, FilePlus, Trash2, FileEdit } from 'lucide-react';
+import { CalendarIcon, FileText, FilePlus, Trash2, FileEdit, X } from 'lucide-react';
 import { 
   Table, 
   TableBody, 
@@ -65,6 +65,48 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
   const [deletingDate, setDeletingDate] = useState<string | null>(null);
+  const [showCalendar, setShowCalendar] = useState<boolean>(false);
+  
+  // 캘린더 컨테이너에 대한 참조
+  const calendarRef = useRef<HTMLDivElement>(null);
+  // 캘린더 버튼에 대한 참조
+  const calendarButtonRef = useRef<HTMLButtonElement>(null);
+  
+  // 현재 컴포넌트가 마운트된 상태인지 추적
+  const isMountedRef = useRef<boolean>(true);
+  
+  useEffect(() => {
+    // 컴포넌트 마운트 시 설정
+    isMountedRef.current = true;
+    
+    // 캘린더 외부 클릭 감지 핸들러
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        calendarRef.current && 
+        !calendarRef.current.contains(event.target as Node) && 
+        calendarButtonRef.current && 
+        !calendarButtonRef.current.contains(event.target as Node)
+      ) {
+        setShowCalendar(false);
+      }
+    };
+    
+    // 이벤트 리스너 등록
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    // 컴포넌트 언마운트 시 클린업 함수
+    return () => {
+      isMountedRef.current = false;
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+  
+  // 탭 변경 시 캘린더 상태 초기화
+  useEffect(() => {
+    if (activeTab !== 'list') {
+      setShowCalendar(false);
+    }
+  }, [activeTab]);
   
   useEffect(() => {
     fetchCookingPlans();
@@ -153,9 +195,33 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
     setFilterEndDate(endOfMonth(lastMonth));
   };
   
+  // 캘린더 선택 처리
+  const handleCalendarSelect = useCallback((range: { from?: Date; to?: Date } | undefined) => {
+    if (!range || !isMountedRef.current) return;
+    
+    if (range.from) setFilterStartDate(range.from);
+    if (range.to) setFilterEndDate(range.to);
+    
+    // 캘린더 닫기
+    setTimeout(() => {
+      if (isMountedRef.current) {
+        setShowCalendar(false);
+      }
+    }, 10);
+  }, [isMountedRef]);
+  
+  // 캘린더 토글
+  const toggleCalendar = useCallback(() => {
+    setShowCalendar(prev => !prev);
+  }, []);
+  
   return (
     <div className="space-y-6">
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={(value) => {
+        // 탭 변경 전에 캘린더 닫기
+        setShowCalendar(false);
+        setActiveTab(value);
+      }}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="list">조리계획서 목록</TabsTrigger>
           <TabsTrigger value="create">새 조리계획서 작성</TabsTrigger>
@@ -174,29 +240,47 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
                   <Button variant="outline" size="sm" onClick={handleFilterLastMonth}>
                     지난 달
                   </Button>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        날짜 선택
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="end">
-                      <Calendar
-                        initialFocus
-                        mode="range"
-                        selected={{
-                          from: filterStartDate,
-                          to: filterEndDate
-                        }}
-                        onSelect={(range) => {
-                          if (range?.from) setFilterStartDate(range.from);
-                          if (range?.to) setFilterEndDate(range.to);
-                        }}
-                        locale={ko}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <div className="relative">
+                    <Button 
+                      ref={calendarButtonRef}
+                      variant="outline" 
+                      size="sm" 
+                      onClick={toggleCalendar}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      날짜 선택
+                    </Button>
+                    
+                    {showCalendar && (
+                      <div 
+                        ref={calendarRef} 
+                        className="absolute z-50 right-0 mt-2 bg-white border rounded-md shadow-md"
+                      >
+                        <div className="flex justify-between items-center p-2 border-b">
+                          <span className="text-sm font-medium">날짜 범위 선택</span>
+                          <Button 
+                            type="button"
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={() => setShowCalendar(false)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <Calendar
+                          mode="range"
+                          selected={{
+                            from: filterStartDate,
+                            to: filterEndDate
+                          }}
+                          onSelect={handleCalendarSelect}
+                          locale={ko}
+                          disabled={isLoading}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -277,8 +361,10 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
         <TabsContent value="create">
           <CookingPlanContainer 
             companyId={companyId} 
-            initialDate={selectedDate}
+            initialDate={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined}
             onComplete={() => {
+              // 탭 전환 전에 모든 캘린더 상태 초기화
+              setShowCalendar(false);
               setActiveTab('list');
               setSelectedDate(null);
               fetchCookingPlans();

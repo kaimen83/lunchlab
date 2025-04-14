@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import CookingPlanForm from './CookingPlanForm';
 import CookingPlanResult from './CookingPlanResult';
@@ -16,6 +16,18 @@ export default function CookingPlanContainer({ companyId, initialDate, onComplet
   const { toast } = useToast();
   const [cookingPlan, setCookingPlan] = useState<CookingPlan | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  
+  // 현재 컴포넌트가 마운트된 상태인지 추적
+  const isMountedRef = useRef<boolean>(true);
+  
+  // 컴포넌트 마운트/언마운트 관리
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // 식사 시간 한글화
   const getMealTimeName = (mealTime: string) => {
@@ -78,9 +90,29 @@ export default function CookingPlanContainer({ companyId, initialDate, onComplet
     window.print();
   };
 
+  // 다운로드 처리를 별도 함수로 분리
+  const downloadCSV = useCallback((csvContent: string, filename: string) => {
+    if (!isMountedRef.current) return;
+    
+    try {
+      // 데이터 URI를 사용한 다운로드 방식 (DOM 요소 추가/제거 없음)
+      const encodedCsv = encodeURIComponent(csvContent);
+      const dataUri = `data:text/csv;charset=utf-8,${encodedCsv}`;
+      
+      // 가상 링크 생성 및 클릭 (DOM에 추가하지 않음)
+      const link = document.createElement('a');
+      link.setAttribute('href', dataUri);
+      link.setAttribute('download', filename);
+      link.style.display = 'none';
+      link.click();
+    } catch (error) {
+      console.error('다운로드 오류:', error);
+    }
+  }, [isMountedRef]);
+
   // 다운로드 처리 (CSV 형식)
-  const handleDownload = () => {
-    if (!cookingPlan) return;
+  const handleDownload = useCallback(() => {
+    if (!cookingPlan || !isMountedRef.current) return;
     
     try {
       // 메뉴별 식수 CSV 데이터 생성
@@ -98,27 +130,15 @@ export default function CookingPlanContainer({ companyId, initialDate, onComplet
         ingredientsCsv += `${item.ingredient_id},${item.ingredient_name},${item.unit},${item.total_amount},${item.unit_price},${item.total_price}\n`;
       });
       
-      // 파일 생성 및 다운로드 - 메뉴
-      const menuBlob = new Blob([menuCsv], { type: 'text/csv;charset=utf-8;' });
-      const menuUrl = URL.createObjectURL(menuBlob);
-      const menuLink = document.createElement('a');
-      menuLink.href = menuUrl;
-      menuLink.setAttribute('download', `조리계획서_메뉴_${cookingPlan.date}.csv`);
-      document.body.appendChild(menuLink);
-      menuLink.click();
+      // 메뉴 CSV 다운로드
+      downloadCSV(menuCsv, `조리계획서_메뉴_${cookingPlan.date}.csv`);
       
-      // 파일 생성 및 다운로드 - 식재료
-      const ingredientsBlob = new Blob([ingredientsCsv], { type: 'text/csv;charset=utf-8;' });
-      const ingredientsUrl = URL.createObjectURL(ingredientsBlob);
-      const ingredientsLink = document.createElement('a');
-      ingredientsLink.href = ingredientsUrl;
-      ingredientsLink.setAttribute('download', `조리계획서_식재료_${cookingPlan.date}.csv`);
-      document.body.appendChild(ingredientsLink);
-      ingredientsLink.click();
-      
-      // 임시 요소 제거
-      document.body.removeChild(menuLink);
-      document.body.removeChild(ingredientsLink);
+      // 약간의 지연 후 식재료 CSV 다운로드
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          downloadCSV(ingredientsCsv, `조리계획서_식재료_${cookingPlan.date}.csv`);
+        }
+      }, 500); // 더 긴 지연 시간 사용
       
       toast({
         title: '다운로드 완료',
@@ -132,7 +152,7 @@ export default function CookingPlanContainer({ companyId, initialDate, onComplet
         variant: 'destructive',
       });
     }
-  };
+  }, [cookingPlan, isMountedRef, getMealTimeName, downloadCSV, toast]);
 
   // 다시 작성
   const handleReset = () => {

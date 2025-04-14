@@ -20,26 +20,6 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
   // 다운로드 처리 (CSV 형식)
   const handleDownload = () => {
     try {
-      // 안전하게 파일 다운로드하는 함수
-      const downloadCSV = (csvContent: string, filename: string) => {
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        
-        // 다운로드 링크 생성
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', filename);
-        
-        // 링크를 DOM에 추가하지 않고 직접 클릭 이벤트 발생
-        link.style.visibility = 'hidden';
-        link.click();
-        
-        // URL 객체 해제
-        setTimeout(() => {
-          URL.revokeObjectURL(url);
-        }, 1000);
-      };
-
       // 메뉴별 식수 CSV 데이터 생성
       let menuCsv = '식사시간,메뉴ID,메뉴명,용기명,식수\n';
       
@@ -55,9 +35,27 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
         ingredientsCsv += `${item.ingredient_id},${item.ingredient_name},${item.unit},${item.total_amount},${item.unit_price},${item.total_price}\n`;
       });
       
-      // 파일 다운로드 실행
-      downloadCSV(menuCsv, `조리계획서_메뉴_${cookingPlan.date}.csv`);
-      downloadCSV(ingredientsCsv, `조리계획서_식재료_${cookingPlan.date}.csv`);
+      // 파일 생성 및 다운로드 - 메뉴
+      const menuBlob = new Blob([menuCsv], { type: 'text/csv;charset=utf-8;' });
+      const menuUrl = URL.createObjectURL(menuBlob);
+      const menuLink = document.createElement('a');
+      menuLink.href = menuUrl;
+      menuLink.setAttribute('download', `조리계획서_메뉴_${cookingPlan.date}.csv`);
+      document.body.appendChild(menuLink);
+      menuLink.click();
+      
+      // 파일 생성 및 다운로드 - 식재료
+      const ingredientsBlob = new Blob([ingredientsCsv], { type: 'text/csv;charset=utf-8;' });
+      const ingredientsUrl = URL.createObjectURL(ingredientsBlob);
+      const ingredientsLink = document.createElement('a');
+      ingredientsLink.href = ingredientsUrl;
+      ingredientsLink.setAttribute('download', `조리계획서_식재료_${cookingPlan.date}.csv`);
+      document.body.appendChild(ingredientsLink);
+      ingredientsLink.click();
+      
+      // 임시 요소 제거
+      document.body.removeChild(menuLink);
+      document.body.removeChild(ingredientsLink);
       
       toast({
         title: '다운로드 완료',
