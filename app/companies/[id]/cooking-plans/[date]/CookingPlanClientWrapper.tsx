@@ -32,7 +32,9 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
       let ingredientsCsv = '식재료ID,식재료명,단위,필요량,단가,총 비용\n';
       
       cookingPlan.ingredient_requirements.forEach(item => {
-        ingredientsCsv += `${item.ingredient_id},${item.ingredient_name},${item.unit},${item.total_amount},${item.unit_price},${item.total_price}\n`;
+        // 단가를 "금액/단위" 형식으로 표시
+        const unitPrice = `${item.unit_price.toLocaleString()}원/${item.unit}`;
+        ingredientsCsv += `${item.ingredient_id},${item.ingredient_name},${item.unit},${item.total_amount},${unitPrice},${item.total_price.toLocaleString()}원\n`;
       });
       
       // 파일 생성 및 다운로드 - 메뉴

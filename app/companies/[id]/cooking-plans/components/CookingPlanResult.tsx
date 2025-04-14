@@ -110,6 +110,20 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
     }).format(amount);
   };
 
+  // 단가 포맷 (원/단위 형태로 표시)
+  const formatUnitPrice = (unitPrice: number, unit: string) => {
+    // 통화 형식으로 포맷
+    const formattedPrice = new Intl.NumberFormat('ko-KR', {
+      style: 'currency',
+      currency: 'KRW',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(unitPrice);
+    
+    // 단위 추가 (예: "1,000원/g")
+    return `${formattedPrice}/${unit}`;
+  };
+
   // 수량 포맷
   const formatAmount = (amount: number) => {
     return amount % 1 === 0 ? amount.toString() : amount.toFixed(1);
@@ -227,7 +241,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                       <TableCell className="text-right">
                         {formatAmount(item.total_amount)} {item.unit}
                       </TableCell>
-                      <TableCell className="text-right">{formatCurrency(item.unit_price)}</TableCell>
+                      <TableCell className="text-right">{formatUnitPrice(item.unit_price, item.unit)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(item.total_price)}</TableCell>
                     </TableRow>
                   ))}
