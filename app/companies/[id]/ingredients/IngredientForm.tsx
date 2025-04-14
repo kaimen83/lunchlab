@@ -129,6 +129,9 @@ export default function IngredientForm({
           isLoadingSuppliers={isLoadingSuppliers}
           handleSupplierSelect={handleSupplierSelect}
           addNewSupplier={addNewSupplier}
+          companyId={companyId}
+          mode={mode}
+          ingredientId={ingredient?.id}
         />
 
         <div className="flex justify-end space-x-2 pt-4">

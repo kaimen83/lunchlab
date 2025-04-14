@@ -181,6 +181,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (error) {
       console.error('식재료 추가 오류:', error);
+      
+      // 유니크 제약조건 위반 오류 (중복 코드명) 처리
+      if (error.code === '23505' && error.message?.includes('unique_company_code_name')) {
+        return Response.json({ 
+          error: '코드명 중복 오류',
+          message: '이미 사용 중인 코드명입니다. 다른 코드명을 사용해주세요.',
+          code: 'DUPLICATE_CODE_NAME',
+          details: error.message
+        }, { status: 409 });
+      }
+      
       return Response.json({ error: '식재료 추가에 실패했습니다.' }, { status: 500 });
     }
 
@@ -277,6 +288,17 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 
     if (error) {
       console.error('식재료 수정 오류:', error);
+      
+      // 유니크 제약조건 위반 오류 (중복 코드명) 처리
+      if (error.code === '23505' && error.message?.includes('unique_company_code_name')) {
+        return Response.json({ 
+          error: '코드명 중복 오류',
+          message: '이미 사용 중인 코드명입니다. 다른 코드명을 사용해주세요.',
+          code: 'DUPLICATE_CODE_NAME',
+          details: error.message
+        }, { status: 409 });
+      }
+      
       return Response.json({ error: '식재료 수정에 실패했습니다.' }, { status: 500 });
     }
 
