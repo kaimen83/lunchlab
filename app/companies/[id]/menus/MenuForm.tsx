@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/form';
 // 타입 오류를 피하기 위해 바로 import 선언
 import MenuIngredientsSelector from './MenuIngredientsSelector';
-import { Package, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Package, ChevronRight, ChevronLeft, Info } from 'lucide-react';
 import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog';
 import ContainersList from './components/ContainersList';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -638,7 +638,10 @@ export default function MenuForm({
                     </Button>
                   </CardTitle>
                   {container.description && (
-                    <CardDescription className="text-xs">{container.description}</CardDescription>
+                    <CardDescription className="text-xs mt-1 py-1 px-2 bg-blue-50 border-l-2 border-blue-300 rounded flex items-start">
+                      <Info className="text-blue-500 mr-1 h-3 w-3 mt-0.5" />
+                      {container.description}
+                    </CardDescription>
                   )}
                 </CardHeader>
               </Card>
@@ -674,7 +677,10 @@ export default function MenuForm({
                       </Button>
                     </div>
                     {container.description && (
-                      <CardDescription>{container.description}</CardDescription>
+                      <CardDescription className="text-xs mt-1 py-1 px-2 bg-amber-50 border-l-2 border-amber-300 rounded flex items-start">
+                        <Info className="text-amber-500 mr-1 h-3 w-3 mt-0.5" />
+                        {container.description}
+                      </CardDescription>
                     )}
                   </CardHeader>
                   <CardContent>
