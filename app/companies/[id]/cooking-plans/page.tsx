@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { notFound, redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { FileText } from 'lucide-react';
+import CookingPlanContainer from './components/CookingPlanContainer';
 
 export const metadata: Metadata = {
   title: '조리계획서 - LunchLab',
@@ -78,11 +79,8 @@ export default async function CookingPlanPage({ params }: CookingPlanPageProps) 
       
       {/* 채널 콘텐츠 */}
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-            <h2 className="text-xl font-semibold mb-4">조리계획서</h2>
-            <p className="text-gray-500">현재 개발 중인 기능입니다. 곧 서비스가 제공될 예정입니다.</p>
-          </div>
+        <div className="max-w-4xl mx-auto">
+          <CookingPlanContainer companyId={id} />
         </div>
       </div>
     </div>
