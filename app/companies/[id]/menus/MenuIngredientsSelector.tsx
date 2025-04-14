@@ -167,9 +167,11 @@ export default function MenuIngredientsSelector({
   };
 
   // 사용 가능한 식재료 목록 (이미 선택된 식재료 제외)
-  const availableIngredients = ingredients.filter(ingredient => 
-    !selectedIngredients.some(item => item.ingredient_id === ingredient.id)
-  );
+  const availableIngredients = ingredients
+    .filter(ingredient => 
+      !selectedIngredients.some(item => item.ingredient_id === ingredient.id)
+    )
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 
   // 양 포맷팅
   const formatAmount = (amount: number) => {

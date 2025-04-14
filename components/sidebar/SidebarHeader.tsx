@@ -29,8 +29,8 @@ export function SidebarHeader({ user, isMobile, onClose }: SidebarHeaderProps) {
       
       {/* 사용자 프로필 */}
       <div className="px-4 py-2 flex items-center">
-        <UserButton afterSignOutUrl="/sign-in" />
-        <div className="ml-2 overflow-hidden">
+        {!isMobile && <UserButton afterSignOutUrl="/sign-in" />}
+        <div className={!isMobile ? "ml-2 overflow-hidden" : "overflow-hidden"}>
           <p className="text-white text-sm truncate">
             {user?.fullName || '사용자'}
           </p>
