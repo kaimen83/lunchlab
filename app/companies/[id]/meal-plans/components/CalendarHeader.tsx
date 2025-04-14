@@ -1,5 +1,5 @@
 import React from 'react';
-import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Menu } from 'lucide-react';
+import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Menu, Calendar, CalendarDays, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
@@ -13,6 +13,7 @@ interface CalendarHeaderProps {
   onPreviousPeriod: () => void;
   onNextPeriod: () => void;
   onToday: () => void;
+  onExportToExcel: () => void;
 }
 
 const CalendarHeader: React.FC<CalendarHeaderProps> = ({
@@ -21,7 +22,8 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   onViewTypeChange,
   onPreviousPeriod,
   onNextPeriod,
-  onToday
+  onToday,
+  onExportToExcel
 }) => {
   // 현재 주의 시작일과 종료일
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
@@ -57,6 +59,16 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
+          
+          {/* PC에서만 보이는 내보내기 버튼 */}
+          <Button
+            variant="outline"
+            className="h-9 text-xs md:text-sm"
+            onClick={onExportToExcel}
+          >
+            <Download className="mr-1 h-4 w-4" />
+            <span>내보내기</span>
+          </Button>
         </div>
       </div>
       

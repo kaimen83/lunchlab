@@ -48,7 +48,7 @@ const MonthView: React.FC<MonthViewProps> = ({
   const renderDesktopView = () => (
     <div className="hidden md:block border-t border-gray-200">
       <div className="grid grid-cols-7 border-l border-gray-200">
-        {['월', '화', '수', '목', '금', '토', '일'].map((day) => (
+        {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
           <div key={day} className="text-center py-3 font-semibold text-sm border-r border-b border-gray-200 bg-gray-50">
             {day}
           </div>
@@ -160,58 +160,82 @@ const MonthView: React.FC<MonthViewProps> = ({
               <div className="px-4 py-2 space-y-2 border-t bg-gray-50">
                 {/* 아침 */}
                 {mealCounts.breakfast > 0 && (
-                  <div 
-                    className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors"
-                    onClick={() => onViewMealTimeSlot(
-                      day, 
-                      'breakfast', 
-                      getMealPlansByDate(mealPlans, day, 'breakfast')
-                    )}
-                  >
+                  <div className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors">
                     <div className="w-2 h-2 rounded-full bg-yellow-400 mr-2"></div>
                     <div className="text-sm font-medium mr-2">아침</div>
-                    <Badge variant="secondary" className="text-xs mr-auto">
-                      {mealCounts.breakfast}개
-                    </Badge>
-                    <span className="text-xs text-blue-600">자세히 &rarr;</span>
+                    <div className="text-xs mr-auto overflow-hidden">
+                      <Badge variant="secondary" className="text-xs">
+                        {mealCounts.breakfast}개
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex gap-1">
+                      {getMealPlansByDate(mealPlans, day, 'breakfast').map(plan => (
+                        <Button
+                          key={plan.id}
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs px-2"
+                          onClick={() => onViewMealTimeSlot(day, 'breakfast', [plan])}
+                        >
+                          {plan.name}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 )}
                 
                 {/* 점심 */}
                 {mealCounts.lunch > 0 && (
-                  <div 
-                    className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors"
-                    onClick={() => onViewMealTimeSlot(
-                      day, 
-                      'lunch', 
-                      getMealPlansByDate(mealPlans, day, 'lunch')
-                    )}
-                  >
+                  <div className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors">
                     <div className="w-2 h-2 rounded-full bg-green-400 mr-2"></div>
                     <div className="text-sm font-medium mr-2">점심</div>
-                    <Badge variant="secondary" className="text-xs mr-auto">
-                      {mealCounts.lunch}개
-                    </Badge>
-                    <span className="text-xs text-blue-600">자세히 &rarr;</span>
+                    <div className="text-xs mr-auto overflow-hidden">
+                      <Badge variant="secondary" className="text-xs">
+                        {mealCounts.lunch}개
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex gap-1">
+                      {getMealPlansByDate(mealPlans, day, 'lunch').map(plan => (
+                        <Button
+                          key={plan.id}
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs px-2"
+                          onClick={() => onViewMealTimeSlot(day, 'lunch', [plan])}
+                        >
+                          {plan.name}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 )}
                 
                 {/* 저녁 */}
                 {mealCounts.dinner > 0 && (
-                  <div 
-                    className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors"
-                    onClick={() => onViewMealTimeSlot(
-                      day, 
-                      'dinner', 
-                      getMealPlansByDate(mealPlans, day, 'dinner')
-                    )}
-                  >
+                  <div className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors">
                     <div className="w-2 h-2 rounded-full bg-red-400 mr-2"></div>
                     <div className="text-sm font-medium mr-2">저녁</div>
-                    <Badge variant="secondary" className="text-xs mr-auto">
-                      {mealCounts.dinner}개
-                    </Badge>
-                    <span className="text-xs text-blue-600">자세히 &rarr;</span>
+                    <div className="text-xs mr-auto overflow-hidden">
+                      <Badge variant="secondary" className="text-xs">
+                        {mealCounts.dinner}개
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex gap-1">
+                      {getMealPlansByDate(mealPlans, day, 'dinner').map(plan => (
+                        <Button
+                          key={plan.id}
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs px-2"
+                          onClick={() => onViewMealTimeSlot(day, 'dinner', [plan])}
+                        >
+                          {plan.name}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

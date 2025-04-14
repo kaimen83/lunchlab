@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { Badge } from '@/components/ui/badge';
 import { MealPlan } from '../types';
 import { calculateMealPlanCost, formatCurrency, getMealPlansByDate, getMenuNames } from '../utils';
 import { 
@@ -114,99 +115,143 @@ const WeekView: React.FC<WeekViewProps> = ({
 
   // 모바일 버전 렌더링
   const renderMobileView = () => (
-    <div className="md:hidden space-y-4">
-      <Accordion type="single" collapsible className="w-full">
-        {daysOfWeek.map((day, index) => (
-          <AccordionItem key={index} value={`day-${index}`}>
-            <AccordionTrigger className="py-3 px-4 bg-gray-50 rounded-t-md">
-              <div className="flex items-center space-x-3">
-                <div className="bg-blue-100 rounded-full w-10 h-10 flex items-center justify-center">
-                  <span className="text-lg font-bold text-blue-700">{format(day, 'd')}</span>
+    <div className="md:hidden space-y-3">
+      {daysOfWeek.map((day, index) => {
+        // 각 시간대별 식단 가져오기
+        const breakfastPlans = getMealPlansByDate(mealPlans, day, 'breakfast');
+        const lunchPlans = getMealPlansByDate(mealPlans, day, 'lunch');
+        const dinnerPlans = getMealPlansByDate(mealPlans, day, 'dinner');
+        
+        // 식단이 있는지 확인
+        const hasBreakfast = breakfastPlans.length > 0;
+        const hasLunch = lunchPlans.length > 0;
+        const hasDinner = dinnerPlans.length > 0;
+        const hasAnyMeal = hasBreakfast || hasLunch || hasDinner;
+        
+        // 오늘 날짜인지 확인
+        const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+        
+        return (
+          <div 
+            key={`mobile-day-${index}`} 
+            className={`border rounded-md overflow-hidden ${isToday ? 'border-blue-300 bg-blue-50' : ''}`}
+          >
+            <div className="px-4 py-3 flex justify-between items-center">
+              <div className="flex items-center">
+                <div className={`rounded-full w-10 h-10 flex items-center justify-center mr-3 ${
+                  isToday ? 'bg-blue-500 text-white' : 'bg-gray-100'
+                }`}>
+                  {format(day, 'd')}
                 </div>
-                <div className="text-left">
-                  <div className="font-semibold">{format(day, 'E', { locale: ko })}</div>
+                <div>
+                  <div className="font-medium">{format(day, 'E', { locale: ko })}</div>
                   <div className="text-xs text-gray-500">{format(day, 'yyyy년 MM월 dd일')}</div>
                 </div>
               </div>
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="px-2 py-1 space-y-3">
-                {/* 아침 식단 */}
-                <div className="border rounded-md overflow-hidden">
-                  <div className="bg-yellow-50 px-4 py-2 border-b flex justify-between items-center">
-                    <div className="font-medium text-sm flex items-center">
-                      <div className="w-2 h-2 rounded-full bg-yellow-400 mr-2"></div>
-                      아침
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-8 text-xs"
-                      onClick={() => onAddMealPlan(day, 'breakfast')}
-                    >
-                      <Plus className="h-3 w-3 mr-1" /> 추가
-                    </Button>
-                  </div>
-                  <div className="p-2 space-y-1 min-h-[50px]">
-                    {getMealPlansByDate(mealPlans, day, 'breakfast').length > 0 ? 
-                      getMealPlansByDate(mealPlans, day, 'breakfast').map(renderMealPlanCard) : 
-                      <div className="p-2 text-xs text-gray-400 italic">등록된 식단이 없습니다.</div>
-                    }
-                  </div>
-                </div>
-                
-                {/* 점심 식단 */}
-                <div className="border rounded-md overflow-hidden">
-                  <div className="bg-green-50 px-4 py-2 border-b flex justify-between items-center">
-                    <div className="font-medium text-sm flex items-center">
-                      <div className="w-2 h-2 rounded-full bg-green-400 mr-2"></div>
-                      점심
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-8 text-xs"
-                      onClick={() => onAddMealPlan(day, 'lunch')}
-                    >
-                      <Plus className="h-3 w-3 mr-1" /> 추가
-                    </Button>
-                  </div>
-                  <div className="p-2 space-y-1 min-h-[50px]">
-                    {getMealPlansByDate(mealPlans, day, 'lunch').length > 0 ? 
-                      getMealPlansByDate(mealPlans, day, 'lunch').map(renderMealPlanCard) : 
-                      <div className="p-2 text-xs text-gray-400 italic">등록된 식단이 없습니다.</div>
-                    }
-                  </div>
-                </div>
-                
-                {/* 저녁 식단 */}
-                <div className="border rounded-md overflow-hidden">
-                  <div className="bg-red-50 px-4 py-2 border-b flex justify-between items-center">
-                    <div className="font-medium text-sm flex items-center">
-                      <div className="w-2 h-2 rounded-full bg-red-400 mr-2"></div>
-                      저녁
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-8 text-xs"
-                      onClick={() => onAddMealPlan(day, 'dinner')}
-                    >
-                      <Plus className="h-3 w-3 mr-1" /> 추가
-                    </Button>
-                  </div>
-                  <div className="p-2 space-y-1 min-h-[50px]">
-                    {getMealPlansByDate(mealPlans, day, 'dinner').length > 0 ? 
-                      getMealPlansByDate(mealPlans, day, 'dinner').map(renderMealPlanCard) : 
-                      <div className="p-2 text-xs text-gray-400 italic">등록된 식단이 없습니다.</div>
-                    }
-                  </div>
-                </div>
+              
+              <div className="flex gap-1">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-xs h-8"
+                  onClick={() => onAddMealPlan(day, 'lunch')} // 기본값으로 점심 선택
+                >
+                  <Plus className="h-3 w-3 mr-1" /> 식단 추가
+                </Button>
               </div>
-            </AccordionContent>
-          </AccordionItem>
-        ))}
-      </Accordion>
+            </div>
+            
+            {hasAnyMeal ? (
+              <div className="px-4 py-2 space-y-2 border-t bg-gray-50">
+                {/* 아침 */}
+                {hasBreakfast && (
+                  <div className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors">
+                    <div className="w-2 h-2 rounded-full bg-yellow-400 mr-2"></div>
+                    <div className="text-sm font-medium mr-2">아침</div>
+                    <div className="text-xs mr-auto overflow-hidden">
+                      <Badge variant="secondary" className="text-xs">
+                        {breakfastPlans.length}개
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex gap-1">
+                      {breakfastPlans.map(plan => (
+                        <Button
+                          key={plan.id}
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs px-2"
+                          onClick={() => onViewMealPlan(plan)}
+                        >
+                          {plan.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* 점심 */}
+                {hasLunch && (
+                  <div className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors">
+                    <div className="w-2 h-2 rounded-full bg-green-400 mr-2"></div>
+                    <div className="text-sm font-medium mr-2">점심</div>
+                    <div className="text-xs mr-auto overflow-hidden">
+                      <Badge variant="secondary" className="text-xs">
+                        {lunchPlans.length}개
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex gap-1">
+                      {lunchPlans.map(plan => (
+                        <Button
+                          key={plan.id}
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs px-2"
+                          onClick={() => onViewMealPlan(plan)}
+                        >
+                          {plan.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* 저녁 */}
+                {hasDinner && (
+                  <div className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors">
+                    <div className="w-2 h-2 rounded-full bg-red-400 mr-2"></div>
+                    <div className="text-sm font-medium mr-2">저녁</div>
+                    <div className="text-xs mr-auto overflow-hidden">
+                      <Badge variant="secondary" className="text-xs">
+                        {dinnerPlans.length}개
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex gap-1">
+                      {dinnerPlans.map(plan => (
+                        <Button
+                          key={plan.id}
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs px-2"
+                          onClick={() => onViewMealPlan(plan)}
+                        >
+                          {plan.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="px-4 py-3 border-t text-xs text-gray-400 italic">
+                등록된 식단이 없습니다.
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 

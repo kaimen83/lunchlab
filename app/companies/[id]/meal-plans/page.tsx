@@ -14,6 +14,7 @@ import CalendarHeader from './components/CalendarHeader';
 import { MealPlan, ViewType, FormMode } from './types';
 import { getMealTimeName } from './utils';
 import MealPlanListModal from './components/MealPlanListModal';
+import { exportWeeklyMealPlans, exportMonthlyMealPlans } from './utils/exportExcel';
 
 // 문제가 있는 컴포넌트는 타입 정의 문제를 회피하기 위해 type assertion 사용
 const MealPlanForm = require('./components/MealPlanForm').default as React.FC<{
@@ -46,6 +47,26 @@ export default function MealPlansPage() {
   const [selectedMealTime, setSelectedMealTime] = useState<'breakfast' | 'lunch' | 'dinner'>('lunch');
   const [selectedPlansForSlot, setSelectedPlansForSlot] = useState<MealPlan[] | null>(null);
   const [showMealPlanListModal, setShowMealPlanListModal] = useState<boolean>(false);
+  const [companyName, setCompanyName] = useState<string>('');
+
+  // 회사 정보 가져오기
+  useEffect(() => {
+    const fetchCompanyInfo = async () => {
+      try {
+        const response = await fetch(`/api/companies/${companyId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setCompanyName(data.name || '회사');
+        }
+      } catch (error) {
+        console.error('회사 정보 가져오기 오류:', error);
+      }
+    };
+    
+    if (companyId) {
+      fetchCompanyInfo();
+    }
+  }, [companyId]);
 
   // 페이지 로드 시 식단 목록 가져오기
   useEffect(() => {
@@ -280,6 +301,22 @@ export default function MealPlansPage() {
     setViewType(type);
   };
 
+  // 엑셀로 내보내기
+  const handleExportToExcel = () => {
+    if (viewType === 'week') {
+      // 주간 식단표 내보내기
+      exportWeeklyMealPlans(daysOfWeek, mealPlans, companyName);
+    } else {
+      // 월간 식단표 내보내기
+      exportMonthlyMealPlans(getMonthWeeks(), mealPlans, companyName, currentWeek.getMonth());
+    }
+    
+    toast({
+      title: '내보내기 완료',
+      description: '엑셀 파일이 다운로드 되었습니다.'
+    });
+  };
+
   // 특정 시간대 식단 목록 보기
   const handleViewMealTimeSlot = (date: Date, mealTime: 'breakfast' | 'lunch' | 'dinner', plans: MealPlan[]) => {
     setSelectedDate(date);
@@ -301,17 +338,27 @@ export default function MealPlansPage() {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     
-    // 첫 주의 시작일 (월요일부터 시작)
-    let weekStart = startOfWeek(firstDay, { weekStartsOn: 1 });
+    // 달력 표시에 필요한 이전 달의 날짜들을 포함 (첫째 주 채우기 위함)
+    // 첫날의 요일을 기준으로 필요한 이전 달의 날짜들을 계산
+    const firstDayOfWeek = firstDay.getDay(); // 0: 일요일, 1: 월요일, ..., 6: 토요일
+    let startDate = new Date(firstDay);
     
-    // 월 뷰의 표시 날짜가 전월이면 현재 월의 1일로 조정
-    if (weekStart.getMonth() !== month) {
-      weekStart = firstDay;
+    // 일요일(0)부터 시작하는 달력을 위해 날짜 조정
+    if (firstDayOfWeek > 0) {
+      startDate.setDate(firstDay.getDate() - firstDayOfWeek);
     }
     
-    // 날짜 범위 계산 (마지막 날짜를 포함한 전체 주)
-    const endDate = endOfWeek(lastDay, { weekStartsOn: 1 });
-    const days = eachDayOfInterval({ start: weekStart, end: endDate });
+    // 마지막 주를 채우기 위한 다음 달의 날짜 계산
+    const lastDayOfWeek = lastDay.getDay();
+    let endDate = new Date(lastDay);
+    
+    // 토요일(6)로 끝나지 않는 경우 다음 달 날짜 추가
+    if (lastDayOfWeek < 6) {
+      endDate.setDate(lastDay.getDate() + (6 - lastDayOfWeek));
+    }
+    
+    // 시작일부터 종료일까지의 모든 날짜 배열 생성
+    const days = eachDayOfInterval({ start: startDate, end: endDate });
     
     // 주 단위로 분할
     const weeks: Date[][] = [];
@@ -320,7 +367,8 @@ export default function MealPlansPage() {
     days.forEach((day, index) => {
       week.push(day);
       
-      if ((index + 1) % 7 === 0 || index === days.length - 1) {
+      // 토요일(6)마다 또는 마지막 날짜에 새로운 주 추가
+      if (day.getDay() === 6 || index === days.length - 1) {
         weeks.push([...week]);
         week = [];
       }
@@ -338,6 +386,7 @@ export default function MealPlansPage() {
         onPreviousPeriod={handlePreviousPeriod}
         onNextPeriod={handleNextPeriod}
         onToday={handleGoToToday}
+        onExportToExcel={handleExportToExcel}
       />
       
       <Card className="shadow-sm">
