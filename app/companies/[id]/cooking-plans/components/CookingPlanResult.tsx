@@ -18,6 +18,7 @@ interface CookingPlanResultProps {
 export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: CookingPlanResultProps) {
   // 식사 시간별로 그룹화
   const menusByMealTime = cookingPlan.menu_portions.reduce((acc, menu) => {
+    // meal_time이 없을 경우 '기타'로 처리
     const mealTime = menu.meal_time || '기타';
     
     if (!acc[mealTime]) {
@@ -37,6 +38,9 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
       // meal_plan_id가 있는 경우에만 처리
       if (menu.meal_plan_id) {
         mealPlanHeadcounts.set(menu.meal_plan_id, menu.headcount);
+      } else {
+        // meal_plan_id가 없는 경우 menu_id를 키로 사용
+        mealPlanHeadcounts.set(menu.menu_id, menu.headcount);
       }
     });
     

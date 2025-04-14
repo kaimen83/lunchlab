@@ -64,15 +64,83 @@ export async function GET(request: NextRequest, context: RouteContext) {
     
     const searchParams = request.nextUrl.searchParams;
     const date = searchParams.get('date');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
     
+    const supabase = createServerSupabaseClient();
+    
+    // date 파라미터가 없고 startDate, endDate가 있는 경우: 목록 조회
+    if (!date && (startDate || endDate)) {
+      let query = supabase
+        .from('meal_portions')
+        .select(`
+          id,
+          date,
+          headcount,
+          meal_plan_id,
+          meal_plans:meal_plans!meal_plan_id(
+            id,
+            name,
+            meal_time
+          )
+        `)
+        .eq('company_id', companyId)
+        .order('date', { ascending: false });
+      
+      if (startDate) {
+        query = query.gte('date', startDate);
+      }
+      
+      if (endDate) {
+        query = query.lte('date', endDate);
+      }
+      
+      const { data: portions, error } = await query;
+      
+      if (error) {
+        console.error('조리계획서 목록 조회 오류:', error);
+        return NextResponse.json(
+          { error: '조리계획서 목록을 조회하는데 실패했습니다.' },
+          { status: 500 }
+        );
+      }
+      
+      // 날짜별로 그룹화
+      const dateGroups: Record<string, any> = {};
+      portions?.forEach(portion => {
+        if (!dateGroups[portion.date]) {
+          dateGroups[portion.date] = {
+            date: portion.date,
+            meal_times: new Set(),
+            total_headcount: 0,
+          };
+        }
+        
+        // 식사 시간 추가 (meal_plans가 있는 경우)
+        if (portion.meal_plans && portion.meal_plans.meal_time) {
+          dateGroups[portion.date].meal_times.add(portion.meal_plans.meal_time);
+        }
+        
+        // 총 식수 누적
+        dateGroups[portion.date].total_headcount += portion.headcount;
+      });
+      
+      // Set을 배열로 변환
+      const result = Object.values(dateGroups).map(group => ({
+        ...group,
+        meal_times: Array.from(group.meal_times as Set<string>)
+      }));
+      
+      return NextResponse.json(result);
+    }
+    
+    // date 파라미터가 없는 경우 (그리고 startDate, endDate도 없는 경우): 오류 반환
     if (!date) {
       return NextResponse.json(
         { error: '날짜 파라미터가 필요합니다.' },
         { status: 400 }
       );
     }
-    
-    const supabase = createServerSupabaseClient();
     
     // 해당 날짜의 식수 계획 조회
     const { data: mealPortions, error: portionsError } = await supabase
@@ -175,7 +243,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           headcount,
           container_id: container?.id || null,
           container_name: container?.name || null,
-          meal_time: mealPlan.meal_time, // 식사 시간 정보 추가
+          meal_time: mealPlan.meal_time || '기타', // 식사 시간 정보가 없을 경우 '기타'로 지정
           meal_plan_id: mealPlan.id      // 식단 ID 추가
         });
         
@@ -339,6 +407,83 @@ export async function POST(request: NextRequest, context: RouteContext) {
     console.error('조리계획서 생성 오류:', error);
     return NextResponse.json(
       { error: '조리계획서를 생성하는데 실패했습니다.' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE: 조리계획서 삭제
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  try {
+    const { id: companyId } = await context.params;
+    const { userId } = await auth();
+    
+    if (!userId) {
+      return NextResponse.json(
+        { error: '인증되지 않은 요청입니다.' },
+        { status: 401 }
+      );
+    }
+    
+    const searchParams = request.nextUrl.searchParams;
+    const date = searchParams.get('date');
+    
+    if (!date) {
+      return NextResponse.json(
+        { error: '날짜 파라미터가 필요합니다.' },
+        { status: 400 }
+      );
+    }
+    
+    const supabase = createServerSupabaseClient();
+    
+    // 회사 멤버십 확인
+    const { data: membership, error: membershipError } = await supabase
+      .from('company_memberships')
+      .select('role')
+      .eq('company_id', companyId)
+      .eq('user_id', userId)
+      .single();
+    
+    if (membershipError || !membership) {
+      return NextResponse.json(
+        { error: '해당 회사에 접근 권한이 없습니다.' },
+        { status: 403 }
+      );
+    }
+    
+    // 관리자 또는 소유자만 삭제 가능
+    if (membership.role !== 'owner' && membership.role !== 'admin') {
+      return NextResponse.json(
+        { error: '조리계획서를 삭제할 권한이 없습니다.' },
+        { status: 403 }
+      );
+    }
+    
+    // 해당 날짜의 식수 계획 삭제
+    const { error: deleteError } = await supabase
+      .from('meal_portions')
+      .delete()
+      .eq('company_id', companyId)
+      .eq('date', date);
+    
+    if (deleteError) {
+      console.error('조리계획서 삭제 오류:', deleteError);
+      return NextResponse.json(
+        { error: '조리계획서를 삭제하는데 실패했습니다.' },
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json(
+      { message: '조리계획서가 성공적으로 삭제되었습니다.' },
+      { status: 200 }
+    );
+    
+  } catch (error) {
+    console.error('조리계획서 삭제 오류:', error);
+    return NextResponse.json(
+      { error: '조리계획서를 삭제하는데 실패했습니다.' },
       { status: 500 }
     );
   }

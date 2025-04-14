@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { notFound, redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { FileText } from 'lucide-react';
-import CookingPlanContainer from './components/CookingPlanContainer';
+import CookingPlanList from './components/CookingPlanList';
 
 export const metadata: Metadata = {
   title: '조리계획서 - LunchLab',
@@ -80,7 +80,7 @@ export default async function CookingPlanPage({ params }: CookingPlanPageProps) 
       {/* 채널 콘텐츠 */}
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-4xl mx-auto">
-          <CookingPlanContainer companyId={id} />
+          <CookingPlanList companyId={id} />
         </div>
       </div>
     </div>

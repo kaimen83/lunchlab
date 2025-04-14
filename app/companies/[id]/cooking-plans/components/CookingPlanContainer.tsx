@@ -8,9 +8,11 @@ import { CookingPlan, CookingPlanFormData } from '../types';
 
 interface CookingPlanContainerProps {
   companyId: string;
+  initialDate?: string;
+  onComplete?: () => void;
 }
 
-export default function CookingPlanContainer({ companyId }: CookingPlanContainerProps) {
+export default function CookingPlanContainer({ companyId, initialDate, onComplete }: CookingPlanContainerProps) {
   const { toast } = useToast();
   const [cookingPlan, setCookingPlan] = useState<CookingPlan | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -53,6 +55,11 @@ export default function CookingPlanContainer({ companyId }: CookingPlanContainer
       
       const cookingPlanData = await fetchResponse.json();
       setCookingPlan(cookingPlanData);
+      
+      // 완료 콜백 함수 호출
+      if (onComplete) {
+        onComplete();
+      }
       
     } catch (error) {
       console.error('조리계획서 생성 오류:', error);
@@ -154,6 +161,7 @@ export default function CookingPlanContainer({ companyId }: CookingPlanContainer
         <CookingPlanForm
           companyId={companyId}
           onSubmit={handleFormSubmit}
+          initialDate={initialDate}
         />
       )}
     </div>
