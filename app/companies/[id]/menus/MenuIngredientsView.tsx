@@ -83,7 +83,11 @@ export default function MenuIngredientsView({ companyId, menuId }: MenuIngredien
 
   // 금액 포맷팅
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(amount);
+    return new Intl.NumberFormat('ko-KR', { 
+      style: 'currency', 
+      currency: 'KRW', 
+      maximumFractionDigits: 1 
+    }).format(amount);
   };
 
   // 용기별 식재료 테이블 렌더링

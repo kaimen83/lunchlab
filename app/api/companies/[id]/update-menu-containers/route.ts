@@ -177,7 +177,7 @@ export async function POST(request: Request, context: RouteContext) {
         await supabase
           .from('menus')
           .update({ 
-            cost_price: Math.round(totalCost),
+            cost_price: parseFloat(totalCost.toFixed(1)),
             updated_at: new Date().toISOString()
           })
           .eq('id', menuId);
@@ -187,7 +187,7 @@ export async function POST(request: Request, context: RouteContext) {
           .from('menu_price_history')
           .insert({
             menu_id: menuId,
-            cost_price: Math.round(totalCost),
+            cost_price: parseFloat(totalCost.toFixed(1)),
             recorded_at: new Date().toISOString()
           });
       }

@@ -320,9 +320,13 @@ export default function MenuForm({
         }
       });
       
-      newContainerCosts[containerId] = containerCost;
+      // 소수점 첫째자리까지 계산 (반올림)
+      newContainerCosts[containerId] = parseFloat(containerCost.toFixed(1));
       totalCost += containerCost;
     });
+    
+    // 총 원가도 소수점 첫째자리까지 계산 (반올림)
+    totalCost = parseFloat(totalCost.toFixed(1));
     
     // 용기별 원가와 총 원가 업데이트
     setContainerCosts(newContainerCosts);
@@ -453,7 +457,7 @@ export default function MenuForm({
         // 메뉴 기본 정보 및 식재료 구성 데이터
         const menuData = {
           ...data,
-          cost: Math.round(cost),
+          cost: parseFloat(cost.toFixed(1)),
           ingredients: selectedIngredients.map(item => ({
             id: item.ingredient_id,
           })),
@@ -664,7 +668,7 @@ export default function MenuForm({
                       <div>
                         <CardTitle className="text-md">{container.name}</CardTitle>
                         <p className="text-sm text-blue-600 font-medium">
-                          원가: {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(containerCosts[container.id] || 0)}
+                          원가: {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW', maximumFractionDigits: 1 }).format(containerCosts[container.id] || 0)}
                         </p>
                       </div>
                       <Button 
@@ -696,7 +700,7 @@ export default function MenuForm({
                               <p className="font-medium">{item.ingredient.name}</p>
                               <p className="text-xs text-slate-500">
                                 {item.ingredient.package_amount} {item.ingredient.unit} / 
-                                {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(item.ingredient.price)}
+                                {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW', maximumFractionDigits: 1 }).format(item.ingredient.price)}
                               </p>
                             </div>
                             <div className="flex items-center space-x-2">
@@ -711,6 +715,11 @@ export default function MenuForm({
                                   item.ingredient_id,
                                   parseFloat(e.target.value)
                                 )}
+                                onFocus={(e) => {
+                                  if (e.target.value === '0') {
+                                    e.target.value = '';
+                                  }
+                                }}
                               />
                               <span className="text-sm w-10">{item.ingredient.unit}</span>
                             </div>

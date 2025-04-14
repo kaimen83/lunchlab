@@ -295,6 +295,7 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
     return new Intl.NumberFormat("ko-KR", {
       style: "currency",
       currency: "KRW",
+      maximumFractionDigits: 1
     }).format(amount);
   };
 
