@@ -23,9 +23,10 @@ interface CookingPlanFormProps {
   companyId: string;
   initialDate?: string;
   onSubmit: (data: CookingPlanFormData) => Promise<void>;
+  isEditing?: boolean;
 }
 
-export default function CookingPlanForm({ companyId, initialDate, onSubmit }: CookingPlanFormProps) {
+export default function CookingPlanForm({ companyId, initialDate, onSubmit, isEditing = false }: CookingPlanFormProps) {
   const { toast } = useToast();
   const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
   const [mealPortions, setMealPortions] = useState<Map<string, number>>(new Map());
@@ -117,6 +118,29 @@ export default function CookingPlanForm({ companyId, initialDate, onSubmit }: Co
         data.forEach((plan: MealPlan) => {
           initialPortions.set(plan.id, 0);
         });
+        
+        // 수정 모드일 경우 기존 식수 데이터 불러오기
+        if (isEditing && selectedDate) {
+          try {
+            const cookingPlanResponse = await fetch(`/api/companies/${companyId}/cooking-plans?date=${selectedDate}`);
+            
+            if (cookingPlanResponse.ok) {
+              const cookingPlanData = await cookingPlanResponse.json();
+              
+              // 기존 식수 데이터 설정
+              if (cookingPlanData?.meal_portions && cookingPlanData.meal_portions.length > 0) {
+                cookingPlanData.meal_portions.forEach((portion: any) => {
+                  if (initialPortions.has(portion.meal_plan_id)) {
+                    initialPortions.set(portion.meal_plan_id, portion.headcount);
+                  }
+                });
+              }
+            }
+          } catch (error) {
+            console.error('기존 조리계획서 조회 오류:', error);
+          }
+        }
+        
         setMealPortions(initialPortions);
       } catch (error) {
         console.error('식단 조회 오류:', error);
@@ -131,7 +155,7 @@ export default function CookingPlanForm({ companyId, initialDate, onSubmit }: Co
     };
     
     fetchMealPlans();
-  }, [selectedDate, companyId, toast]);
+  }, [selectedDate, companyId, toast, isEditing]);
 
   // 식수 입력 처리
   const handlePortionChange = (mealPlanId: string, value: string) => {
@@ -177,10 +201,12 @@ export default function CookingPlanForm({ companyId, initialDate, onSubmit }: Co
       // 폼 데이터 구성
       const formData: CookingPlanFormData = {
         date: selectedDate,
-        meal_portions: Array.from(mealPortions.entries()).map(([meal_plan_id, headcount]) => ({
-          meal_plan_id,
-          headcount
-        }))
+        meal_portions: Array.from(mealPortions.entries())
+          .filter(([_, headcount]) => headcount > 0) // 식수가 0인 항목은 제외
+          .map(([meal_plan_id, headcount]) => ({
+            meal_plan_id,
+            headcount
+          }))
       };
       
       await onSubmit(formData);
@@ -189,14 +215,14 @@ export default function CookingPlanForm({ companyId, initialDate, onSubmit }: Co
       const dateForDisplay = new Date(selectedDate);
       
       toast({
-        title: '조리계획서가 생성되었습니다',
-        description: `${format(dateForDisplay, 'yyyy년 MM월 dd일')} 조리계획서가 생성되었습니다.`,
+        title: isEditing ? '조리계획서가 수정되었습니다' : '조리계획서가 생성되었습니다',
+        description: `${format(dateForDisplay, 'yyyy년 MM월 dd일')} 조리계획서가 ${isEditing ? '수정' : '생성'}되었습니다.`,
       });
     } catch (error) {
-      console.error('조리계획서 생성 오류:', error);
+      console.error(isEditing ? '조리계획서 수정 오류:' : '조리계획서 생성 오류:', error);
       toast({
-        title: '조리계획서 생성 실패',
-        description: '조리계획서를 생성하는데 실패했습니다.',
+        title: isEditing ? '조리계획서 수정 실패' : '조리계획서 생성 실패',
+        description: '조리계획서를 처리하는데 실패했습니다.',
         variant: 'destructive',
       });
     } finally {
@@ -220,101 +246,127 @@ export default function CookingPlanForm({ companyId, initialDate, onSubmit }: Co
 
   return (
     <div className="space-y-6">
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>에러</AlertTitle>
+          <AlertDescription>
+            {error}
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <Card>
         <CardHeader>
-          <CardTitle>조리계획서 생성</CardTitle>
+          <CardTitle>{isEditing ? '조리계획서 수정' : '새 조리계획서 작성'}</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* 날짜 선택 */}
-          <div className="space-y-2">
-            <Label>날짜 선택</Label>
-            <div className="relative">
-              <Button
-                ref={calendarButtonRef}
-                type="button"
-                variant="outline"
-                className="w-full justify-start text-left font-normal"
-                onClick={toggleCalendar}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {selectedDate ? format(new Date(selectedDate), 'PPP', { locale: ko }) : '날짜를 선택하세요'}
-              </Button>
-              
-              {showCalendar && (
-                <div 
-                  ref={calendarRef} 
-                  className="absolute z-50 mt-2 bg-white border rounded-md shadow-md"
+        <CardContent>
+          <div className="space-y-8">
+            {/* 날짜 선택 */}
+            <div>
+              <Label htmlFor="plan-date">날짜 선택</Label>
+              <div className="flex mt-2 relative">
+                <Button
+                  ref={calendarButtonRef}
+                  type="button"
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !selectedDate && "text-muted-foreground"
+                  )}
+                  onClick={() => setShowCalendar(true)}
+                  disabled={isEditing} // 수정 모드에서는 날짜 변경 비활성화
                 >
-                  <div className="flex justify-between items-center p-2 border-b">
-                    <span className="text-sm font-medium">날짜 선택</span>
-                    <Button 
-                      type="button"
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-8 w-8 p-0"
-                      onClick={() => setShowCalendar(false)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {selectedDate ? (
+                    format(dateObj, "yyyy년 MM월 dd일 (EEEE)", { locale: ko })
+                  ) : (
+                    <span>날짜를 선택하세요</span>
+                  )}
+                </Button>
+                
+                {showCalendar && (
+                  <div 
+                    ref={calendarRef} 
+                    className="absolute z-50 mt-2 bg-white border rounded-md shadow-md"
+                  >
+                    <div className="flex justify-between items-center p-2 border-b">
+                      <span className="text-sm font-medium">날짜 선택</span>
+                      <Button 
+                        type="button"
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0"
+                        onClick={() => setShowCalendar(false)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <Calendar
+                      mode="single"
+                      selected={dateObj}
+                      onSelect={handleDateSelect}
+                      locale={ko}
+                      disabled={isLoading || isSubmitting}
+                    />
                   </div>
-                  <Calendar
-                    mode="single"
-                    selected={dateObj}
-                    onSelect={handleDateSelect}
-                    locale={ko}
-                    disabled={isSubmitting}
-                  />
-                </div>
+                )}
+              </div>
+            </div>
+            
+            {/* 식단별 식수 입력 */}
+            <div>
+              <h3 className="text-lg font-medium mb-4">식단별 식수 입력</h3>
+              
+              {isLoading ? (
+                <p className="text-center text-gray-500 py-4">식단 정보를 불러오는 중...</p>
+              ) : mealPlans.length === 0 ? (
+                <p className="text-center text-yellow-600 py-4">
+                  선택한 날짜에 등록된 식단이 없습니다.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>식사 시간</TableHead>
+                      <TableHead>식단명</TableHead>
+                      <TableHead className="text-right">식수 (명)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {mealPlans.map((mealPlan) => (
+                      <TableRow key={mealPlan.id}>
+                        <TableCell>
+                          {getMealTimeName(mealPlan.meal_time)}
+                        </TableCell>
+                        <TableCell>
+                          {mealPlan.name}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            type="number"
+                            min="0"
+                            value={mealPortions.get(mealPlan.id) || 0}
+                            onChange={(e) => handlePortionChange(mealPlan.id, e.target.value)}
+                            className="w-24 ml-auto text-right"
+                            disabled={isSubmitting}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </div>
-          </div>
-          
-          {/* 식단별 식수 입력 */}
-          <div className="space-y-2">
-            <Label>식단별 식수 입력</Label>
-            {isLoading ? (
-              <div className="py-4 text-center text-sm text-gray-500">식단 정보를 불러오는 중...</div>
-            ) : mealPlans.length === 0 ? (
-              <div className="py-4 text-center text-sm text-gray-500">
-                선택한 날짜에 등록된 식단이 없습니다.
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>식사 시간</TableHead>
-                    <TableHead>식단명</TableHead>
-                    <TableHead className="text-right">식수 (명)</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mealPlans.map((plan) => (
-                    <TableRow key={plan.id}>
-                      <TableCell>{getMealTimeName(plan.meal_time)}</TableCell>
-                      <TableCell className="font-medium">{plan.name}</TableCell>
-                      <TableCell className="text-right">
-                        <Input
-                          type="number"
-                          min="0"
-                          className="w-24 inline-block text-right"
-                          value={mealPortions.get(plan.id) || 0}
-                          onChange={(e) => handlePortionChange(plan.id, e.target.value)}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </div>
-          
-          <div className="flex justify-end">
-            <Button 
-              onClick={handleSubmit} 
-              disabled={isLoading || isSubmitting || mealPlans.length === 0}
-            >
-              조리계획서 생성
-            </Button>
+            
+            <div className="flex justify-end">
+              <Button 
+                onClick={handleSubmit} 
+                disabled={isLoading || isSubmitting || mealPlans.length === 0}
+              >
+                {isSubmitting ? '처리 중...' : isEditing ? '수정하기' : '생성하기'}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

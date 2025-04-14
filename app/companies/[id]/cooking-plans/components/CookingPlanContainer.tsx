@@ -115,12 +115,74 @@ export default function CookingPlanContainer({ companyId, initialDate, onComplet
     if (!cookingPlan || !isMountedRef.current) return;
     
     try {
-      // 메뉴별 식수 CSV 데이터 생성
-      let menuCsv = '식사시간,메뉴ID,메뉴명,용기명,식수\n';
+      // 메뉴별로 중복을 합치고 식단 정보 추가
+      const processMenus = () => {
+        // 식사 시간별로 그룹화
+        const menusByMealTime = cookingPlan.menu_portions.reduce((acc, menu) => {
+          const mealTime = menu.meal_time || '기타';
+          
+          if (!acc[mealTime]) {
+            acc[mealTime] = [];
+          }
+          acc[mealTime].push(menu);
+          
+          return acc;
+        }, {} as Record<string, typeof cookingPlan.menu_portions>);
+        
+        // 식사 시간별로 중복 메뉴 통합
+        return Object.entries(menusByMealTime).flatMap(([mealTime, menus]) => {
+          // 메뉴 ID별로 그룹화
+          const menuMap = new Map<string, {
+            menu: typeof menus[0],
+            totalHeadcount: number,
+            mealPlans: Set<string>
+          }>();
+          
+          menus.forEach(menu => {
+            if (menuMap.has(menu.menu_id)) {
+              const existingMenu = menuMap.get(menu.menu_id)!;
+              existingMenu.totalHeadcount += menu.headcount;
+              if (menu.meal_plan_id) {
+                existingMenu.mealPlans.add(menu.meal_plan_id);
+              }
+            } else {
+              menuMap.set(menu.menu_id, {
+                menu: {...menu},
+                totalHeadcount: menu.headcount,
+                mealPlans: menu.meal_plan_id ? new Set([menu.meal_plan_id]) : new Set()
+              });
+            }
+          });
+          
+          // 통합된 메뉴 목록 생성
+          return Array.from(menuMap.values()).map(item => ({
+            ...item.menu,
+            headcount: item.totalHeadcount,
+            mealPlans: Array.from(item.mealPlans)
+          }));
+        });
+      };
       
-      cookingPlan.menu_portions.forEach(item => {
+      // 식단 ID를 식단명으로 변환
+      const getMealPlanNames = (mealPlanIds: string[]) => {
+        if (!mealPlanIds.length) return '';
+        
+        const mealPlanNames = mealPlanIds.map(id => {
+          const mealPlan = cookingPlan.meal_plans.find(mp => mp.id === id);
+          return mealPlan?.name || id;
+        });
+        
+        return mealPlanNames.join(', ');
+      };
+      
+      // 메뉴별 식수 CSV 데이터 생성
+      const processedMenus = processMenus();
+      let menuCsv = '식사시간,메뉴ID,메뉴명,용기명,사용 식단,식수\n';
+      
+      processedMenus.forEach(item => {
         const mealTime = getMealTimeName(item.meal_time || '기타');
-        menuCsv += `${mealTime},${item.menu_id},${item.menu_name},${item.container_name || ''},${item.headcount}\n`;
+        const mealPlans = 'mealPlans' in item ? getMealPlanNames((item as any).mealPlans) : '';
+        menuCsv += `${mealTime},${item.menu_id},${item.menu_name},${item.container_name || ''},${mealPlans},${item.headcount}\n`;
       });
       
       // 식재료 CSV 데이터 생성

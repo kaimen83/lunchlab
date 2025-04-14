@@ -51,6 +51,45 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
     return acc;
   }, {} as Record<string, number>);
 
+  // 식사 시간별로 중복 메뉴를 통합하고 식단 정보 추가
+  const processedMenusByMealTime = Object.keys(menusByMealTime).reduce((acc, mealTime) => {
+    // 메뉴 ID별로 그룹화
+    const menuMap = new Map<string, {
+      menu: MenuPortion,
+      totalHeadcount: number,
+      mealPlans: Set<string>
+    }>();
+    
+    menusByMealTime[mealTime].forEach(menu => {
+      // 동일 메뉴가 있는지 확인
+      if (menuMap.has(menu.menu_id)) {
+        const existingMenu = menuMap.get(menu.menu_id)!;
+        // 식수 합산
+        existingMenu.totalHeadcount += menu.headcount;
+        // 식단 정보 추가 (meal_plan_id가 있을 경우)
+        if (menu.meal_plan_id) {
+          existingMenu.mealPlans.add(menu.meal_plan_id);
+        }
+      } else {
+        // 새 메뉴 추가
+        menuMap.set(menu.menu_id, {
+          menu: {...menu},
+          totalHeadcount: menu.headcount,
+          mealPlans: menu.meal_plan_id ? new Set([menu.meal_plan_id]) : new Set()
+        });
+      }
+    });
+    
+    // 통합된 메뉴 목록 생성
+    acc[mealTime] = Array.from(menuMap.values()).map(item => ({
+      ...item.menu,
+      headcount: item.totalHeadcount,
+      mealPlans: Array.from(item.mealPlans)
+    }));
+    
+    return acc;
+  }, {} as Record<string, (MenuPortion & { mealPlans: string[] })[]>);
+
   // 식사 시간 한글화
   const getMealTimeName = (mealTime: string) => {
     switch (mealTime) {
@@ -74,6 +113,19 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
   // 수량 포맷
   const formatAmount = (amount: number) => {
     return amount % 1 === 0 ? amount.toString() : amount.toFixed(1);
+  };
+
+  // 식단 ID를 식단명으로 변환하는 함수
+  const getMealPlanNames = (mealPlanIds: string[]) => {
+    if (!mealPlanIds.length) return '-';
+    
+    // 식단 ID에 해당하는 식단 찾기
+    const mealPlanNames = mealPlanIds.map(id => {
+      const mealPlan = cookingPlan.meal_plans.find(mp => mp.id === id);
+      return mealPlan?.name || id;
+    });
+    
+    return mealPlanNames.join(', ');
   };
 
   // 총 식재료 비용 계산
@@ -114,7 +166,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
         
         {/* 식단별 식수 탭 */}
         <TabsContent value="menu-portions" className="space-y-4">
-          {Object.entries(menusByMealTime).map(([mealTime, menus]) => (
+          {Object.entries(processedMenusByMealTime).map(([mealTime, menus]) => (
             <Card key={mealTime}>
               <CardHeader>
                 <CardTitle>{getMealTimeName(mealTime)} 식단</CardTitle>
@@ -128,6 +180,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                     <TableRow>
                       <TableHead>메뉴명</TableHead>
                       <TableHead>용기</TableHead>
+                      <TableHead>사용 식단</TableHead>
                       <TableHead className="text-right">식수 (명)</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -136,6 +189,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                       <TableRow key={index}>
                         <TableCell className="font-medium">{menuPortion.menu_name}</TableCell>
                         <TableCell>{menuPortion.container_name || '-'}</TableCell>
+                        <TableCell>{getMealPlanNames(menuPortion.mealPlans)}</TableCell>
                         <TableCell className="text-right">{menuPortion.headcount}</TableCell>
                       </TableRow>
                     ))}

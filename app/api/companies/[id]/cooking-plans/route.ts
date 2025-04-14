@@ -487,4 +487,130 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       { status: 500 }
     );
   }
+}
+
+// PUT: 조리계획서 수정
+export async function PUT(request: NextRequest, context: RouteContext) {
+  try {
+    const { id: companyId } = await context.params;
+    const { userId } = await auth();
+    
+    if (!userId) {
+      return NextResponse.json(
+        { error: '인증되지 않은 요청입니다.' },
+        { status: 401 }
+      );
+    }
+    
+    // 요청 본문 파싱
+    const body = await request.json();
+    
+    // 요청 데이터 검증
+    const validationResult = cookingPlanSchema.safeParse(body);
+    if (!validationResult.success) {
+      const errors = validationResult.error.format();
+      return NextResponse.json(
+        { 
+          error: '유효하지 않은 요청 데이터입니다.',
+          details: errors
+        },
+        { status: 400 }
+      );
+    }
+    
+    const { date, meal_portions } = validationResult.data;
+    
+    const supabase = createServerSupabaseClient();
+    
+    // 회사 소속 확인
+    const { data: membership, error: membershipError } = await supabase
+      .from('company_memberships')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('user_id', userId)
+      .single();
+    
+    if (membershipError || !membership) {
+      return NextResponse.json(
+        { error: '이 회사에 대한 접근 권한이 없습니다.' },
+        { status: 403 }
+      );
+    }
+    
+    try {
+      // 기존 조리계획서 조회
+      const { data: existingMealPortions, error: existingError } = await supabase
+        .from('meal_portions')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('date', date);
+      
+      if (existingError) {
+        console.error('기존 조리계획서 조회 오류:', existingError);
+        return NextResponse.json(
+          { error: '기존 조리계획서 조회에 실패했습니다.' },
+          { status: 500 }
+        );
+      }
+      
+      // 기존 데이터가 없으면 오류 반환
+      if (!existingMealPortions || existingMealPortions.length === 0) {
+        return NextResponse.json(
+          { error: '수정할 조리계획서가 존재하지 않습니다.' },
+          { status: 404 }
+        );
+      }
+      
+      // 기존 조리계획서 삭제
+      const { error: deleteError } = await supabase
+        .from('meal_portions')
+        .delete()
+        .eq('company_id', companyId)
+        .eq('date', date);
+      
+      if (deleteError) {
+        console.error('기존 조리계획서 삭제 오류:', deleteError);
+        return NextResponse.json(
+          { error: '기존 조리계획서 삭제에 실패했습니다.' },
+          { status: 500 }
+        );
+      }
+      
+      // 새 조리계획서 데이터 생성
+      const newPortions = meal_portions.map(portion => ({
+        company_id: companyId,
+        date,
+        meal_plan_id: portion.meal_plan_id,
+        headcount: portion.headcount,
+        created_by: userId
+      }));
+      
+      // 새 조리계획서 저장
+      const { error: insertError } = await supabase
+        .from('meal_portions')
+        .insert(newPortions);
+      
+      if (insertError) {
+        console.error('새 조리계획서 저장 오류:', insertError);
+        return NextResponse.json(
+          { error: '새 조리계획서 저장에 실패했습니다.' },
+          { status: 500 }
+        );
+      }
+      
+      return NextResponse.json({ success: true, date });
+    } catch (error) {
+      console.error('조리계획서 수정 오류:', error);
+      return NextResponse.json(
+        { error: '조리계획서 수정에 실패했습니다.' },
+        { status: 500 }
+      );
+    }
+  } catch (error) {
+    console.error('조리계획서 수정 핸들러 오류:', error);
+    return NextResponse.json(
+      { error: '서버 오류가 발생했습니다.' },
+      { status: 500 }
+    );
+  }
 } 

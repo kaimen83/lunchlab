@@ -33,6 +33,8 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import CookingPlanContainer from './CookingPlanContainer';
+import CookingPlanForm from './CookingPlanForm';
+import { CookingPlanFormData } from '../types';
 
 // 식사 시간 한글화
 const getMealTimeName = (mealTime: string) => {
@@ -66,6 +68,11 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
   const [deletingDate, setDeletingDate] = useState<string | null>(null);
   const [showCalendar, setShowCalendar] = useState<boolean>(false);
+  
+  // 수정 모달 관련 상태
+  const [showEditModal, setShowEditModal] = useState<boolean>(false);
+  const [editingDate, setEditingDate] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
   
   // 캘린더 컨테이너에 대한 참조
   const calendarRef = useRef<HTMLDivElement>(null);
@@ -146,6 +153,54 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
   
   const handleCreateNewClick = () => {
     setActiveTab('create');
+  };
+  
+  // 조리계획서 수정 모달 열기
+  const handleEditCookingPlan = (date: string) => {
+    setEditingDate(date);
+    setShowEditModal(true);
+  };
+  
+  // 조리계획서 수정 처리
+  const handleEditFormSubmit = async (data: CookingPlanFormData) => {
+    setIsEditing(true);
+    
+    try {
+      // 수정 API 호출
+      const response = await fetch(`/api/companies/${companyId}/cooking-plans`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '조리계획서 수정 중 오류가 발생했습니다.');
+      }
+      
+      // 목록 새로고침
+      fetchCookingPlans();
+      
+      // 모달 닫기
+      setShowEditModal(false);
+      setEditingDate(null);
+      
+      toast({
+        title: '조리계획서 수정 완료',
+        description: `${data.date} 조리계획서가 수정되었습니다.`,
+      });
+    } catch (error) {
+      console.error('조리계획서 수정 오류:', error);
+      toast({
+        title: '조리계획서 수정 실패',
+        description: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsEditing(false);
+    }
   };
   
   const handleDeleteCookingPlan = async () => {
@@ -329,10 +384,7 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => {
-                                setSelectedDate(new Date(plan.date));
-                                setActiveTab('create');
-                              }}
+                              onClick={() => handleEditCookingPlan(plan.date)}
                             >
                               <FileEdit className="h-4 w-4" />
                             </Button>
@@ -391,6 +443,40 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
             </Button>
             <Button variant="destructive" onClick={handleDeleteCookingPlan} disabled={isLoading}>
               삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* 수정 모달 */}
+      <Dialog open={showEditModal} onOpenChange={(open) => {
+        setShowEditModal(open);
+        if (!open) setEditingDate(null);
+      }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>조리계획서 수정</DialogTitle>
+            <DialogDescription>
+              {editingDate && 
+                `${format(new Date(editingDate), 'yyyy년 MM월 dd일', { locale: ko })} 조리계획서를 수정합니다.`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          {editingDate && (
+            <div className="py-4">
+              <CookingPlanForm
+                companyId={companyId}
+                initialDate={editingDate}
+                onSubmit={handleEditFormSubmit}
+                isEditing={true}
+              />
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditModal(false)}>
+              취소
             </Button>
           </DialogFooter>
         </DialogContent>
