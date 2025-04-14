@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { CalendarIcon, X } from 'lucide-react';
+import { CalendarIcon, X, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +34,7 @@ export default function CookingPlanForm({ companyId, initialDate, onSubmit, isEd
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [showCalendar, setShowCalendar] = useState<boolean>(false);
+  const [hasExistingData, setHasExistingData] = useState<boolean>(false);
   
   // 캘린더 컨테이너에 대한 참조
   const calendarRef = useRef<HTMLDivElement>(null);
@@ -97,6 +98,32 @@ export default function CookingPlanForm({ companyId, initialDate, onSubmit, isEd
     }, 10);
   }, [form, isMountedRef]);
 
+  // 기존 조리계획서 데이터 확인
+  const checkExistingCookingPlan = useCallback(async (date: string) => {
+    if (!date || isEditing) return;
+    
+    try {
+      const response = await fetch(`/api/companies/${companyId}/cooking-plans?date=${date}`);
+      
+      // 404인 경우 기존 데이터 없음
+      if (response.status === 404) {
+        setHasExistingData(false);
+        return;
+      }
+      
+      // 성공적으로 데이터를 가져온 경우 기존 데이터 있음
+      if (response.ok) {
+        setHasExistingData(true);
+        return;
+      }
+      
+      setHasExistingData(false);
+    } catch (error) {
+      console.error('기존 조리계획서 확인 오류:', error);
+      setHasExistingData(false);
+    }
+  }, [companyId, isEditing]);
+
   // 선택한 날짜 변경 시 해당 날짜의 식단 목록 가져오기
   useEffect(() => {
     const fetchMealPlans = async () => {
@@ -104,6 +131,9 @@ export default function CookingPlanForm({ companyId, initialDate, onSubmit, isEd
       
       setIsLoading(true);
       try {
+        // 기존 조리계획서 데이터 확인
+        await checkExistingCookingPlan(selectedDate);
+        
         const response = await fetch(`/api/companies/${companyId}/meal-plans/by-date?date=${selectedDate}`);
         
         if (!response.ok) {
@@ -155,7 +185,7 @@ export default function CookingPlanForm({ companyId, initialDate, onSubmit, isEd
     };
     
     fetchMealPlans();
-  }, [selectedDate, companyId, toast, isEditing]);
+  }, [selectedDate, companyId, toast, isEditing, checkExistingCookingPlan]);
 
   // 식수 입력 처리
   const handlePortionChange = (mealPlanId: string, value: string) => {
@@ -230,6 +260,7 @@ export default function CookingPlanForm({ companyId, initialDate, onSubmit, isEd
     }
   };
 
+  // 식사 시간 한글화
   const getMealTimeName = (mealTime: string) => {
     switch (mealTime) {
       case 'breakfast': return '아침';
@@ -239,11 +270,6 @@ export default function CookingPlanForm({ companyId, initialDate, onSubmit, isEd
     }
   };
 
-  // 캘린더 토글
-  const toggleCalendar = useCallback(() => {
-    setShowCalendar(prev => !prev);
-  }, []);
-
   return (
     <div className="space-y-6">
       {error && (
@@ -252,6 +278,16 @@ export default function CookingPlanForm({ companyId, initialDate, onSubmit, isEd
           <AlertTitle>에러</AlertTitle>
           <AlertDescription>
             {error}
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {hasExistingData && !isEditing && (
+        <Alert className="border-amber-500 bg-amber-50">
+          <AlertTriangle className="h-4 w-4 text-amber-500" />
+          <AlertTitle className="text-amber-700 font-bold">주의: 선택한 날짜에 이미 조리계획서가 있습니다</AlertTitle>
+          <AlertDescription className="text-amber-600">
+            계속 진행하면 기존 데이터가 삭제되고 새로 작성한 데이터로 대체됩니다.
           </AlertDescription>
         </Alert>
       )}
