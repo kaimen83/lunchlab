@@ -145,12 +145,15 @@ export default function MealPlanForm({
       }
       
       const templateData = await response.json();
+      console.log("템플릿 데이터 로드 성공:", templateData);
       
       // 이름 설정
       setName(templateId);
       
       // 템플릿에 메뉴 정보가 있다면 컨테이너와 메뉴 선택 설정
       if (templateData.template_selections?.length) {
+        console.log("템플릿 선택 정보:", templateData.template_selections);
+        
         const containerIds: string[] = [];
         const menuSelections: Record<string, string> = {};
         
@@ -160,6 +163,9 @@ export default function MealPlanForm({
             menuSelections[selection.container_id] = selection.menu_id;
           }
         });
+        
+        console.log("선택할 용기 IDs:", containerIds);
+        console.log("메뉴 선택 매핑:", menuSelections);
         
         setSelectedContainers(containerIds);
         setContainerMenuSelections(menuSelections);

@@ -144,7 +144,6 @@ export default function MealPlanBasicInfo({
             <Select
               value={name}
               onValueChange={(val) => {
-                setName(val);
                 handleTemplateSelect(val);
               }}
             >

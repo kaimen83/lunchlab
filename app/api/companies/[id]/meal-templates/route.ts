@@ -108,24 +108,41 @@ export async function POST(request: NextRequest, context: RouteContext) {
         );
       }
       
-      // 각 용기 ID에 대해 템플릿 선택 저장 (먼저 빈 메뉴 ID로 저장)
-      const containerSelections = container_selections.map((containerId: string) => ({
-        template_id: data.id,
-        container_id: containerId,
-        // 메뉴 ID는 나중에 사용자가 선택하게 됩니다
-        menu_id: null 
-      }));
-      
-      if (containerSelections.length > 0) {
-        const { error: selectionError } = await supabase
-          .from('template_selections')
-          .insert(containerSelections);
+      try {
+        // 먼저 회사의 첫 번째 메뉴를 찾아서 임시로 사용
+        // menu_id가 필수 필드이므로 임시 메뉴 ID가 필요함
+        const { data: firstMenu, error: menuError } = await supabase
+          .from('menus')
+          .select('id')
+          .eq('company_id', companyId)
+          .limit(1)
+          .single();
         
-        if (selectionError) {
-          console.error('템플릿 선택 저장 오류:', selectionError);
-          // 템플릿 선택 저장 실패 시에도 템플릿은 이미 생성되었으므로 성공으로 간주
-          // 하지만 오류 로그는 남깁니다
+        if (menuError || !firstMenu) {
+          console.error('임시 메뉴 ID 조회 오류:', menuError);
+          return NextResponse.json(data); // 템플릿은 생성했으니 성공으로 간주
         }
+        
+        // 각 용기 ID에 대해 템플릿 선택 저장 (임시 메뉴 ID 사용)
+        const containerSelections = container_selections.map((containerId: string) => ({
+          template_id: data.id,
+          container_id: containerId,
+          menu_id: firstMenu.id // 임시 메뉴 ID 사용
+        }));
+        
+        if (containerSelections.length > 0) {
+          const { error: selectionError } = await supabase
+            .from('template_selections')
+            .insert(containerSelections);
+          
+          if (selectionError) {
+            console.error('템플릿 선택 저장 오류:', selectionError);
+            // 템플릿 선택 저장 실패 시에도 템플릿은 이미 생성되었으므로 성공으로 간주
+          }
+        }
+      } catch (selectionError) {
+        console.error('템플릿 선택 저장 중 오류:', selectionError);
+        // 템플릿 선택 저장 실패 시에도 템플릿은 이미 생성되었으므로 성공으로 간주
       }
     }
     
