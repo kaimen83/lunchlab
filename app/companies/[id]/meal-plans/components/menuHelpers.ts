@@ -10,7 +10,7 @@ export const getFilteredMenusForContainer = (
     mc => mc.container_id === containerId
   );
   
-  // 모든 메뉴 ID 추출
+  // 모든 메뉴 ID 추출 (모든 메뉴 사용 가능)
   const allMenuIds = Array.from(
     new Set(menuContainers.map(mc => mc.menu_id))
   );
@@ -35,12 +35,15 @@ export const getFilteredMenusForContainer = (
       return nameMatch || descriptionMatch;
     })
     .sort((a, b) => {
+      // 호환되는 메뉴를 먼저 표시
       const aIsCompatible = compatibleMenuIds.includes(a.id);
       const bIsCompatible = compatibleMenuIds.includes(b.id);
       
       if (aIsCompatible && !bIsCompatible) return -1;
       if (!aIsCompatible && bIsCompatible) return 1;
-      return 0;
+      
+      // 두 메뉴 모두 호환되거나 호환되지 않는 경우 이름 순으로 정렬
+      return a.name.localeCompare(b.name);
     });
 };
 

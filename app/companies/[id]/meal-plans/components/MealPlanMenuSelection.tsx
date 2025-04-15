@@ -106,9 +106,11 @@ export default function MealPlanMenuSelection({
                     {selectedMenuId ? (
                       <div className="text-sm text-muted-foreground flex items-center mt-0.5">
                         <span className="mr-2 truncate">{menuDetails?.name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {formatPrice(costInfo.total_cost)}
-                        </Badge>
+                        {costInfo.total_cost > 0 && (
+                          <Badge variant="outline" className="text-xs">
+                            {formatPrice(costInfo.total_cost)}
+                          </Badge>
+                        )}
                       </div>
                     ) : (
                       <Badge variant="destructive" className="text-xs mt-0.5">
