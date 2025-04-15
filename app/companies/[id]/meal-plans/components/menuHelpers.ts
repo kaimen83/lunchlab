@@ -1,5 +1,18 @@
 import { Menu, MenuContainer } from './types';
 
+// 메뉴가 다른 용기와 호환되는지 확인하는 헬퍼 함수
+const hasCompatibleContainers = (
+  menuId: string,
+  currentContainerId: string,
+  menuContainers: MenuContainer[]
+): boolean => {
+  return menuContainers.some(mc => 
+    mc.menu_id === menuId && 
+    mc.container_id !== currentContainerId && 
+    mc.total_cost > 0
+  );
+};
+
 export const getFilteredMenusForContainer = (
   containerId: string,
   menuContainers: MenuContainer[],
@@ -35,14 +48,26 @@ export const getFilteredMenusForContainer = (
       return nameMatch || descriptionMatch;
     })
     .sort((a, b) => {
-      // 호환되는 메뉴를 먼저 표시
+      // 1. 현재 용기와 호환되는 메뉴를 가장 먼저 표시
       const aIsCompatible = compatibleMenuIds.includes(a.id);
       const bIsCompatible = compatibleMenuIds.includes(b.id);
       
       if (aIsCompatible && !bIsCompatible) return -1;
       if (!aIsCompatible && bIsCompatible) return 1;
       
-      // 두 메뉴 모두 호환되거나 호환되지 않는 경우 이름 순으로 정렬
+      // 2. 둘 다 호환되면 이름순 정렬
+      if (aIsCompatible && bIsCompatible) {
+        return a.name.localeCompare(b.name);
+      }
+      
+      // 3. 둘 다 호환되지 않는 경우, 다른 용기와 호환되는 메뉴 우선
+      const aCompatibleWithOthers = hasCompatibleContainers(a.id, containerId, menuContainers);
+      const bCompatibleWithOthers = hasCompatibleContainers(b.id, containerId, menuContainers);
+      
+      if (aCompatibleWithOthers && !bCompatibleWithOthers) return -1;
+      if (!aCompatibleWithOthers && bCompatibleWithOthers) return 1;
+      
+      // 4. 그 외에는 이름순 정렬
       return a.name.localeCompare(b.name);
     });
 };

@@ -148,47 +148,131 @@ export default function MenuSelection({
             <ScrollArea className="h-52 sm:h-72 border rounded-md">
               <div className="p-2">
                 {filteredMenus.length > 0 ? (
-                  filteredMenus.map(menu => {
-                    const isCompatible = isMenuCompatibleWithContainer(menu.id, containerId, menuContainers);
-                    const costInfo = getCostInfoForMenuAndContainer(menu.id, containerId, menuContainers);
-                    const compatibleWithOthers = !isCompatible && 
-                      getCompatibleContainersForMenu(menu.id, containerId, menuContainers).length > 0;
-                    
-                    return (
-                      <div 
-                        key={menu.id} 
-                        className={cn(
-                          "flex flex-col p-3 border-b last:border-0 cursor-pointer hover:bg-accent/20",
-                          selectedMenuId === menu.id && "bg-accent/30"
-                        )}
-                        onClick={(e) => handleMenuSelect(e, menu.id, menu)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center">
-                            <span className="font-medium">{menu.name}</span>
-                            {isCompatible && (
-                              <Badge variant="secondary" className="ml-2 text-xs">
-                                호환
-                              </Badge>
-                            )}
-                            {compatibleWithOthers && (
-                              <Badge variant="outline" className="ml-2 text-xs border-amber-500 text-amber-600">
-                                다른 용기 호환
-                              </Badge>
-                            )}
-                          </div>
-                          <span className="text-sm font-medium">
-                            {isCompatible || costInfo.total_cost > 0 ? formatPrice(costInfo.total_cost) : ''}
-                          </span>
-                        </div>
-                        {menu.description && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {menu.description}
-                          </p>
-                        )}
+                  <>
+                    {/* 호환되는 메뉴 그룹 */}
+                    {filteredMenus.some(menu => isMenuCompatibleWithContainer(menu.id, containerId, menuContainers)) && (
+                      <div className="mb-3">
+                        <h4 className="text-xs font-medium text-muted-foreground mb-1 px-1">호환되는 메뉴</h4>
+                        {filteredMenus
+                          .filter(menu => isMenuCompatibleWithContainer(menu.id, containerId, menuContainers))
+                          .map(menu => {
+                            const costInfo = getCostInfoForMenuAndContainer(menu.id, containerId, menuContainers);
+                            
+                            return (
+                              <div 
+                                key={menu.id} 
+                                className={cn(
+                                  "flex flex-col p-3 border-b cursor-pointer hover:bg-accent/20",
+                                  selectedMenuId === menu.id && "bg-accent/30"
+                                )}
+                                onClick={(e) => handleMenuSelect(e, menu.id, menu)}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center">
+                                    <span className="font-medium">{menu.name}</span>
+                                    <Badge variant="secondary" className="ml-2 text-xs">
+                                      호환
+                                    </Badge>
+                                  </div>
+                                  <span className="text-sm font-medium">
+                                    {formatPrice(costInfo.total_cost)}
+                                  </span>
+                                </div>
+                                {menu.description && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {menu.description}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
                       </div>
-                    );
-                  })
+                    )}
+                    
+                    {/* 다른 용기와 호환되는 메뉴 그룹 */}
+                    {filteredMenus.some(menu => {
+                      const isCompatible = isMenuCompatibleWithContainer(menu.id, containerId, menuContainers);
+                      return !isCompatible && getCompatibleContainersForMenu(menu.id, containerId, menuContainers).length > 0;
+                    }) && (
+                      <div className="mb-3">
+                        <h4 className="text-xs font-medium text-muted-foreground mb-1 px-1">다른 용기와 호환되는 메뉴</h4>
+                        {filteredMenus
+                          .filter(menu => {
+                            const isCompatible = isMenuCompatibleWithContainer(menu.id, containerId, menuContainers);
+                            return !isCompatible && getCompatibleContainersForMenu(menu.id, containerId, menuContainers).length > 0;
+                          })
+                          .map(menu => {
+                            const costInfo = getCostInfoForMenuAndContainer(menu.id, containerId, menuContainers);
+                            
+                            return (
+                              <div 
+                                key={menu.id} 
+                                className={cn(
+                                  "flex flex-col p-3 border-b cursor-pointer hover:bg-accent/20",
+                                  selectedMenuId === menu.id && "bg-accent/30"
+                                )}
+                                onClick={(e) => handleMenuSelect(e, menu.id, menu)}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center">
+                                    <span className="font-medium">{menu.name}</span>
+                                    <Badge variant="outline" className="ml-2 text-xs border-amber-500 text-amber-600">
+                                      다른 용기 호환
+                                    </Badge>
+                                  </div>
+                                  <span className="text-sm font-medium">
+                                    {costInfo.total_cost > 0 ? formatPrice(costInfo.total_cost) : ''}
+                                  </span>
+                                </div>
+                                {menu.description && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {menu.description}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                    
+                    {/* 호환되지 않는 메뉴 그룹 */}
+                    {filteredMenus.some(menu => {
+                      const isCompatible = isMenuCompatibleWithContainer(menu.id, containerId, menuContainers);
+                      return !isCompatible && getCompatibleContainersForMenu(menu.id, containerId, menuContainers).length === 0;
+                    }) && (
+                      <div>
+                        <h4 className="text-xs font-medium text-muted-foreground mb-1 px-1">호환되지 않는 메뉴</h4>
+                        {filteredMenus
+                          .filter(menu => {
+                            const isCompatible = isMenuCompatibleWithContainer(menu.id, containerId, menuContainers);
+                            return !isCompatible && getCompatibleContainersForMenu(menu.id, containerId, menuContainers).length === 0;
+                          })
+                          .map(menu => {
+                            return (
+                              <div 
+                                key={menu.id} 
+                                className={cn(
+                                  "flex flex-col p-3 border-b last:border-0 cursor-pointer hover:bg-accent/20",
+                                  selectedMenuId === menu.id && "bg-accent/30"
+                                )}
+                                onClick={(e) => handleMenuSelect(e, menu.id, menu)}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center">
+                                    <span className="font-medium">{menu.name}</span>
+                                  </div>
+                                </div>
+                                {menu.description && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {menu.description}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="text-center py-4 text-muted-foreground">
                     검색 결과가 없습니다
