@@ -47,7 +47,7 @@ export const useMealTemplates = (companyId: string) => {
   }, [loadTemplates]);
 
   // 새 템플릿 추가 함수
-  const addNewTemplate = async (templateName: string) => {
+  const addNewTemplate = async (templateName: string, containerSelections: string[] = []) => {
     try {
       const response = await fetch(`/api/companies/${companyId}/meal-templates`, {
         method: 'POST',
@@ -56,6 +56,7 @@ export const useMealTemplates = (companyId: string) => {
         },
         body: JSON.stringify({
           name: templateName,
+          container_selections: containerSelections
         }),
       });
 

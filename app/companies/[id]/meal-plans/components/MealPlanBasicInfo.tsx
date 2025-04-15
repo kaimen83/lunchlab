@@ -1,6 +1,6 @@
 'use client';
 
-import { Dispatch, SetStateAction } from 'react';
+import { Dispatch, SetStateAction, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Loader2, Plus, Search } from 'lucide-react';
+import { CalendarIcon, Loader2, Plus, Search, Save, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -28,6 +28,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useMealTemplates } from '../hooks/useMealTemplates';
 
 interface MealPlanBasicInfoProps {
@@ -70,6 +78,58 @@ export default function MealPlanBasicInfo({
   handleTemplateSelect
 }: MealPlanBasicInfoProps) {
   const { templates, isLoadingTemplates, addNewTemplate } = useMealTemplates(companyId);
+  const [isAddTemplateOpen, setIsAddTemplateOpen] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [templateContainerSearch, setTemplateContainerSearch] = useState('');
+  const [selectedTemplateContainers, setSelectedTemplateContainers] = useState<string[]>([]);
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+
+  const filteredTemplateContainers = filteredContainers.filter(container => 
+    container.name.toLowerCase().includes(templateContainerSearch.toLowerCase()) ||
+    (container.description && container.description.toLowerCase().includes(templateContainerSearch.toLowerCase()))
+  );
+
+  const toggleTemplateContainerSelection = (containerId: string) => {
+    setSelectedTemplateContainers(prev => 
+      prev.includes(containerId) 
+        ? prev.filter(id => id !== containerId) 
+        : [...prev, containerId]
+    );
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!newTemplateName.trim()) return;
+    
+    setIsSavingTemplate(true);
+    try {
+      const newTemplateId = await addNewTemplate(newTemplateName.trim(), selectedTemplateContainers);
+      if (newTemplateId) {
+        setName(newTemplateId);
+
+        // 템플릿과 함께 선택된 용기도 저장해야 하지만,
+        // 현재 API에는 이 기능이 없으므로 템플릿 ID만 반환하고
+        // 메인 컴포넌트에서 선택된 용기 설정을 호출
+        handleTemplateSelect(newTemplateId);
+        
+        // 용기 정보도 선택에 반영
+        if (selectedTemplateContainers.length > 0) {
+          // 템플릿 선택 시 모든 용기들이 자동 선택됨
+          selectedTemplateContainers.forEach(containerId => {
+            if (!selectedContainers.includes(containerId)) {
+              toggleContainerSelection(containerId);
+            }
+          });
+        }
+      }
+      setIsAddTemplateOpen(false);
+      setNewTemplateName('');
+      setSelectedTemplateContainers([]);
+    } catch (error) {
+      console.error('템플릿 저장 오류:', error);
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
 
   return (
     <Card>
@@ -115,15 +175,7 @@ export default function MealPlanBasicInfo({
               size="sm" 
               className="w-full"
               disabled={isLoading}
-              onClick={async () => {
-                const name = prompt("새 템플릿 이름을 입력하세요");
-                if (name && name.trim()) {
-                  const newTemplateId = await addNewTemplate(name.trim());
-                  if (newTemplateId) {
-                    setName(newTemplateId);
-                  }
-                }
-              }}
+              onClick={() => setIsAddTemplateOpen(true)}
             >
               <Plus className="mr-2 h-4 w-4" /> 새 템플릿 추가
             </Button>
@@ -179,6 +231,7 @@ export default function MealPlanBasicInfo({
         
         <div className="space-y-2">
           <Label>용기 선택</Label>
+          <p className="text-sm text-muted-foreground mb-2">이 식단에서 사용할 용기를 모두 선택해주세요</p>
           {isLoadingContainers ? (
             <div className="flex justify-center items-center py-4">
               <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
@@ -234,6 +287,106 @@ export default function MealPlanBasicInfo({
           </Button>
         )}
       </CardFooter>
+
+      {/* 새 템플릿 추가 모달 */}
+      <Dialog open={isAddTemplateOpen} onOpenChange={setIsAddTemplateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>새 식단 템플릿 추가</DialogTitle>
+            <DialogDescription>
+              새 식단 템플릿의 이름과 기본 용기를 선택해주세요.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="template-name">템플릿 이름</Label>
+              <Input
+                id="template-name"
+                placeholder="예: 일반식, 특별식 등"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>기본 용기 선택</Label>
+              <p className="text-sm text-muted-foreground mb-2">
+                이 템플릿에서 사용할 기본 용기를 선택해주세요
+              </p>
+              
+              <div className="relative mb-2">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="용기 검색..."
+                  className="pl-9"
+                  value={templateContainerSearch}
+                  onChange={(e) => setTemplateContainerSearch(e.target.value)}
+                />
+              </div>
+              
+              <ScrollArea className="h-40 border rounded-md">
+                <div className="p-2">
+                  {filteredTemplateContainers.length > 0 ? (
+                    filteredTemplateContainers.map(container => (
+                      <div key={container.id} className="flex items-start space-x-2 p-2 hover:bg-accent rounded-md">
+                        <Checkbox
+                          id={`template-container-${container.id}`}
+                          checked={selectedTemplateContainers.includes(container.id)}
+                          onCheckedChange={() => toggleTemplateContainerSelection(container.id)}
+                        />
+                        <div className="flex-1">
+                          <label 
+                            htmlFor={`template-container-${container.id}`} 
+                            className="text-sm font-medium cursor-pointer"
+                          >
+                            {container.name}
+                          </label>
+                          {container.description && (
+                            <p className="text-xs text-muted-foreground line-clamp-1">
+                              {container.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-4 text-muted-foreground">검색 결과가 없습니다</div>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => {
+                setIsAddTemplateOpen(false);
+                setNewTemplateName('');
+                setSelectedTemplateContainers([]);
+              }}
+              disabled={isSavingTemplate}
+            >
+              <X className="h-4 w-4 mr-2" /> 취소
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveTemplate}
+              disabled={!newTemplateName.trim() || isSavingTemplate}
+            >
+              {isSavingTemplate ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              저장
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 } 

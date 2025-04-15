@@ -47,7 +47,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const supabase = createServerSupabaseClient();
     
     // 요청 본문에서 데이터 추출
-    const { name } = await request.json();
+    const { name, container_selections = [] } = await request.json();
     
     // 필수 필드 확인
     if (!name || name.trim() === '') {
@@ -96,6 +96,37 @@ export async function POST(request: NextRequest, context: RouteContext) {
         { error: '템플릿을 추가하는 중 오류가 발생했습니다.' },
         { status: 500 }
       );
+    }
+    
+    // 용기 선택 정보가 제공된 경우 템플릿 선택 테이블에 저장
+    if (container_selections && container_selections.length > 0) {
+      // container_selections이 배열이 아니면 오류 반환
+      if (!Array.isArray(container_selections)) {
+        return NextResponse.json(
+          { error: 'container_selections는 배열이어야 합니다.' },
+          { status: 400 }
+        );
+      }
+      
+      // 각 용기 ID에 대해 템플릿 선택 저장 (먼저 빈 메뉴 ID로 저장)
+      const containerSelections = container_selections.map((containerId: string) => ({
+        template_id: data.id,
+        container_id: containerId,
+        // 메뉴 ID는 나중에 사용자가 선택하게 됩니다
+        menu_id: null 
+      }));
+      
+      if (containerSelections.length > 0) {
+        const { error: selectionError } = await supabase
+          .from('template_selections')
+          .insert(containerSelections);
+        
+        if (selectionError) {
+          console.error('템플릿 선택 저장 오류:', selectionError);
+          // 템플릿 선택 저장 실패 시에도 템플릿은 이미 생성되었으므로 성공으로 간주
+          // 하지만 오류 로그는 남깁니다
+        }
+      }
     }
     
     return NextResponse.json(data);
