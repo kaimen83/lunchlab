@@ -18,6 +18,7 @@ import {
   Eye,
   Info,
   DollarSign,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,7 +103,6 @@ interface Container {
   }[];
   ingredients_cost: number;
   total_cost: number;
-  totalCalories?: number;
 }
 
 interface Menu {
@@ -119,6 +119,23 @@ interface Menu {
 interface MenusListProps {
   companyId: string;
   userRole: string;
+}
+
+// 컨테이너 상세 정보 응답 인터페이스 추가
+interface ContainerDetailsResponse {
+  id: string;
+  menu_id: string;
+  container_id: string;
+  container: {
+    id: string;
+    name: string;
+    description: string | null;
+    price: number;
+  };
+  ingredients_cost: number;
+  container_price: number;
+  calories: number;
+  ingredients: any[];
 }
 
 export default function MenusList({ companyId, userRole }: MenusListProps) {
@@ -138,6 +155,9 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
   const [tabsView, setTabsView] = useState<"basic" | "detailed">("basic");
   const [expandedMenuId, setExpandedMenuId] = useState<string | null>(null);
   const [expandedContainers, setExpandedContainers] = useState<string[]>([]);
+  // 컨테이너 상세 정보 관련 상태 추가
+  const [containerDetails, setContainerDetails] = useState<Record<string, ContainerDetailsResponse>>({});
+  const [loadingContainers, setLoadingContainers] = useState<Record<string, boolean>>({});
 
   const isOwnerOrAdmin = userRole === "owner" || userRole === "admin";
 
@@ -153,33 +173,8 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
 
       const data = await response.json();
 
-      // 각 메뉴 컨테이너의 칼로리 계산
-      const menusWithCalories = await Promise.all(
-        data.map(async (menu: Menu) => {
-          if (!menu.containers || menu.containers.length === 0) {
-            return menu;
-          }
-
-          // 각 컨테이너의 칼로리 계산
-          const containersWithCalories = await Promise.all(
-            menu.containers.map(async (container) => {
-              // 컨테이너의 식재료에 대한 칼로리 계산
-              const totalCalories = await calculateContainerCalories(container);
-              return {
-                ...container,
-                totalCalories,
-              };
-            })
-          );
-
-          return {
-            ...menu,
-            containers: containersWithCalories,
-          };
-        })
-      );
-
-      setMenus(menusWithCalories);
+      // 초기 로드 시에는 칼로리 계산 제외
+      setMenus(data);
     } catch (error) {
       console.error("메뉴 로드 오류:", error);
       toast({
@@ -195,53 +190,73 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
     }
   };
 
-  // 컨테이너의 칼로리 계산 함수
-  const calculateContainerCalories = async (container: Container) => {
+  // 컨테이너 상세 정보 로드 함수
+  const loadContainerDetails = async (containerId: string) => {
+    // 이미 상세 정보가 있으면 다시 로드하지 않음
+    if (containerDetails[containerId]) {
+      return;
+    }
+    
+    // 이미 로딩 중이면 중복 요청 방지
+    if (loadingContainers[containerId]) {
+      return;
+    }
+    
+    // 로딩 상태 설정
+    setLoadingContainers(prev => ({
+      ...prev,
+      [containerId]: true
+    }));
+    
     try {
-      // 식재료 ID 목록 추출
-      const ingredientIds = container.ingredients.map(
-        (item) => item.ingredient_id
-      );
-
-      if (ingredientIds.length === 0) {
-        return 0;
-      }
-
-      // 식재료 칼로리 정보 조회
-      const response = await fetch(
-        `/api/companies/${companyId}/ingredients/batch`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ ids: ingredientIds }),
-        }
-      );
-
+      const response = await fetch(`/api/companies/${companyId}/menus/details`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ container_id: containerId })
+      });
+      
       if (!response.ok) {
-        throw new Error("식재료 정보를 불러오는데 실패했습니다.");
+        throw new Error('컨테이너 상세 정보를 불러오는데 실패했습니다.');
       }
-
-      const ingredientsData = await response.json();
-
-      // 컨테이너 칼로리 계산
-      return container.ingredients.reduce((total, item) => {
-        const ingredientInfo = ingredientsData.find(
-          (ing: any) => ing.id === item.ingredient_id
-        );
-
-        if (!ingredientInfo || !ingredientInfo.calories) {
-          return total;
-        }
-
-        // 칼로리 계산: 식재료 칼로리/포장단위 * 사용량
-        const caloriesPerUnit = ingredientInfo.calories / ingredientInfo.package_amount;
-        return total + caloriesPerUnit * item.amount;
-      }, 0);
+      
+      const data = await response.json();
+      
+      // 상세 정보 저장
+      setContainerDetails(prev => ({
+        ...prev,
+        [containerId]: data
+      }));
     } catch (error) {
-      console.error("칼로리 계산 오류:", error);
-      return 0;
+      console.error('컨테이너 상세 정보 로드 오류:', error);
+      toast({
+        title: "오류 발생",
+        description: "용기 상세 정보를 불러오는데 실패했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      // 로딩 상태 해제
+      setLoadingContainers(prev => ({
+        ...prev,
+        [containerId]: false
+      }));
+    }
+  };
+
+  // 아코디언 토글 시 컨테이너 상세 정보 로드
+  const handleAccordionToggle = (menuId: string | null) => {
+    setExpandedMenuId(menuId);
+    
+    // 메뉴가 확장된 경우, 해당 메뉴의 모든 컨테이너 상세 정보 로드
+    if (menuId) {
+      const menu = menus.find(m => m.id === menuId);
+      if (menu && menu.containers && menu.containers.length > 0) {
+        // 각 컨테이너 별로 상세 정보 로드
+        menu.containers.forEach(container => {
+          loadContainerDetails(container.id);
+        });
+      }
     }
   };
 
@@ -476,7 +491,7 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
           }
         >
           <AccordionItem value="item-1" className="border-b-0">
-            <AccordionTrigger className="py-2">
+            <AccordionTrigger className="py-2" onClick={() => handleAccordionToggle(expandedMenuId === menu.id ? null : menu.id)}>
               <div className="flex items-center text-sm">
                 <Package className="h-4 w-4 mr-2 text-slate-500" />
                 용기 및 식자재 정보
@@ -485,107 +500,124 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
             <AccordionContent>
               {menu.containers && menu.containers.length > 0 ? (
                 <div className="space-y-3">
-                  {menu.containers.map((container) => (
-                    <div
-                      key={container.id}
-                      className="rounded-md overflow-hidden shadow-sm border"
-                    >
-                      <div className="flex items-center justify-between bg-blue-50 p-2 border-b">
-                        <div className="flex items-center">
-                          <div className="mr-2 bg-white p-1 rounded-full w-6 h-6 flex items-center justify-center shadow-sm">
-                            <Package className="h-3 w-3 text-blue-500" />
+                  {menu.containers.map((container) => {
+                    const detail = containerDetails[container.id];
+                    const isLoading = loadingContainers[container.id];
+                    
+                    return (
+                      <div
+                        key={container.id}
+                        className="rounded-md overflow-hidden shadow-sm border"
+                      >
+                        <div className="flex items-center justify-between bg-blue-50 p-2 border-b">
+                          <div className="flex items-center">
+                            <div className="mr-2 bg-white p-1 rounded-full w-6 h-6 flex items-center justify-center shadow-sm">
+                              <Package className="h-3 w-3 text-blue-500" />
+                            </div>
+                            <span className="font-medium text-sm">
+                              {container.container.name}
+                            </span>
                           </div>
-                          <span className="font-medium text-sm">
-                            {container.container.name}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {isLoading ? (
+                              <div className="h-6 w-20 flex items-center justify-center">
+                                <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                              </div>
+                            ) : detail ? (
+                              <>
+                                {detail.calories > 0 && (
+                                  <Badge variant="outline" className="bg-white">
+                                    {Math.round(detail.calories)} kcal
+                                  </Badge>
+                                )}
+                                <Badge variant="secondary" className="bg-white">
+                                  {formatCurrency(detail.ingredients_cost)}
+                                </Badge>
+                              </>
+                            ) : (
+                              <div className="h-6 w-20 flex items-center justify-center text-xs text-gray-400">
+                                정보 없음
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {container.totalCalories !== undefined && (
-                            <Badge variant="outline" className="bg-white">
-                              {Math.round(container.totalCalories)} kcal
-                            </Badge>
-                          )}
-                          <Badge variant="secondary" className="bg-white">
-                            {formatCurrency(container.ingredients_cost)}
-                          </Badge>
-                        </div>
-                      </div>
 
-                      {container.ingredients.length > 0 && (
-                        <div className="p-2 text-xs bg-white">
-                          <div className="text-gray-500 mb-2 text-[10px] flex justify-between px-1">
-                            <span>식자재</span>
-                            <div className="flex space-x-3">
-                              <span>사용량</span>
-                              <span>원가</span>
+                        {container.ingredients.length > 0 && (
+                          <div className="p-2 text-xs bg-white">
+                            <div className="text-gray-500 mb-2 text-[10px] flex justify-between px-1">
+                              <span>식자재</span>
+                              <div className="flex space-x-3">
+                                <span>사용량</span>
+                                <span>원가</span>
+                              </div>
+                            </div>
+                            <div className="space-y-2 ml-1">
+                              {container.ingredients
+                                .sort((a, b) => {
+                                  const aCost =
+                                    (a.ingredient.price /
+                                      a.ingredient.package_amount) *
+                                    a.amount;
+                                  const bCost =
+                                    (b.ingredient.price /
+                                      b.ingredient.package_amount) *
+                                    b.amount;
+                                  return bCost - aCost;
+                                })
+                                .slice(0, expandedContainers.includes(container.id) ? container.ingredients.length : 3)
+                                .map((item) => {
+                                  const unitPrice = item.ingredient.price / item.ingredient.package_amount;
+                                  const itemCost = unitPrice * item.amount;
+                                  return (
+                                    <div
+                                      key={item.id}
+                                      className="flex items-center justify-between border-b border-gray-100 pb-1"
+                                    >
+                                      <div className="flex items-center">
+                                        <div className="h-1 w-1 rounded-full bg-slate-300 mr-2"></div>
+                                        <span>{item.ingredient.name}</span>
+                                      </div>
+                                      <div className="flex items-center gap-4">
+                                        <span className="text-gray-600 tabular-nums">
+                                          {item.amount} {item.ingredient.unit}
+                                        </span>
+                                        <span className="text-blue-600 tabular-nums w-14 text-right">
+                                          {formatCurrency(itemCost)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              {container.ingredients.length > 3 && !expandedContainers.includes(container.id) && (
+                                <div 
+                                  className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleContainerExpand(container.id);
+                                  }}
+                                >
+                                  <span>+{container.ingredients.length - 3}개 더보기</span>
+                                  <ChevronDown className="h-3 w-3" />
+                                </div>
+                              )}
+                              {expandedContainers.includes(container.id) && (
+                                <div 
+                                  className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleContainerExpand(container.id);
+                                  }}
+                                >
+                                  <span>접기</span>
+                                  <ChevronUp className="h-3 w-3" />
+                                </div>
+                              )}
                             </div>
                           </div>
-                          <div className="space-y-2 ml-1">
-                            {container.ingredients
-                              .sort((a, b) => {
-                                const aCost =
-                                  (a.ingredient.price /
-                                    a.ingredient.package_amount) *
-                                  a.amount;
-                                const bCost =
-                                  (b.ingredient.price /
-                                    b.ingredient.package_amount) *
-                                  b.amount;
-                                return bCost - aCost;
-                              })
-                              .slice(0, expandedContainers.includes(container.id) ? container.ingredients.length : 3)
-                              .map((item) => {
-                                const unitPrice = item.ingredient.price / item.ingredient.package_amount;
-                                const itemCost = unitPrice * item.amount;
-                                return (
-                                  <div
-                                    key={item.id}
-                                    className="flex items-center justify-between border-b border-gray-100 pb-1"
-                                  >
-                                    <div className="flex items-center">
-                                      <div className="h-1 w-1 rounded-full bg-slate-300 mr-2"></div>
-                                      <span>{item.ingredient.name}</span>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                      <span className="text-gray-600 tabular-nums">
-                                        {item.amount} {item.ingredient.unit}
-                                      </span>
-                                      <span className="text-blue-600 tabular-nums w-14 text-right">
-                                        {formatCurrency(itemCost)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            {container.ingredients.length > 3 && !expandedContainers.includes(container.id) && (
-                              <div 
-                                className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleContainerExpand(container.id);
-                                }}
-                              >
-                                <span>+{container.ingredients.length - 3}개 더보기</span>
-                                <ChevronDown className="h-3 w-3" />
-                              </div>
-                            )}
-                            {expandedContainers.includes(container.id) && (
-                              <div 
-                                className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleContainerExpand(container.id);
-                                }}
-                              >
-                                <span>접기</span>
-                                <ChevronUp className="h-3 w-3" />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-sm text-gray-500 text-center py-2">
@@ -684,7 +716,10 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                       className="w-full"
                     >
                       <AccordionItem value="containers" className="border-b-0">
-                        <AccordionTrigger className="py-1 text-sm">
+                        <AccordionTrigger 
+                          className="py-1 text-sm"
+                          onClick={() => handleAccordionToggle(expandedMenuId === menu.id ? null : menu.id)}
+                        >
                           <div className="flex items-center">
                             <Package className="h-4 w-4 mr-2 text-slate-500" />
                             <span>용기 및 식자재 정보</span>
@@ -692,107 +727,124 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                         </AccordionTrigger>
                         <AccordionContent>
                           <div className="space-y-4 mt-2">
-                            {menu.containers.map((container) => (
-                              <div
-                                key={container.id}
-                                className="rounded-md overflow-hidden shadow-sm border"
-                              >
-                                <div className="flex items-center justify-between bg-blue-50 p-2 border-b">
-                                  <div className="flex items-center">
-                                    <div className="mr-2 bg-white p-1 rounded-full w-6 h-6 flex items-center justify-center shadow-sm">
-                                      <Package className="h-3 w-3 text-blue-500" />
+                            {menu.containers.map((container) => {
+                              const detail = containerDetails[container.id];
+                              const isLoading = loadingContainers[container.id];
+                              
+                              return (
+                                <div
+                                  key={container.id}
+                                  className="rounded-md overflow-hidden shadow-sm border"
+                                >
+                                  <div className="flex items-center justify-between bg-blue-50 p-2 border-b">
+                                    <div className="flex items-center">
+                                      <div className="mr-2 bg-white p-1 rounded-full w-6 h-6 flex items-center justify-center shadow-sm">
+                                        <Package className="h-3 w-3 text-blue-500" />
+                                      </div>
+                                      <span className="font-medium text-sm">
+                                        {container.container.name}
+                                      </span>
                                     </div>
-                                    <span className="font-medium text-sm">
-                                      {container.container.name}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      {isLoading ? (
+                                        <div className="h-6 w-20 flex items-center justify-center">
+                                          <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                                        </div>
+                                      ) : detail ? (
+                                        <>
+                                          {detail.calories > 0 && (
+                                            <Badge variant="outline" className="bg-white">
+                                              {Math.round(detail.calories)} kcal
+                                            </Badge>
+                                          )}
+                                          <Badge variant="secondary" className="bg-white">
+                                            {formatCurrency(detail.ingredients_cost)}
+                                          </Badge>
+                                        </>
+                                      ) : (
+                                        <div className="h-6 w-20 flex items-center justify-center text-xs text-gray-400">
+                                          정보 없음
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-2">
-                                    {container.totalCalories !== undefined && (
-                                      <Badge variant="outline" className="bg-white">
-                                        {Math.round(container.totalCalories)} kcal
-                                      </Badge>
-                                    )}
-                                    <Badge variant="secondary" className="bg-white">
-                                      {formatCurrency(container.ingredients_cost)}
-                                    </Badge>
-                                  </div>
-                                </div>
 
-                                {container.ingredients.length > 0 && (
-                                  <div className="p-2 text-xs bg-white">
-                                    <div className="text-gray-500 mb-2 text-[10px] flex justify-between px-1">
-                                      <span>식자재</span>
-                                      <div className="flex space-x-3">
-                                        <span>사용량</span>
-                                        <span>원가</span>
+                                  {container.ingredients.length > 0 && (
+                                    <div className="p-2 text-xs bg-white">
+                                      <div className="text-gray-500 mb-2 text-[10px] flex justify-between px-1">
+                                        <span>식자재</span>
+                                        <div className="flex space-x-3">
+                                          <span>사용량</span>
+                                          <span>원가</span>
+                                        </div>
+                                      </div>
+                                      <div className="space-y-2 ml-1">
+                                        {container.ingredients
+                                          .sort((a, b) => {
+                                            const aCost =
+                                              (a.ingredient.price /
+                                                a.ingredient.package_amount) *
+                                              a.amount;
+                                            const bCost =
+                                              (b.ingredient.price /
+                                                b.ingredient.package_amount) *
+                                              b.amount;
+                                            return bCost - aCost;
+                                          })
+                                          .slice(0, expandedContainers.includes(container.id) ? container.ingredients.length : 3)
+                                          .map((item) => {
+                                            const unitPrice = item.ingredient.price / item.ingredient.package_amount;
+                                            const itemCost = unitPrice * item.amount;
+                                            return (
+                                              <div
+                                                key={item.id}
+                                                className="flex items-center justify-between border-b border-gray-100 pb-1"
+                                              >
+                                                <div className="flex items-center">
+                                                  <div className="h-1 w-1 rounded-full bg-slate-300 mr-2"></div>
+                                                  <span>{item.ingredient.name}</span>
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                  <span className="text-gray-600 tabular-nums">
+                                                    {item.amount} {item.ingredient.unit}
+                                                  </span>
+                                                  <span className="text-blue-600 tabular-nums w-14 text-right">
+                                                    {formatCurrency(itemCost)}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        {container.ingredients.length > 3 && !expandedContainers.includes(container.id) && (
+                                          <div 
+                                            className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              toggleContainerExpand(container.id);
+                                            }}
+                                          >
+                                            <span>+{container.ingredients.length - 3}개 더보기</span>
+                                            <ChevronDown className="h-3 w-3" />
+                                          </div>
+                                        )}
+                                        {expandedContainers.includes(container.id) && (
+                                          <div 
+                                            className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              toggleContainerExpand(container.id);
+                                            }}
+                                          >
+                                            <span>접기</span>
+                                            <ChevronUp className="h-3 w-3" />
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
-                                    <div className="space-y-2 ml-1">
-                                      {container.ingredients
-                                        .sort((a, b) => {
-                                          const aCost =
-                                            (a.ingredient.price /
-                                              a.ingredient.package_amount) *
-                                            a.amount;
-                                          const bCost =
-                                            (b.ingredient.price /
-                                              b.ingredient.package_amount) *
-                                            b.amount;
-                                          return bCost - aCost;
-                                        })
-                                        .slice(0, expandedContainers.includes(container.id) ? container.ingredients.length : 3)
-                                        .map((item) => {
-                                          const unitPrice = item.ingredient.price / item.ingredient.package_amount;
-                                          const itemCost = unitPrice * item.amount;
-                                          return (
-                                            <div
-                                              key={item.id}
-                                              className="flex items-center justify-between border-b border-gray-100 pb-1"
-                                            >
-                                              <div className="flex items-center">
-                                                <div className="h-1 w-1 rounded-full bg-slate-300 mr-2"></div>
-                                                <span>{item.ingredient.name}</span>
-                                              </div>
-                                              <div className="flex items-center gap-4">
-                                                <span className="text-gray-600 tabular-nums">
-                                                  {item.amount} {item.ingredient.unit}
-                                                </span>
-                                                <span className="text-blue-600 tabular-nums w-14 text-right">
-                                                  {formatCurrency(itemCost)}
-                                                </span>
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                      {container.ingredients.length > 3 && !expandedContainers.includes(container.id) && (
-                                        <div 
-                                          className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            toggleContainerExpand(container.id);
-                                          }}
-                                        >
-                                          <span>+{container.ingredients.length - 3}개 더보기</span>
-                                          <ChevronDown className="h-3 w-3" />
-                                        </div>
-                                      )}
-                                      {expandedContainers.includes(container.id) && (
-                                        <div 
-                                          className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            toggleContainerExpand(container.id);
-                                          }}
-                                        >
-                                          <span>접기</span>
-                                          <ChevronUp className="h-3 w-3" />
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </AccordionContent>
                       </AccordionItem>

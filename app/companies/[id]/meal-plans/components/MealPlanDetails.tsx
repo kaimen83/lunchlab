@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -44,6 +44,75 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
   const [menuDetails, setMenuDetails] = useState<Record<string, MenuDetailsResponse>>({});
   const [loadingMenus, setLoadingMenus] = useState<Record<string, boolean>>({});
+  const [totalCalories, setTotalCalories] = useState<number>(0);
+  const [isLoadingCalories, setIsLoadingCalories] = useState<boolean>(true);
+  
+  // 컴포넌트 마운트 시 모든 메뉴의 칼로리 정보를 한 번에 로드
+  useEffect(() => {
+    const loadAllMenuDetails = async () => {
+      if (!mealPlan.meal_plan_menus || mealPlan.meal_plan_menus.length === 0) {
+        setIsLoadingCalories(false);
+        return;
+      }
+
+      setIsLoadingCalories(true);
+      
+      try {
+        // 배치 API를 사용하는 대신 순차적으로 처리
+        const loadedDetails = await loadMenuDetailsSequentially();
+        
+        // 총 칼로리 계산
+        const caloriesSum = Object.values(loadedDetails).reduce(
+          (sum, detail) => sum + (detail.calories || 0), 
+          0
+        );
+        
+        setTotalCalories(caloriesSum);
+      } catch (error) {
+        console.error('메뉴 상세 정보 로드 오류:', error);
+        setTotalCalories(0);
+      } finally {
+        setIsLoadingCalories(false);
+      }
+    };
+    
+    // 메뉴 상세 정보를 순차적으로 로드하는 함수
+    const loadMenuDetailsSequentially = async () => {
+      const detailsMap: Record<string, MenuDetailsResponse> = {};
+      const companyId = mealPlan.company_id;
+      
+      for (const item of mealPlan.meal_plan_menus) {
+        const cacheKey = `${item.menu_id}-${item.container_id}`;
+        
+        try {
+          const response = await fetch(`/api/companies/${companyId}/meal-plans/menus/details/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              menu_id: item.menu_id,
+              container_id: item.container_id || null
+            })
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            detailsMap[cacheKey] = data;
+          } else {
+            console.warn(`메뉴 ${item.menu_id} 상세 정보 로드 실패:`, await response.text());
+          }
+        } catch (error) {
+          console.error(`메뉴 ${item.menu_id} 상세 정보 로드 오류:`, error);
+        }
+      }
+      
+      setMenuDetails(detailsMap);
+      return detailsMap;
+    };
+    
+    loadAllMenuDetails();
+  }, [mealPlan]);
   
   // 메뉴 확장 토글 함수
   const toggleMenuExpand = async (menuId: string, containerIdOrNull: string | null | undefined) => {
@@ -166,6 +235,11 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
     }, 0);
   };
   
+  // 총 칼로리 계산 함수 - 캐시된 값 사용
+  const calculateTotalCalories = () => {
+    return totalCalories;
+  };
+  
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -249,6 +323,13 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
       <div className="flex justify-between items-center pt-2 border-t">
         <div className="font-medium text-lg">
           총 비용: {formatCurrency(calculateTotalCost())}
+        </div>
+        <div className="font-medium text-lg">
+          총 칼로리: {isLoadingCalories ? (
+            <span className="text-sm text-muted-foreground">로딩 중...</span>
+          ) : (
+            `${Math.round(calculateTotalCalories())} kcal`
+          )}
         </div>
       </div>
       
