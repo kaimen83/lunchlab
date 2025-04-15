@@ -102,6 +102,7 @@ interface Container {
   }[];
   ingredients_cost: number;
   total_cost: number;
+  totalCalories?: number;
 }
 
 interface Menu {
@@ -151,7 +152,34 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
       }
 
       const data = await response.json();
-      setMenus(data);
+
+      // 각 메뉴 컨테이너의 칼로리 계산
+      const menusWithCalories = await Promise.all(
+        data.map(async (menu: Menu) => {
+          if (!menu.containers || menu.containers.length === 0) {
+            return menu;
+          }
+
+          // 각 컨테이너의 칼로리 계산
+          const containersWithCalories = await Promise.all(
+            menu.containers.map(async (container) => {
+              // 컨테이너의 식재료에 대한 칼로리 계산
+              const totalCalories = await calculateContainerCalories(container);
+              return {
+                ...container,
+                totalCalories,
+              };
+            })
+          );
+
+          return {
+            ...menu,
+            containers: containersWithCalories,
+          };
+        })
+      );
+
+      setMenus(menusWithCalories);
     } catch (error) {
       console.error("메뉴 로드 오류:", error);
       toast({
@@ -164,6 +192,56 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // 컨테이너의 칼로리 계산 함수
+  const calculateContainerCalories = async (container: Container) => {
+    try {
+      // 식재료 ID 목록 추출
+      const ingredientIds = container.ingredients.map(
+        (item) => item.ingredient_id
+      );
+
+      if (ingredientIds.length === 0) {
+        return 0;
+      }
+
+      // 식재료 칼로리 정보 조회
+      const response = await fetch(
+        `/api/companies/${companyId}/ingredients/batch`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ids: ingredientIds }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("식재료 정보를 불러오는데 실패했습니다.");
+      }
+
+      const ingredientsData = await response.json();
+
+      // 컨테이너 칼로리 계산
+      return container.ingredients.reduce((total, item) => {
+        const ingredientInfo = ingredientsData.find(
+          (ing: any) => ing.id === item.ingredient_id
+        );
+
+        if (!ingredientInfo || !ingredientInfo.calories) {
+          return total;
+        }
+
+        // 칼로리 계산: 식재료 칼로리/포장단위 * 사용량
+        const caloriesPerUnit = ingredientInfo.calories / ingredientInfo.package_amount;
+        return total + caloriesPerUnit * item.amount;
+      }, 0);
+    } catch (error) {
+      console.error("칼로리 계산 오류:", error);
+      return 0;
     }
   };
 
@@ -421,9 +499,16 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                             {container.container.name}
                           </span>
                         </div>
-                        <Badge variant="secondary" className="bg-white">
-                          {formatCurrency(container.ingredients_cost)}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          {container.totalCalories !== undefined && (
+                            <Badge variant="outline" className="bg-white">
+                              {Math.round(container.totalCalories)} kcal
+                            </Badge>
+                          )}
+                          <Badge variant="secondary" className="bg-white">
+                            {formatCurrency(container.ingredients_cost)}
+                          </Badge>
+                        </div>
                       </div>
 
                       {container.ingredients.length > 0 && (
@@ -621,9 +706,16 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                                       {container.container.name}
                                     </span>
                                   </div>
-                                  <Badge variant="secondary" className="bg-white">
-                                    {formatCurrency(container.ingredients_cost)}
-                                  </Badge>
+                                  <div className="flex items-center gap-2">
+                                    {container.totalCalories !== undefined && (
+                                      <Badge variant="outline" className="bg-white">
+                                        {Math.round(container.totalCalories)} kcal
+                                      </Badge>
+                                    )}
+                                    <Badge variant="secondary" className="bg-white">
+                                      {formatCurrency(container.ingredients_cost)}
+                                    </Badge>
+                                  </div>
                                 </div>
 
                                 {container.ingredients.length > 0 && (
