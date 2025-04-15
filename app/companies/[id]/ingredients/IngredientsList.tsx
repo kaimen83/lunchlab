@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Plus, FilePen, Trash2, Search, PackageOpen, 
-  ChevronDown, ChevronUp, LineChart, MoreVertical, Eye
+  ChevronDown, ChevronUp, LineChart, MoreVertical, Eye,
+  Settings, X, ChevronRight, Info
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,9 +19,18 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface Ingredient {
   id: string;
@@ -35,6 +45,12 @@ interface Ingredient {
   pac_count?: number;
   stock_grade?: string;
   memo1?: string;
+  origin?: string;
+  calories?: number;
+  protein?: number;
+  fat?: number;
+  carbs?: number;
+  allergens?: string;
   created_at: string;
   updated_at?: string;
 }
@@ -58,6 +74,22 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [ingredientToDelete, setIngredientToDelete] = useState<Ingredient | null>(null);
+  // 확장된 행 상태 관리
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  // 칼럼 가시성 상태 관리
+  const [visibleColumns, setVisibleColumns] = useState({
+    name: true,
+    code_name: true,
+    supplier: true,
+    package_amount: true,
+    price: true,
+    items_per_box: true,
+    stock_grade: true,
+    origin: false,
+    calories: false,
+    nutrition: false,
+    allergens: false
+  });
 
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin';
 
@@ -127,7 +159,10 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
   const filteredIngredients = ingredients
     .filter(ingredient => 
       ingredient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ingredient.unit.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (ingredient.code_name && ingredient.code_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (ingredient.origin && ingredient.origin.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (ingredient.allergens && ingredient.allergens.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (ingredient.unit && ingredient.unit.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (ingredient.memo1 && ingredient.memo1.toLowerCase().includes(searchQuery.toLowerCase()))
     )
     .sort((a, b) => {
@@ -229,54 +264,101 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
   const renderTableHeader = () => (
     <TableHeader>
       <TableRow>
-        <TableHead 
-          className="cursor-pointer"
-          onClick={() => toggleSort('name')}
-        >
-          식재료명
-          {sortField === 'name' && (
-            sortDirection === 'asc' ? 
-              <ChevronUp className="inline ml-1 h-4 w-4" /> : 
-              <ChevronDown className="inline ml-1 h-4 w-4" />
-          )}
-        </TableHead>
-        <TableHead 
-          className="cursor-pointer"
-          onClick={() => toggleSort('code_name')}
-        >
-          코드명
-          {sortField === 'code_name' && (
-            sortDirection === 'asc' ? 
-              <ChevronUp className="inline ml-1 h-4 w-4" /> : 
-              <ChevronDown className="inline ml-1 h-4 w-4" />
-          )}
-        </TableHead>
-        <TableHead 
-          className="cursor-pointer w-[180px]"
-          onClick={() => toggleSort('supplier')}
-        >
-          식재료 업체
-          {sortField === 'supplier' && (
-            sortDirection === 'asc' ? 
-              <ChevronUp className="inline ml-1 h-4 w-4" /> : 
-              <ChevronDown className="inline ml-1 h-4 w-4" />
-          )}
-        </TableHead>
-        <TableHead className="w-[120px]">포장 단위</TableHead>
-        <TableHead 
-          className="cursor-pointer text-right w-[120px]"
-          onClick={() => toggleSort('price')}
-        >
-          가격
-          {sortField === 'price' && (
-            sortDirection === 'asc' ? 
-              <ChevronUp className="inline ml-1 h-4 w-4" /> : 
-              <ChevronDown className="inline ml-1 h-4 w-4" />
-          )}
-        </TableHead>
-        <TableHead className="w-[100px]">박스당 갯수</TableHead>
-        <TableHead className="w-[100px]">재고관리 등급</TableHead>
-        <TableHead className="text-right">작업</TableHead>
+        <TableHead className="w-8"></TableHead> {/* 확장 버튼 열 */}
+        {visibleColumns.name && (
+          <TableHead 
+            className="cursor-pointer whitespace-nowrap"
+            onClick={() => toggleSort('name')}
+          >
+            식재료 명
+            {sortField === 'name' && (
+              sortDirection === 'asc' ? 
+                <ChevronUp className="inline-block h-4 w-4 ml-1" /> : 
+                <ChevronDown className="inline-block h-4 w-4 ml-1" />
+            )}
+          </TableHead>
+        )}
+        {visibleColumns.code_name && (
+          <TableHead 
+            className="cursor-pointer whitespace-nowrap"
+            onClick={() => toggleSort('code_name')}
+          >
+            코드명
+            {sortField === 'code_name' && (
+              sortDirection === 'asc' ? 
+                <ChevronUp className="inline-block h-4 w-4 ml-1" /> : 
+                <ChevronDown className="inline-block h-4 w-4 ml-1" />
+            )}
+          </TableHead>
+        )}
+        {visibleColumns.supplier && (
+          <TableHead 
+            className="cursor-pointer whitespace-nowrap"
+            onClick={() => toggleSort('supplier')}
+          >
+            식재료 업체
+            {sortField === 'supplier' && (
+              sortDirection === 'asc' ? 
+                <ChevronUp className="inline ml-1 h-4 w-4" /> : 
+                <ChevronDown className="inline ml-1 h-4 w-4" />
+            )}
+          </TableHead>
+        )}
+        {visibleColumns.package_amount && (
+          <TableHead className="whitespace-nowrap">포장 단위</TableHead>
+        )}
+        {visibleColumns.price && (
+          <TableHead 
+            className="cursor-pointer text-right whitespace-nowrap"
+            onClick={() => toggleSort('price')}
+          >
+            가격
+            {sortField === 'price' && (
+              sortDirection === 'asc' ? 
+                <ChevronUp className="inline ml-1 h-4 w-4" /> : 
+                <ChevronDown className="inline ml-1 h-4 w-4" />
+            )}
+          </TableHead>
+        )}
+        {visibleColumns.items_per_box && (
+          <TableHead className="whitespace-nowrap">박스당 갯수</TableHead>
+        )}
+        {visibleColumns.stock_grade && (
+          <TableHead className="whitespace-nowrap">재고관리 등급</TableHead>
+        )}
+        {visibleColumns.origin && (
+          <TableHead
+            className="cursor-pointer whitespace-nowrap"
+            onClick={() => toggleSort('origin')}
+          >
+            원산지
+            {sortField === 'origin' && (
+              sortDirection === 'asc' ? 
+                <ChevronUp className="inline-block h-4 w-4 ml-1" /> : 
+                <ChevronDown className="inline-block h-4 w-4 ml-1" />
+            )}
+          </TableHead>
+        )}
+        {visibleColumns.calories && (
+          <TableHead 
+            className="cursor-pointer whitespace-nowrap"
+            onClick={() => toggleSort('calories')}
+          >
+            칼로리
+            {sortField === 'calories' && (
+              sortDirection === 'asc' ? 
+                <ChevronUp className="inline-block h-4 w-4 ml-1" /> : 
+                <ChevronDown className="inline-block h-4 w-4 ml-1" />
+            )}
+          </TableHead>
+        )}
+        {visibleColumns.nutrition && (
+          <TableHead className="whitespace-nowrap">영양성분</TableHead>
+        )}
+        {visibleColumns.allergens && (
+          <TableHead className="whitespace-nowrap">알러지 유발물질</TableHead>
+        )}
+        <TableHead className="text-right whitespace-nowrap">작업</TableHead>
       </TableRow>
     </TableHeader>
   );
@@ -286,57 +368,159 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
     <TableBody>
       {isLoading ? (
         <TableRow>
-          <TableCell colSpan={10} className="text-center">로딩 중...</TableCell>
+          <TableCell colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} className="text-center">로딩 중...</TableCell>
         </TableRow>
       ) : filteredIngredients.length === 0 ? (
         <TableRow>
-          <TableCell colSpan={10} className="text-center">
+          <TableCell colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} className="text-center">
             {searchQuery ? '검색 결과가 없습니다.' : '등록된 식재료가 없습니다.'}
           </TableCell>
         </TableRow>
       ) : (
         filteredIngredients.map(ingredient => (
-          <TableRow key={ingredient.id}>
-            <TableCell className="font-medium">{ingredient.name}</TableCell>
-            <TableCell>{ingredient.code_name || '-'}</TableCell>
-            <TableCell>{ingredient.supplier || '-'}</TableCell>
-            <TableCell>{formatNumber(ingredient.package_amount)}{ingredient.unit}</TableCell>
-            <TableCell className="text-right">{formatCurrency(ingredient.price)}</TableCell>
-            <TableCell>{ingredient.items_per_box ? formatNumber(ingredient.items_per_box) : '-'}</TableCell>
-            <TableCell>{ingredient.stock_grade || '-'}</TableCell>
-            <TableCell className="text-right">
-              <div className="flex justify-end space-x-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleViewPriceHistory(ingredient)}
-                  title="가격 이력 보기"
+          <>
+            <TableRow key={ingredient.id} className={expandedRows[ingredient.id] ? "border-b-0" : ""}>
+              <TableCell className="p-0 pl-4">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-6 w-6" 
+                  onClick={() => toggleRowExpand(ingredient.id)}
                 >
-                  <LineChart className="h-4 w-4" />
+                  <ChevronRight 
+                    className={`h-4 w-4 transition-transform ${expandedRows[ingredient.id] ? 'rotate-90' : ''}`} 
+                  />
                 </Button>
-                {isOwnerOrAdmin && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEditIngredient(ingredient)}
-                      title="수정"
-                    >
-                      <FilePen className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteConfirm(ingredient)}
-                      title="삭제"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </>
-                )}
-              </div>
-            </TableCell>
-          </TableRow>
+              </TableCell>
+              {visibleColumns.name && (
+                <TableCell className="font-medium">{ingredient.name}</TableCell>
+              )}
+              {visibleColumns.code_name && (
+                <TableCell className="whitespace-nowrap">{ingredient.code_name || '-'}</TableCell>
+              )}
+              {visibleColumns.supplier && (
+                <TableCell>{ingredient.supplier || '-'}</TableCell>
+              )}
+              {visibleColumns.package_amount && (
+                <TableCell>{formatNumber(ingredient.package_amount)}{ingredient.unit}</TableCell>
+              )}
+              {visibleColumns.price && (
+                <TableCell className="text-right">{formatCurrency(ingredient.price)}</TableCell>
+              )}
+              {visibleColumns.items_per_box && (
+                <TableCell>{ingredient.items_per_box ? formatNumber(ingredient.items_per_box) : '-'}</TableCell>
+              )}
+              {visibleColumns.stock_grade && (
+                <TableCell>{ingredient.stock_grade || '-'}</TableCell>
+              )}
+              {visibleColumns.origin && (
+                <TableCell className="whitespace-nowrap">{ingredient.origin || '-'}</TableCell>
+              )}
+              {visibleColumns.calories && (
+                <TableCell className="whitespace-nowrap">
+                  {ingredient.calories ? `${ingredient.calories} kcal` : '-'}
+                </TableCell>
+              )}
+              {visibleColumns.nutrition && (
+                <TableCell className="whitespace-nowrap">
+                  {ingredient.protein || ingredient.fat || ingredient.carbs ? 
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-help">영양성분 정보</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>단백질: {ingredient.protein || 0}g</p>
+                          <p>지방: {ingredient.fat || 0}g</p>
+                          <p>탄수화물: {ingredient.carbs || 0}g</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider> : '-'}
+                </TableCell>
+              )}
+              {visibleColumns.allergens && (
+                <TableCell className="whitespace-nowrap">
+                  {ingredient.allergens || '-'}
+                </TableCell>
+              )}
+              <TableCell className="text-right">
+                <div className="flex justify-end space-x-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleViewPriceHistory(ingredient)}
+                    title="가격 이력 보기"
+                  >
+                    <LineChart className="h-4 w-4" />
+                  </Button>
+                  {isOwnerOrAdmin && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditIngredient(ingredient)}
+                        title="수정"
+                      >
+                        <FilePen className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteConfirm(ingredient)}
+                        title="삭제"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </TableCell>
+            </TableRow>
+            {expandedRows[ingredient.id] && (
+              <TableRow key={`${ingredient.id}-expanded`}>
+                <TableCell colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} className="bg-muted/20 px-6 py-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {!visibleColumns.origin && ingredient.origin && (
+                      <div>
+                        <span className="font-medium text-sm">원산지:</span>
+                        <p>{ingredient.origin}</p>
+                      </div>
+                    )}
+                    {!visibleColumns.calories && ingredient.calories && (
+                      <div>
+                        <span className="font-medium text-sm">칼로리:</span>
+                        <p>{ingredient.calories} kcal</p>
+                      </div>
+                    )}
+                    {!visibleColumns.nutrition && (ingredient.protein || ingredient.fat || ingredient.carbs) && (
+                      <div>
+                        <span className="font-medium text-sm">영양성분:</span>
+                        <p className="text-sm">
+                          {ingredient.protein ? `단백질: ${ingredient.protein}g` : ''}
+                          {ingredient.protein && <br />}
+                          {ingredient.fat ? `지방: ${ingredient.fat}g` : ''}
+                          {ingredient.fat && <br />}
+                          {ingredient.carbs ? `탄수화물: ${ingredient.carbs}g` : ''}
+                        </p>
+                      </div>
+                    )}
+                    {!visibleColumns.allergens && ingredient.allergens && (
+                      <div>
+                        <span className="font-medium text-sm">알러지 유발물질:</span>
+                        <p>{ingredient.allergens}</p>
+                      </div>
+                    )}
+                    {ingredient.memo1 && (
+                      <div>
+                        <span className="font-medium text-sm">메모:</span>
+                        <p>{ingredient.memo1}</p>
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+          </>
         ))
       )}
     </TableBody>
@@ -344,59 +528,41 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
 
   // 모바일 카드 아이템 렌더링
   const renderMobileCard = (ingredient: Ingredient) => (
-    <div className="p-3 border-b border-gray-200 last:border-0">
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="font-semibold text-base">{ingredient.name}</h3>
+    <Card key={ingredient.id} className="p-4 mb-2">
+      <div className="flex justify-between items-start mb-2">
+        <div>
+          <h3 className="font-bold text-base">{ingredient.name}</h3>
+          {ingredient.code_name && (
+            <p className="text-xs text-muted-foreground mb-1">
+              코드: {ingredient.code_name}
+            </p>
+          )}
+          {ingredient.origin && (
+            <p className="text-xs text-muted-foreground mb-1">
+              원산지: {ingredient.origin}
+            </p>
+          )}
+        </div>
+        
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <Button variant="ghost" size="icon" className="h-8 w-8">
               <MoreVertical className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent 
-            align="end"
-            // 메뉴가 닫힐 때 DOM 요소 강제 제거 방지
-            onCloseAutoFocus={(event) => {
-              event.preventDefault();
-              // DropdownMenu가 닫힐 때 이벤트 처리 개선
-              try {
-                // 메뉴 닫기 후 포커스 리셋
-                if (document.activeElement instanceof HTMLElement) {
-                  document.activeElement.blur();
-                }
-              } catch (e) {
-                console.warn("DropdownMenu 닫기 처리 중 오류:", e);
-              }
-            }}
-          >
-            <DropdownMenuItem 
-              onClick={(e) => {
-                e.stopPropagation(); // 이벤트 전파 중지
-                handleViewPriceHistory(ingredient);
-              }}
-            >
-              <LineChart className="h-4 w-4 mr-2" />
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleViewPriceHistory(ingredient)}>
+              <LineChart className="mr-2 h-4 w-4" />
               <span>가격 이력</span>
             </DropdownMenuItem>
             {isOwnerOrAdmin && (
               <>
-                <DropdownMenuItem 
-                  onClick={(e) => {
-                    e.stopPropagation(); // 이벤트 전파 중지
-                    handleEditIngredient(ingredient);
-                  }}
-                >
-                  <FilePen className="h-4 w-4 mr-2" />
+                <DropdownMenuItem onClick={() => handleEditIngredient(ingredient)}>
+                  <FilePen className="mr-2 h-4 w-4" />
                   <span>수정</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem 
-                  className="text-red-500" 
-                  onClick={(e) => {
-                    e.stopPropagation(); // 이벤트 전파 중지
-                    handleDeleteConfirm(ingredient);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
+                <DropdownMenuItem onClick={() => handleDeleteConfirm(ingredient)} className="text-destructive">
+                  <Trash2 className="mr-2 h-4 w-4" />
                   <span>삭제</span>
                 </DropdownMenuItem>
               </>
@@ -404,34 +570,48 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <div className="grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <span className="text-gray-500">포장 단위:</span>
-          <span className="ml-2">{formatNumber(ingredient.package_amount)}{ingredient.unit}</span>
-        </div>
-        <div>
-          <span className="text-gray-500">가격:</span>
-          <span className="ml-2">{formatCurrency(ingredient.price)}</span>
-        </div>
-        <div>
-          <span className="text-gray-500">코드명:</span>
-          <span className="ml-2">{ingredient.code_name || '-'}</span>
-        </div>
-        <div>
-          <span className="text-gray-500">식재료 업체:</span>
-          <span className="ml-2">{ingredient.supplier || '-'}</span>
-        </div>
-        <div>
-          <span className="text-gray-500">박스당 갯수:</span>
-          <span className="ml-2">{ingredient.items_per_box ? formatNumber(ingredient.items_per_box) : '-'}</span>
-        </div>
-        <div>
-          <span className="text-gray-500">재고관리 등급:</span>
-          <span className="ml-2">{ingredient.stock_grade || '-'}</span>
-        </div>
+      <div className="grid grid-cols-2 gap-1 text-sm">
+        <div className="text-muted-foreground">단가:</div>
+        <div>{formatCurrency(ingredient.price)}원/{ingredient.package_amount}{ingredient.unit}</div>
+        
+        <div className="text-muted-foreground">공급업체:</div>
+        <div>{ingredient.supplier || '-'}</div>
+        
+        {ingredient.calories && (
+          <>
+            <div className="text-muted-foreground">칼로리:</div>
+            <div>{ingredient.calories} kcal</div>
+          </>
+        )}
+        
+        {(ingredient.protein || ingredient.fat || ingredient.carbs) && (
+          <>
+            <div className="text-muted-foreground">영양성분:</div>
+            <div className="text-xs">
+              {ingredient.protein ? `단백질 ${ingredient.protein}g` : ''}
+              {ingredient.fat ? (ingredient.protein ? ', ' : '') + `지방 ${ingredient.fat}g` : ''}
+              {ingredient.carbs ? ((ingredient.protein || ingredient.fat) ? ', ' : '') + `탄수화물 ${ingredient.carbs}g` : ''}
+            </div>
+          </>
+        )}
+        
+        {ingredient.allergens && (
+          <>
+            <div className="text-muted-foreground">알러지 유발물질:</div>
+            <div>{ingredient.allergens}</div>
+          </>
+        )}
       </div>
-    </div>
+    </Card>
   );
+
+  // 행 확장 토글
+  const toggleRowExpand = (ingredientId: string) => {
+    setExpandedRows(prev => ({
+      ...prev,
+      [ingredientId]: !prev[ingredientId]
+    }));
+  };
 
   return (
     <div className="p-2 sm:p-6">
@@ -445,9 +625,111 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
             className="w-full"
           />
         </div>
-        <Button onClick={handleAddIngredient} className="w-full sm:w-auto mt-2 sm:mt-0">
-          <Plus className="mr-2 h-4 w-4" /> 식재료 추가
-        </Button>
+        <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1">
+                <Settings className="h-4 w-4" />
+                <span>칼럼 설정</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.name}
+                onCheckedChange={(checked) => 
+                  setVisibleColumns({...visibleColumns, name: checked})
+                }
+                disabled={true} // 필수 칼럼은 비활성화
+              >
+                식재료 명
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.code_name}
+                onCheckedChange={(checked) => 
+                  setVisibleColumns({...visibleColumns, code_name: checked})
+                }
+              >
+                코드명
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.supplier}
+                onCheckedChange={(checked) => 
+                  setVisibleColumns({...visibleColumns, supplier: checked})
+                }
+              >
+                식재료 업체
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.package_amount}
+                onCheckedChange={(checked) => 
+                  setVisibleColumns({...visibleColumns, package_amount: checked})
+                }
+              >
+                포장 단위
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.price}
+                onCheckedChange={(checked) => 
+                  setVisibleColumns({...visibleColumns, price: checked})
+                }
+              >
+                가격
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.items_per_box}
+                onCheckedChange={(checked) => 
+                  setVisibleColumns({...visibleColumns, items_per_box: checked})
+                }
+              >
+                박스당 갯수
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.stock_grade}
+                onCheckedChange={(checked) => 
+                  setVisibleColumns({...visibleColumns, stock_grade: checked})
+                }
+              >
+                재고관리 등급
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.origin}
+                onCheckedChange={(checked) => 
+                  setVisibleColumns({...visibleColumns, origin: checked})
+                }
+              >
+                원산지
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.calories}
+                onCheckedChange={(checked) => 
+                  setVisibleColumns({...visibleColumns, calories: checked})
+                }
+              >
+                칼로리
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.nutrition}
+                onCheckedChange={(checked) => 
+                  setVisibleColumns({...visibleColumns, nutrition: checked})
+                }
+              >
+                영양성분
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.allergens}
+                onCheckedChange={(checked) => 
+                  setVisibleColumns({...visibleColumns, allergens: checked})
+                }
+              >
+                알러지 유발물질
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button onClick={handleAddIngredient}>
+            <Plus className="mr-2 h-4 w-4" /> 식재료 추가
+          </Button>
+        </div>
       </div>
 
       <Card>

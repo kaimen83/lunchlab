@@ -38,6 +38,36 @@ export const ingredientSchema = z.object({
     .max(200, { message: '메모는 200자 이하여야 합니다.' })
     .optional()
     .nullable(),
+  origin: z
+    .string()
+    .max(100, { message: '원산지는 100자 이하여야 합니다.' })
+    .optional()
+    .nullable(),
+  calories: z
+    .number()
+    .min(0, { message: '칼로리는 0 이상이어야 합니다.' })
+    .optional()
+    .nullable(),
+  protein: z
+    .number()
+    .min(0, { message: '단백질은 0 이상이어야 합니다.' })
+    .optional()
+    .nullable(),
+  fat: z
+    .number()
+    .min(0, { message: '지방은 0 이상이어야 합니다.' })
+    .optional()
+    .nullable(),
+  carbs: z
+    .number()
+    .min(0, { message: '탄수화물은 0 이상이어야 합니다.' })
+    .optional()
+    .nullable(),
+  allergens: z
+    .string()
+    .max(200, { message: '알러지 유발물질은 200자 이하여야 합니다.' })
+    .optional()
+    .nullable(),
 });
 
 export type IngredientFormValues = z.infer<typeof ingredientSchema>;
@@ -53,6 +83,12 @@ export interface Ingredient {
   items_per_box?: number;
   stock_grade?: string;
   memo1?: string;
+  origin?: string;
+  calories?: number;
+  protein?: number;
+  fat?: number;
+  carbs?: number;
+  allergens?: string;
   created_at: string;
   updated_at?: string;
 }

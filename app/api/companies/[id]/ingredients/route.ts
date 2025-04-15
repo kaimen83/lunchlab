@@ -50,6 +50,36 @@ const ingredientSchema = z.object({
     .max(200, { message: '메모는 200자 이하여야 합니다.' })
     .optional()
     .nullable(),
+  origin: z
+    .string()
+    .max(100, { message: '원산지는 100자 이하여야 합니다.' })
+    .optional()
+    .nullable(),
+  calories: z
+    .number()
+    .min(0, { message: '칼로리는 0 이상이어야 합니다.' })
+    .optional()
+    .nullable(),
+  protein: z
+    .number()
+    .min(0, { message: '단백질은 0 이상이어야 합니다.' })
+    .optional()
+    .nullable(),
+  fat: z
+    .number()
+    .min(0, { message: '지방은 0 이상이어야 합니다.' })
+    .optional()
+    .nullable(),
+  carbs: z
+    .number()
+    .min(0, { message: '탄수화물은 0 이상이어야 합니다.' })
+    .optional()
+    .nullable(),
+  allergens: z
+    .string()
+    .max(200, { message: '알러지 유발물질은 200자 이하여야 합니다.' })
+    .optional()
+    .nullable(),
 });
 
 interface RouteContext {
@@ -175,6 +205,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
         items_per_box: ingredient.items_per_box || null,
         stock_grade: ingredient.stock_grade || null,
         memo1: ingredient.memo1 || null,
+        origin: ingredient.origin || null,
+        calories: ingredient.calories || null,
+        protein: ingredient.protein || null,
+        fat: ingredient.fat || null,
+        carbs: ingredient.carbs || null,
+        allergens: ingredient.allergens || null,
       })
       .select('*')
       .single();

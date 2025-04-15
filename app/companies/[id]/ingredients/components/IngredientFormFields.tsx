@@ -1,4 +1,4 @@
-import { Plus, Pencil, Trash2, Save, AlertTriangle, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Save, AlertTriangle, Loader2, Info } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Separator } from "@/components/ui/separator";
 import { IngredientFormValues, SupplierOption } from '../schema';
 import { formatPrice } from '../utils';
 import { createServerSupabaseClient } from '@/lib/supabase';
@@ -351,18 +358,20 @@ export function IngredientFormFields({
         <FormField
           control={form.control}
           name="package_amount"
-          render={({ field }) => (
+          render={({ field: { value, onChange, ...rest } }) => (
             <FormItem>
               <FormLabel className="flex items-center">
                 포장당 식재료 양 <span className="text-red-500 ml-1">*</span>
               </FormLabel>
               <FormControl>
                 <Input
-                  {...field}
+                  {...rest}
                   type="number"
                   step="0.1"
                   min="0.1"
                   placeholder="1포장당 양을 입력하세요"
+                  value={value || ''}
+                  onChange={(e) => onChange(e.target.value === '' ? 0 : Number(e.target.value))}
                 />
               </FormControl>
               <FormMessage />
@@ -425,17 +434,17 @@ export function IngredientFormFields({
         <FormField
           control={form.control}
           name="items_per_box"
-          render={({ field }) => (
+          render={({ field: { value, onChange, ...rest } }) => (
             <FormItem>
               <FormLabel>박스당 포장 갯수</FormLabel>
               <FormControl>
                 <Input
-                  {...field}
+                  {...rest}
                   type="number"
                   min="0"
                   placeholder="박스당 포장 갯수를 입력하세요"
-                  onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                  value={field.value === 0 ? "" : field.value || ""}
+                  onChange={(e) => onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+                  value={value === 0 ? "" : value || ""}
                   onFocus={(e) => {
                     if (parseInt(e.target.value) === 0) {
                       e.target.value = "";
@@ -443,7 +452,7 @@ export function IngredientFormFields({
                   }}
                   onBlur={(e) => {
                     if (e.target.value === "") {
-                      field.onChange(0);
+                      onChange(0);
                     }
                   }}
                 />
@@ -482,16 +491,16 @@ export function IngredientFormFields({
 
       <FormField
         control={form.control}
-        name="memo1"
-        render={({ field }) => (
+        name="origin"
+        render={({ field: { value, onChange, ...rest } }) => (
           <FormItem>
-            <FormLabel>메모</FormLabel>
+            <FormLabel>원산지</FormLabel>
             <FormControl>
-              <Textarea
-                {...field}
-                placeholder="추가 정보를 입력하세요"
-                rows={2}
-                value={field.value || ""}
+              <Input 
+                {...rest} 
+                placeholder="원산지를 입력하세요" 
+                value={value || ''} 
+                onChange={(e) => onChange(e.target.value)}
               />
             </FormControl>
             <FormMessage />
@@ -499,7 +508,138 @@ export function IngredientFormFields({
         )}
       />
 
-      {/* 공급업체 수정 모달 */}
+      <Accordion type="single" collapsible className="w-full border rounded-md">
+        <AccordionItem value="nutrition-info">
+          <AccordionTrigger className="px-4 py-2 hover:no-underline">
+            <div className="flex items-center">
+              <Info className="h-4 w-4 mr-2" />
+              <span>영양 정보</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4 pt-2 space-y-4">
+            <FormField
+              control={form.control}
+              name="calories"
+              render={({ field: { value, onChange, ...rest } }) => (
+                <FormItem>
+                  <FormLabel>칼로리 (kcal)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      {...rest} 
+                      type="number" 
+                      placeholder="0" 
+                      value={value === null || value === undefined ? '' : value}
+                      onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="protein"
+              render={({ field: { value, onChange, ...rest } }) => (
+                <FormItem>
+                  <FormLabel>단백질 (g)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      {...rest} 
+                      type="number" 
+                      placeholder="0" 
+                      value={value === null || value === undefined ? '' : value}
+                      onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="fat"
+              render={({ field: { value, onChange, ...rest } }) => (
+                <FormItem>
+                  <FormLabel>지방 (g)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      {...rest} 
+                      type="number" 
+                      placeholder="0" 
+                      value={value === null || value === undefined ? '' : value}
+                      onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="carbs"
+              render={({ field: { value, onChange, ...rest } }) => (
+                <FormItem>
+                  <FormLabel>탄수화물 (g)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      {...rest} 
+                      type="number" 
+                      placeholder="0" 
+                      value={value === null || value === undefined ? '' : value}
+                      onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
+      <FormField
+        control={form.control}
+        name="allergens"
+        render={({ field: { value, onChange, ...rest } }) => (
+          <FormItem>
+            <FormLabel>알러지 유발물질</FormLabel>
+            <FormControl>
+              <Textarea 
+                {...rest} 
+                placeholder="알러지 유발물질을 입력하세요 (예: 밀, 대두, 우유)"
+                className="resize-none h-20"
+                value={value || ''}
+                onChange={(e) => onChange(e.target.value)}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={form.control}
+        name="memo1"
+        render={({ field: { value, onChange, ...rest } }) => (
+          <FormItem>
+            <FormLabel>메모</FormLabel>
+            <FormControl>
+              <Textarea 
+                {...rest} 
+                placeholder="추가 정보를 입력하세요"
+                className="resize-none h-20"
+                value={value || ''}
+                onChange={(e) => onChange(e.target.value)}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
       <Dialog open={isEditSupplierOpen} onOpenChange={setIsEditSupplierOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -553,7 +693,6 @@ export function IngredientFormFields({
         </DialogContent>
       </Dialog>
       
-      {/* 공급업체 삭제 확인 모달 */}
       <AlertDialog open={isDeleteSupplierOpen} onOpenChange={setIsDeleteSupplierOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -35,6 +35,12 @@ export const useIngredientForm = ({
         items_per_box: ingredient.items_per_box || 0,
         stock_grade: ingredient.stock_grade || '',
         memo1: ingredient.memo1 || '',
+        origin: ingredient.origin || '',
+        calories: ingredient.calories || 0,
+        protein: ingredient.protein || 0,
+        fat: ingredient.fat || 0,
+        carbs: ingredient.carbs || 0,
+        allergens: ingredient.allergens || '',
       }
     : {
         name: '',
@@ -46,6 +52,12 @@ export const useIngredientForm = ({
         items_per_box: 0,
         stock_grade: '',
         memo1: '',
+        origin: '',
+        calories: 0,
+        protein: 0,
+        fat: 0,
+        carbs: 0,
+        allergens: '',
       };
 
   // 폼 생성
@@ -62,7 +74,13 @@ export const useIngredientForm = ({
           name: ingredient.name,
           code_name: ingredient.code_name,
           supplier_id: ingredient.supplier_id,
-          stock_grade: ingredient.stock_grade
+          stock_grade: ingredient.stock_grade,
+          origin: ingredient.origin,
+          calories: ingredient.calories,
+          protein: ingredient.protein,
+          fat: ingredient.fat,
+          carbs: ingredient.carbs,
+          allergens: ingredient.allergens,
         });
 
         // 모든 필드를 명시적으로 설정
@@ -76,6 +94,12 @@ export const useIngredientForm = ({
           items_per_box: ingredient.items_per_box || 0,
           stock_grade: ingredient.stock_grade || '',
           memo1: ingredient.memo1 || '',
+          origin: ingredient.origin || '',
+          calories: ingredient.calories || 0,
+          protein: ingredient.protein || 0,
+          fat: ingredient.fat || 0,
+          carbs: ingredient.carbs || 0,
+          allergens: ingredient.allergens || '',
         });
       }
       setFormInitialized(true);

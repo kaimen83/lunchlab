@@ -107,7 +107,11 @@ export async function PUT(request: Request, context: RouteContext) {
     }
     
     const body = await request.json();
-    const { name, code_name, package_amount, unit, price, items_per_box, stock_grade, memo1, supplier_id } = body;
+    const { 
+      name, code_name, package_amount, unit, price, 
+      items_per_box, stock_grade, memo1, supplier_id,
+      origin, calories, protein, fat, carbs, allergens
+    } = body;
     
     // 필수 입력값 검증
     if (!name || !package_amount || !unit || !price) {
@@ -182,6 +186,12 @@ export async function PUT(request: Request, context: RouteContext) {
         items_per_box: items_per_box || null,
         stock_grade: stock_grade || null,
         memo1: memo1 || null,
+        origin: origin || null,
+        calories: calories || null,
+        protein: protein || null,
+        fat: fat || null,
+        carbs: carbs || null,
+        allergens: allergens || null,
         updated_at: new Date().toISOString()
       })
       .eq('id', ingredientId)
