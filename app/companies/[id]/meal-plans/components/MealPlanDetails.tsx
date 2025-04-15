@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import { FilePen, Trash2, Package } from 'lucide-react';
+import { FilePen, Trash2, Package, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { MealPlan } from '../types';
 import { getMealTimeName, calculateMealPlanCost, formatCurrency } from '../utils';
@@ -25,8 +25,146 @@ interface MealPlanDetailsProps {
   onDelete: () => void;
 }
 
+// 메뉴 상세 정보 응답 타입
+interface MenuDetailsResponse {
+  menu_id: string;
+  container_id: string | null;
+  cost: number;
+  calories: number;
+  container: {
+    id: string;
+    name: string;
+    description: string | null;
+    price: number;
+  } | null;
+}
+
 export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlanDetailsProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState<boolean>(false);
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
+  const [menuDetails, setMenuDetails] = useState<Record<string, MenuDetailsResponse>>({});
+  const [loadingMenus, setLoadingMenus] = useState<Record<string, boolean>>({});
+  
+  // 메뉴 확장 토글 함수
+  const toggleMenuExpand = async (menuId: string, containerIdOrNull: string | null | undefined) => {
+    const containerId = containerIdOrNull || null;
+    const cacheKey = `${menuId}-${containerId}`;
+    
+    // 이미 확장되어 있으면 접기
+    if (expandedMenus[cacheKey]) {
+      setExpandedMenus({
+        ...expandedMenus,
+        [cacheKey]: false
+      });
+      return;
+    }
+    
+    // 이미 상세 정보가 있으면 바로 확장
+    if (menuDetails[cacheKey]) {
+      setExpandedMenus({
+        ...expandedMenus,
+        [cacheKey]: true
+      });
+      return;
+    }
+    
+    // 로딩 상태 설정
+    setLoadingMenus({
+      ...loadingMenus,
+      [cacheKey]: true
+    });
+    
+    // 상세 정보 로드
+    try {
+      const companyId = mealPlan.company_id;
+      const response = await fetch(`/api/companies/${companyId}/meal-plans/menus/details`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          menu_id: menuId,
+          container_id: containerId
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('메뉴 상세 정보를 불러오는데 실패했습니다.');
+      }
+      
+      const data = await response.json();
+      
+      // 상세 정보 저장
+      setMenuDetails({
+        ...menuDetails,
+        [cacheKey]: data
+      });
+      
+      // 확장 상태 업데이트
+      setExpandedMenus({
+        ...expandedMenus,
+        [cacheKey]: true
+      });
+    } catch (error) {
+      console.error('메뉴 상세 정보 로드 오류:', error);
+    } finally {
+      // 로딩 상태 해제
+      setLoadingMenus({
+        ...loadingMenus,
+        [cacheKey]: false
+      });
+    }
+  };
+  
+  // 총 원가 계산 함수 (캐시된 상세 정보 활용)
+  const calculateTotalCost = () => {
+    if (!mealPlan.meal_plan_menus) {
+      return 0;
+    }
+    
+    return mealPlan.meal_plan_menus.reduce((totalCost, item) => {
+      const cacheKey = `${item.menu_id}-${item.container_id}`;
+      
+      // 캐시된 상세 정보가 있으면 사용
+      if (menuDetails[cacheKey]) {
+        return totalCost + menuDetails[cacheKey].cost;
+      }
+      
+      // 캐시된 정보가 없으면 기존 방식대로 계산
+      let itemCost = 0;
+      
+      // 용기 ID 확인
+      const containerId = item.container_id;
+      
+      if (containerId && item.menu.menu_containers) {
+        // 현재 메뉴와 용기에 해당하는 원가 정보 찾기
+        const menuContainer = item.menu.menu_containers.find(
+          mc => mc.menu_id === item.menu_id && mc.container_id === containerId
+        );
+        
+        if (menuContainer) {
+          // 특정 메뉴-용기 조합에 대한 원가 사용
+          itemCost = menuContainer.ingredients_cost || 0;
+        } else if (item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
+          // 가격 이력에서 가져옴
+          const sortedHistory = [...item.menu.menu_price_history].sort((a, b) => {
+            if (!a.recorded_at || !b.recorded_at) return 0;
+            return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
+          });
+          itemCost = sortedHistory[0].cost_price || 0;
+        }
+      } else if (item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
+        // 가격 이력에서 가져옴
+        const sortedHistory = [...item.menu.menu_price_history].sort((a, b) => {
+          if (!a.recorded_at || !b.recorded_at) return 0;
+          return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
+        });
+        itemCost = sortedHistory[0].cost_price || 0;
+      }
+      
+      return totalCost + itemCost;
+    }, 0);
+  };
   
   return (
     <div className="space-y-4">
@@ -44,48 +182,13 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
         ) : (
           <ul className="space-y-3">
             {mealPlan.meal_plan_menus.map((item) => {
-              // 메뉴의 원가 계산 - 특정 용기와 메뉴 조합에 대한 원가 사용
-              let menuCost = 0;
-              
-              // 용기 ID 확인
-              const containerId = item.container_id;
-              
-              if (containerId && item.menu.menu_containers) {
-                // 현재 메뉴와 용기에 해당하는 원가 정보 찾기
-                const menuContainer = item.menu.menu_containers.find(
-                  mc => mc.menu_id === item.menu_id && mc.container_id === containerId
-                );
-                
-                if (menuContainer) {
-                  // 특정 메뉴-용기 조합에 대한 원가 사용
-                  menuCost = menuContainer.ingredients_cost || 0;
-                } else {
-                  // 메뉴-용기 조합 정보가 없는 경우 menu_price_history에서 가져옴
-                  if (item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
-                    const sortedHistory = [...item.menu.menu_price_history].sort((a, b) => {
-                      if (!a.recorded_at || !b.recorded_at) return 0;
-                      return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
-                    });
-                    menuCost = sortedHistory[0].cost_price || 0;
-                  }
-                }
-              } else {
-                // 용기 ID가 없거나 menu_containers가 없는 경우 menu_price_history에서 가져옴
-                if (item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
-                  const sortedHistory = [...item.menu.menu_price_history].sort((a, b) => {
-                    if (!a.recorded_at || !b.recorded_at) return 0;
-                    return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
-                  });
-                  menuCost = sortedHistory[0].cost_price || 0;
-                }
-              }
-              
-              // 용기 가격은 표시하되 총액에 포함하지 않음
-              const containerCost = item.container?.price || 0;
-              const totalCost = menuCost; // 용기 가격 제외
+              const cacheKey = `${item.menu_id}-${item.container_id}`;
+              const isExpanded = expandedMenus[cacheKey] || false;
+              const isLoading = loadingMenus[cacheKey] || false;
+              const details = menuDetails[cacheKey];
               
               return (
-                <li key={item.id} className="border-b pb-2 last:border-0 last:pb-0">
+                <li key={item.id} className="border rounded-md p-3">
                   <div className="flex justify-between items-start">
                     <div className="space-y-1">
                       <div className="font-medium">{item.menu.name}</div>
@@ -101,16 +204,41 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
                       )}
                     </div>
                     
-                    <div className="text-right">
-                      <div className="font-medium">{formatCurrency(totalCost)}</div>
-                      {false && item.container && (
-                        <div className="text-xs text-muted-foreground">
-                          메뉴: {formatCurrency(menuCost)}<br />
-                          용기: {formatCurrency(containerCost)}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => toggleMenuExpand(item.menu_id, item.container_id)}
+                      aria-expanded={isExpanded}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : isExpanded ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {isExpanded && details && (
+                    <div className="pt-2 mt-2 border-t">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">원가:</span>
+                        <div className="font-medium">{formatCurrency(details.cost)}</div>
+                      </div>
+                      
+                      {details.calories > 0 && (
+                        <div className="flex justify-between items-center mt-1">
+                          <span className="text-sm">칼로리:</span>
+                          <Badge variant="outline" className="bg-white">
+                            {Math.round(details.calories)} kcal
+                          </Badge>
                         </div>
                       )}
                     </div>
-                  </div>
+                  )}
                 </li>
               );
             })}
@@ -120,7 +248,7 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
       
       <div className="flex justify-between items-center pt-2 border-t">
         <div className="font-medium text-lg">
-          총 비용: {formatCurrency(calculateMealPlanCost(mealPlan))}
+          총 비용: {formatCurrency(calculateTotalCost())}
         </div>
       </div>
       
