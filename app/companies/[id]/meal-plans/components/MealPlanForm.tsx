@@ -48,6 +48,7 @@ export default function MealPlanForm({
   const [isLoadingMenus, setIsLoadingMenus] = useState<boolean>(true);
   const [isLoadingContainers, setIsLoadingContainers] = useState<boolean>(true);
   const [isLoadingMenuContainers, setIsLoadingMenuContainers] = useState<boolean>(true);
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   
   // 초기 데이터 설정
   useEffect(() => {
@@ -131,14 +132,56 @@ export default function MealPlanForm({
     }
   };
   
+  // 템플릿 선택 핸들러
+  const handleTemplateSelect = async (templateId: string) => {
+    setSelectedTemplate(templateId);
+    
+    try {
+      // 템플릿 정보를 서버에서 가져오기
+      const response = await fetch(`/api/companies/${companyId}/meal-templates/${templateId}`);
+      
+      if (!response.ok) {
+        throw new Error('템플릿 정보를 불러오는데 실패했습니다.');
+      }
+      
+      const templateData = await response.json();
+      
+      // 이름 설정
+      setName(templateId);
+      
+      // 템플릿에 메뉴 정보가 있다면 컨테이너와 메뉴 선택 설정
+      if (templateData.template_selections?.length) {
+        const containerIds: string[] = [];
+        const menuSelections: Record<string, string> = {};
+        
+        templateData.template_selections.forEach((selection: any) => {
+          if (selection.container_id) {
+            containerIds.push(selection.container_id);
+            menuSelections[selection.container_id] = selection.menu_id;
+          }
+        });
+        
+        setSelectedContainers(containerIds);
+        setContainerMenuSelections(menuSelections);
+      }
+    } catch (error) {
+      console.error('템플릿 정보 로드 오류:', error);
+      toast({
+        title: '오류 발생',
+        description: error instanceof Error ? error.message : '템플릿 정보를 불러오는데 실패했습니다.',
+        variant: 'destructive',
+      });
+    }
+  };
+  
   // 저장 처리
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!name.trim()) {
+    if (!name) {
       toast({
         title: '유효성 검사 오류',
-        description: '식단 이름을 입력해주세요.',
+        description: '식단 템플릿을 선택해주세요.',
         variant: 'destructive',
       });
       return;
@@ -187,6 +230,7 @@ export default function MealPlanForm({
       
       const data = {
         name,
+        template_id: selectedTemplate,
         date: format(date, 'yyyy-MM-dd'),
         meal_time: mealTime,
         menu_selections
@@ -301,6 +345,8 @@ export default function MealPlanForm({
             isLoadingContainers={isLoadingContainers}
             onCancel={onCancel}
             setActiveTab={setActiveTab}
+            companyId={companyId}
+            handleTemplateSelect={handleTemplateSelect}
           />
         </TabsContent>
         

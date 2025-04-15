@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Loader2, Search } from 'lucide-react';
+import { CalendarIcon, Loader2, Plus, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -28,6 +28,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { useMealTemplates } from '../hooks/useMealTemplates';
 
 interface MealPlanBasicInfoProps {
   name: string;
@@ -45,6 +46,8 @@ interface MealPlanBasicInfoProps {
   isLoadingContainers: boolean;
   onCancel: () => void;
   setActiveTab: Dispatch<SetStateAction<string>>;
+  companyId: string;
+  handleTemplateSelect: (value: string) => void;
 }
 
 export default function MealPlanBasicInfo({
@@ -62,8 +65,12 @@ export default function MealPlanBasicInfo({
   isLoading,
   isLoadingContainers,
   onCancel,
-  setActiveTab
+  setActiveTab,
+  companyId,
+  handleTemplateSelect
 }: MealPlanBasicInfoProps) {
+  const { templates, isLoadingTemplates, addNewTemplate } = useMealTemplates(companyId);
+
   return (
     <Card>
       <CardHeader>
@@ -73,13 +80,54 @@ export default function MealPlanBasicInfo({
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="name">식단 이름</Label>
-          <Input
-            id="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="식단 이름을 입력하세요"
-            disabled={isLoading}
-          />
+          <div className="space-y-2">
+            <Select
+              value={name}
+              onValueChange={(val) => {
+                setName(val);
+                handleTemplateSelect(val);
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="템플릿을 선택하세요" />
+              </SelectTrigger>
+              <SelectContent>
+                {templates.length > 0 ? (
+                  templates.map((template) => (
+                    <SelectItem 
+                      key={template.value} 
+                      value={template.value}
+                    >
+                      {template.label}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="text-center py-2 text-muted-foreground">
+                    {isLoadingTemplates ? "로딩 중..." : "등록된 템플릿이 없습니다."}
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+            
+            <Button 
+              type="button" 
+              variant="secondary" 
+              size="sm" 
+              className="w-full"
+              disabled={isLoading}
+              onClick={async () => {
+                const name = prompt("새 템플릿 이름을 입력하세요");
+                if (name && name.trim()) {
+                  const newTemplateId = await addNewTemplate(name.trim());
+                  if (newTemplateId) {
+                    setName(newTemplateId);
+                  }
+                }
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" /> 새 템플릿 추가
+            </Button>
+          </div>
         </div>
         
         <div className="grid grid-cols-2 gap-4">
