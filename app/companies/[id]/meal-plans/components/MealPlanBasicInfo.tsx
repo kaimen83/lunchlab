@@ -66,6 +66,8 @@ interface MealPlanBasicInfoProps {
   setActiveTab: Dispatch<SetStateAction<string>>;
   companyId: string;
   handleTemplateSelect: (value: string) => void;
+  selectedTemplate: { id: string; name: string } | null;
+  setSelectedTemplate: (template: { id: string; name: string } | null) => void;
 }
 
 export default function MealPlanBasicInfo({
@@ -85,7 +87,9 @@ export default function MealPlanBasicInfo({
   onCancel,
   setActiveTab,
   companyId,
-  handleTemplateSelect
+  handleTemplateSelect,
+  selectedTemplate,
+  setSelectedTemplate
 }: MealPlanBasicInfoProps) {
   const { templates, isLoadingTemplates, addNewTemplate, updateTemplate, deleteTemplate } = useMealTemplates(companyId);
   const [isAddTemplateOpen, setIsAddTemplateOpen] = useState(false);
@@ -123,7 +127,8 @@ export default function MealPlanBasicInfo({
     try {
       const newTemplateId = await addNewTemplate(newTemplateName.trim(), selectedTemplateContainers);
       if (newTemplateId) {
-        setName(newTemplateId);
+        // 템플릿 ID가 아닌 템플릿 이름을 식단 이름으로 설정
+        setName(newTemplateName.trim());
 
         // 템플릿과 함께 선택된 용기도 저장해야 하지만,
         // 현재 API에는 이 기능이 없으므로 템플릿 ID만 반환하고
@@ -279,57 +284,42 @@ export default function MealPlanBasicInfo({
         <div className="space-y-2">
           <Label htmlFor="name">식단 이름</Label>
           <div className="space-y-2">
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Select
-                  value={name}
-                  onValueChange={(val) => {
-                    handleTemplateSelect(val);
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="템플릿을 선택하세요" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templates.length > 0 ? (
-                      templates.map((template) => (
-                        <SelectItem 
-                          key={template.value} 
-                          value={template.value}
-                        >
-                          {template.label}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="text-center py-2 text-muted-foreground">
-                        {isLoadingTemplates ? "로딩 중..." : "등록된 템플릿이 없습니다."}
-                      </div>
-                    )}
-                  </SelectContent>
-                </Select>
+            <div className="grid w-full gap-1.5">
+              <Label>템플릿 사용</Label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Select
+                    value={name}
+                    onValueChange={(val) => {
+                      // 템플릿 선택시 템플릿 ID를 임시 저장하고, handleTemplateSelect에서 이름을 설정
+                      const selectedTemplate = templates.find(t => t.value === val);
+                      if (selectedTemplate) {
+                        handleTemplateSelect(val);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="템플릿을 선택하세요" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {templates.length > 0 ? (
+                        templates.map((template) => (
+                          <SelectItem 
+                            key={template.value} 
+                            value={template.value}
+                          >
+                            {template.label}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="text-center py-2 text-muted-foreground">
+                          {isLoadingTemplates ? "로딩 중..." : "등록된 템플릿이 없습니다."}
+                        </div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="icon" 
-                disabled={isLoading || !name}
-                onClick={handleEditClick}
-                className="shrink-0"
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="icon" 
-                disabled={isLoading || !name}
-                onClick={handleDeleteClick}
-                className="shrink-0"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
             </div>
             
             <Button 

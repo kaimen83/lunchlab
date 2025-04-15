@@ -48,7 +48,7 @@ export default function MealPlanForm({
   const [isLoadingMenus, setIsLoadingMenus] = useState<boolean>(true);
   const [isLoadingContainers, setIsLoadingContainers] = useState<boolean>(true);
   const [isLoadingMenuContainers, setIsLoadingMenuContainers] = useState<boolean>(true);
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<{ id: string; name: string } | null>(null);
   
   // 초기 데이터 설정
   useEffect(() => {
@@ -147,8 +147,8 @@ export default function MealPlanForm({
       const templateData = await response.json();
       console.log("템플릿 데이터 로드 성공:", templateData);
       
-      // 이름 설정
-      setName(templateId);
+      // 템플릿 ID 대신 템플릿 이름을 식단 이름으로 설정
+      setName(templateData.name);
       
       // 템플릿에 메뉴 정보가 있다면 컨테이너만 선택하고 메뉴는 선택하지 않음
       if (templateData.template_selections?.length) {
@@ -169,8 +169,11 @@ export default function MealPlanForm({
         console.log("선택할 용기 IDs:", containerIds);
         console.log("메뉴 선택 매핑:", menuSelections);
         
-        setSelectedContainers(containerIds);
-        setContainerMenuSelections(menuSelections); // 빈 메뉴 선택 상태 설정
+        // 선택된 용기가 있을 경우에만 설정 (빈 배열이면 설정하지 않음)
+        if (containerIds.length > 0) {
+          setSelectedContainers(containerIds);
+          setContainerMenuSelections(menuSelections); // 빈 메뉴 선택 상태 설정
+        }
       }
     } catch (error) {
       console.error('템플릿 정보 로드 오류:', error);
@@ -240,7 +243,7 @@ export default function MealPlanForm({
       
       const data = {
         name,
-        template_id: selectedTemplate,
+        template_id: selectedTemplate?.id || null,
         date: format(date, 'yyyy-MM-dd'),
         meal_time: mealTime,
         menu_selections
