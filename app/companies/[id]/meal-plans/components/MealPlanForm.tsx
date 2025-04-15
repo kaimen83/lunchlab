@@ -150,17 +150,19 @@ export default function MealPlanForm({
       // 이름 설정
       setName(templateId);
       
-      // 템플릿에 메뉴 정보가 있다면 컨테이너와 메뉴 선택 설정
+      // 템플릿에 메뉴 정보가 있다면 컨테이너만 선택하고 메뉴는 선택하지 않음
       if (templateData.template_selections?.length) {
         console.log("템플릿 선택 정보:", templateData.template_selections);
         
         const containerIds: string[] = [];
+        // 메뉴 선택 정보를 초기화 (빈 객체로 설정)
         const menuSelections: Record<string, string> = {};
         
         templateData.template_selections.forEach((selection: any) => {
           if (selection.container_id) {
             containerIds.push(selection.container_id);
-            menuSelections[selection.container_id] = selection.menu_id;
+            // 템플릿에서 메뉴를 가져오지 않음 - 빈 상태로 둠
+            // 주석 처리: menuSelections[selection.container_id] = selection.menu_id;
           }
         });
         
@@ -168,7 +170,7 @@ export default function MealPlanForm({
         console.log("메뉴 선택 매핑:", menuSelections);
         
         setSelectedContainers(containerIds);
-        setContainerMenuSelections(menuSelections);
+        setContainerMenuSelections(menuSelections); // 빈 메뉴 선택 상태 설정
       }
     } catch (error) {
       console.error('템플릿 정보 로드 오류:', error);
@@ -211,6 +213,7 @@ export default function MealPlanForm({
       return;
     }
     
+    /* 메뉴 선택 검사 주석 처리 - 메뉴가 선택되지 않은 용기 허용
     // 선택된 모든 용기에 메뉴가 할당되었는지 확인
     const unassignedContainers = selectedContainers.filter(
       containerId => !containerMenuSelections[containerId]
@@ -224,13 +227,14 @@ export default function MealPlanForm({
       });
       return;
     }
+    */
     
     setIsLoading(true);
     
     try {
       // 메뉴 선택과 용기 선택을 API 요구 형식으로 변환
       const menu_selections = selectedContainers.map(containerId => ({
-        menuId: containerMenuSelections[containerId],
+        menuId: containerMenuSelections[containerId] || null, // 메뉴가 없는 경우 null 처리
         containerId
       }));
       

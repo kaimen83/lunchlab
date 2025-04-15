@@ -96,12 +96,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
     
     // 추가 유효성 검사: 모든 용기-메뉴 선택이 유효한지 확인
     for (const selection of menu_selections) {
-      if (!selection.menuId || !selection.containerId) {
+      if (!selection.containerId) {
         return NextResponse.json(
-          { error: '각 용기에는 메뉴가 할당되어야 합니다.' },
+          { error: '각 선택에는 용기 ID가 필요합니다.' },
           { status: 400 }
         );
       }
+      // menuId는 선택적으로 처리 (null/undefined 허용)
     }
     
     // 트랜잭션을 사용하여 식단 및 관련 메뉴 추가
@@ -125,26 +126,30 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
     
     // 메뉴 및 용기 연결 데이터 생성
-    const menuLinks = menu_selections.map(selection => ({
-      meal_plan_id: mealPlan.id,
-      menu_id: selection.menuId,
-      container_id: selection.containerId
-    }));
+    const menuLinks = menu_selections
+      .filter(selection => selection.menuId) // menuId가 있는 경우만 필터링
+      .map(selection => ({
+        meal_plan_id: mealPlan.id,
+        menu_id: selection.menuId,
+        container_id: selection.containerId
+      }));
     
-    // 메뉴 연결 추가
-    const { error: menuLinkError } = await supabase
-      .from('meal_plan_menus')
-      .insert(menuLinks);
-    
-    if (menuLinkError) {
-      console.error('식단-메뉴 연결 오류:', menuLinkError);
-      // 롤백을 위해 생성된 식단 삭제
-      await supabase.from('meal_plans').delete().eq('id', mealPlan.id);
+    // 메뉴 연결이 있을 경우에만 추가
+    if (menuLinks.length > 0) {
+      const { error: menuLinkError } = await supabase
+        .from('meal_plan_menus')
+        .insert(menuLinks);
       
-      return NextResponse.json(
-        { error: '식단-메뉴 연결 중 오류가 발생했습니다.' },
-        { status: 500 }
-      );
+      if (menuLinkError) {
+        console.error('식단-메뉴 연결 오류:', menuLinkError);
+        // 롤백을 위해 생성된 식단 삭제
+        await supabase.from('meal_plans').delete().eq('id', mealPlan.id);
+        
+        return NextResponse.json(
+          { error: '식단-메뉴 연결 중 오류가 발생했습니다.' },
+          { status: 500 }
+        );
+      }
     }
     
     // 완성된 식단 정보 조회
