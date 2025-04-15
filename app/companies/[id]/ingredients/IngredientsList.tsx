@@ -31,6 +31,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import React from 'react';
 
 interface Ingredient {
   id: string;
@@ -264,7 +265,7 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
   const renderTableHeader = () => (
     <TableHeader>
       <TableRow>
-        <TableHead className="w-8"></TableHead> {/* 확장 버튼 열 */}
+        <TableHead className="w-8"></TableHead>
         {visibleColumns.name && (
           <TableHead 
             className="cursor-pointer whitespace-nowrap"
@@ -378,8 +379,8 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
         </TableRow>
       ) : (
         filteredIngredients.map(ingredient => (
-          <>
-            <TableRow key={ingredient.id} className={expandedRows[ingredient.id] ? "border-b-0" : ""}>
+          <React.Fragment key={ingredient.id}>
+            <TableRow className={expandedRows[ingredient.id] ? "border-b-0" : ""}>
               <TableCell className="p-0 pl-4">
                 <Button 
                   variant="ghost" 
@@ -520,7 +521,7 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
                 </TableCell>
               </TableRow>
             )}
-          </>
+          </React.Fragment>
         ))
       )}
     </TableBody>
@@ -528,7 +529,7 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
 
   // 모바일 카드 아이템 렌더링
   const renderMobileCard = (ingredient: Ingredient) => (
-    <Card key={ingredient.id} className="p-4 mb-2">
+    <Card className="p-4 mb-2">
       <div className="flex justify-between items-start mb-2">
         <div>
           <h3 className="font-bold text-base">{ingredient.name}</h3>
