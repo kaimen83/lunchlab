@@ -91,6 +91,85 @@ export const useMealTemplates = (companyId: string) => {
     }
   };
 
+  // 템플릿 수정 함수
+  const updateTemplate = async (templateId: string, templateName: string, containerSelections: string[] = []) => {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/meal-templates/${templateId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: templateName,
+          container_selections: containerSelections
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '템플릿 수정에 실패했습니다.');
+      }
+
+      const updatedTemplate = await response.json();
+      
+      // 상태 업데이트
+      setTemplates(prev => prev.map(template => 
+        template.value === templateId 
+          ? { label: updatedTemplate.name, value: templateId }
+          : template
+      ));
+
+      toast({
+        title: '템플릿 수정 완료',
+        description: `${updatedTemplate.name} 템플릿이 수정되었습니다.`,
+        variant: 'default',
+      });
+
+      return updatedTemplate.id;
+    } catch (error) {
+      console.error('템플릿 수정 오류:', error);
+      toast({
+        title: '오류 발생',
+        description: error instanceof Error ? error.message : '템플릿 수정 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+      return null;
+    }
+  };
+
+  // 템플릿 삭제 함수
+  const deleteTemplate = async (templateId: string) => {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/meal-templates/${templateId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '템플릿 삭제에 실패했습니다.');
+      }
+
+      // 상태에서 템플릿 제거
+      setTemplates(prev => prev.filter(template => template.value !== templateId));
+
+      toast({
+        title: '템플릿 삭제 완료',
+        description: '템플릿이 삭제되었습니다.',
+        variant: 'default',
+      });
+
+      return true;
+    } catch (error) {
+      console.error('템플릿 삭제 오류:', error);
+      toast({
+        title: '오류 발생',
+        description: error instanceof Error ? error.message : '템플릿 삭제 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  };
+
   // template_id로 템플릿 찾기
   const getTemplateById = useCallback((id: string | undefined | null) => {
     if (!id) return null;
@@ -101,6 +180,8 @@ export const useMealTemplates = (companyId: string) => {
     templates,
     isLoadingTemplates,
     addNewTemplate,
+    updateTemplate,
+    deleteTemplate,
     loadTemplates,
     getTemplateById
   };

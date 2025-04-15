@@ -72,7 +72,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const supabase = createServerSupabaseClient();
     
     // 요청 본문에서 데이터 추출
-    const { name } = await request.json();
+    const { name, container_selections = [] } = await request.json();
     
     // 필수 필드 확인
     if (!name || name.trim() === '') {
@@ -126,6 +126,56 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
     
+    // 용기 선택 정보가 제공된 경우 템플릿 선택 테이블 업데이트
+    if (Array.isArray(container_selections)) {
+      try {
+        // 1. 기존 template_selections 항목 삭제
+        const { error: deleteError } = await supabase
+          .from('template_selections')
+          .delete()
+          .eq('template_id', templateId);
+        
+        if (deleteError) {
+          console.error('템플릿 선택 삭제 오류:', deleteError);
+        }
+        
+        // 2. 선택된 용기가 있는 경우 새 template_selections 추가
+        if (container_selections.length > 0) {
+          // 먼저 회사의 첫 번째 메뉴를 찾아서 임시로 사용
+          // menu_id가 필수 필드이므로 임시 메뉴 ID가 필요함
+          const { data: firstMenu, error: menuError } = await supabase
+            .from('menus')
+            .select('id')
+            .eq('company_id', companyId)
+            .limit(1)
+            .single();
+          
+          if (menuError || !firstMenu) {
+            console.error('임시 메뉴 ID 조회 오류:', menuError);
+            return NextResponse.json(data); // 템플릿은 수정했으니 성공으로 간주
+          }
+          
+          // 각 용기 ID에 대해 템플릿 선택 저장 (임시 메뉴 ID 사용)
+          const containerSelections = container_selections.map((containerId: string) => ({
+            template_id: templateId,
+            container_id: containerId,
+            menu_id: firstMenu.id // 임시 메뉴 ID 사용
+          }));
+          
+          const { error: insertError } = await supabase
+            .from('template_selections')
+            .insert(containerSelections);
+          
+          if (insertError) {
+            console.error('템플릿 선택 저장 오류:', insertError);
+          }
+        }
+      } catch (selectionError) {
+        console.error('템플릿 선택 업데이트 중 오류:', selectionError);
+        // 템플릿 선택 업데이트 실패 시에도 템플릿은 이미 수정되었으므로 성공으로 간주
+      }
+    }
+    
     return NextResponse.json(data);
   } catch (error) {
     console.error('템플릿 수정 오류:', error);
@@ -143,7 +193,18 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     const { id: companyId, templateId } = await context.params;
     const supabase = createServerSupabaseClient();
     
-    // 템플릿 삭제
+    // 1. 먼저 템플릿에 연결된 선택 정보 삭제
+    const { error: selectionError } = await supabase
+      .from('template_selections')
+      .delete()
+      .eq('template_id', templateId);
+    
+    if (selectionError) {
+      console.error('템플릿 선택 항목 삭제 오류:', selectionError);
+      // 템플릿 선택 삭제 실패 시에도 템플릿 자체는 삭제 시도
+    }
+    
+    // 2. 템플릿 삭제
     const { error } = await supabase
       .from('meal_templates')
       .delete()
