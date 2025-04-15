@@ -35,7 +35,7 @@ export default function IngredientForm({
   }, [mode, ingredient]);
 
   // 공급업체 관련 로직
-  const { suppliers, isLoadingSuppliers, addNewSupplier } = useSuppliers(companyId);
+  const { suppliers, isLoadingSuppliers, addNewSupplier, updateSupplier, deleteSupplier } = useSuppliers(companyId);
 
   // 폼 관련 로직
   const { form, isSubmitting, onSubmit, handleSupplierSelect } = useIngredientForm({
@@ -129,6 +129,8 @@ export default function IngredientForm({
           isLoadingSuppliers={isLoadingSuppliers}
           handleSupplierSelect={handleSupplierSelect}
           addNewSupplier={addNewSupplier}
+          updateSupplier={updateSupplier}
+          deleteSupplier={deleteSupplier}
           companyId={companyId}
           mode={mode}
           ingredientId={ingredient?.id}

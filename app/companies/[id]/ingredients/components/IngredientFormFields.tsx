@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react';
+import { Plus, Pencil, Trash2, Save, AlertTriangle, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -18,10 +18,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { IngredientFormValues, SupplierOption } from '../schema';
 import { formatPrice } from '../utils';
 import { createServerSupabaseClient } from '@/lib/supabase';
-import { AlertTriangle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface IngredientFormFieldsProps {
   form: UseFormReturn<IngredientFormValues>;
@@ -29,6 +47,8 @@ interface IngredientFormFieldsProps {
   isLoadingSuppliers: boolean;
   handleSupplierSelect: (value: string) => void;
   addNewSupplier: (name: string) => Promise<string | null>;
+  updateSupplier?: (id: string, name: string) => Promise<string | null>;
+  deleteSupplier?: (id: string) => Promise<boolean>;
   companyId: string;
   mode?: 'create' | 'edit';
   ingredientId?: string;
@@ -40,6 +60,8 @@ export function IngredientFormFields({
   isLoadingSuppliers,
   handleSupplierSelect,
   addNewSupplier,
+  updateSupplier,
+  deleteSupplier,
   companyId,
   mode = 'create',
   ingredientId
@@ -49,12 +71,80 @@ export function IngredientFormFields({
     console.log('현재 form 값:', form.getValues());
   }, [form]);
 
+  // 공급업체 수정 관련 상태
+  const [isEditSupplierOpen, setIsEditSupplierOpen] = useState(false);
+  const [isDeleteSupplierOpen, setIsDeleteSupplierOpen] = useState(false);
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
+  const [editSupplierName, setEditSupplierName] = useState('');
+  const [isEditingSupplier, setIsEditingSupplier] = useState(false);
+  const [isDeletingSupplier, setIsDeletingSupplier] = useState(false);
+
   // 코드명 중복 체크
   const [isCheckingCode, setIsCheckingCode] = useState(false);
   const [codeExists, setCodeExists] = useState(false);
   const currentCodeName = form.watch('code_name');
   const initialCodeName = form.getValues().code_name; // 초기 코드명 (편집 모드일 때 사용)
   
+  // 현재 선택된 공급업체
+  const currentSupplierId = form.watch('supplier_id');
+
+  // 공급업체 수정 모달 열기
+  const handleEditSupplierClick = () => {
+    if (!currentSupplierId || !updateSupplier) return;
+    
+    const currentSupplier = suppliers.find(s => s.value === currentSupplierId);
+    if (currentSupplier) {
+      setSelectedSupplierId(currentSupplier.value);
+      setEditSupplierName(currentSupplier.label);
+      setIsEditSupplierOpen(true);
+    }
+  };
+
+  // 공급업체 삭제 모달 열기
+  const handleDeleteSupplierClick = () => {
+    if (!currentSupplierId || !deleteSupplier) return;
+    
+    setSelectedSupplierId(currentSupplierId);
+    setIsDeleteSupplierOpen(true);
+  };
+
+  // 공급업체 수정 처리
+  const handleUpdateSupplier = async () => {
+    if (!selectedSupplierId || !updateSupplier || !editSupplierName.trim()) return;
+    
+    setIsEditingSupplier(true);
+    try {
+      const result = await updateSupplier(selectedSupplierId, editSupplierName.trim());
+      if (result) {
+        setIsEditSupplierOpen(false);
+        setEditSupplierName('');
+      }
+    } catch (error) {
+      console.error('공급업체 수정 오류:', error);
+    } finally {
+      setIsEditingSupplier(false);
+    }
+  };
+
+  // 공급업체 삭제 처리
+  const handleDeleteSupplier = async () => {
+    if (!selectedSupplierId || !deleteSupplier) return;
+    
+    setIsDeletingSupplier(true);
+    try {
+      const success = await deleteSupplier(selectedSupplierId);
+      if (success) {
+        // 삭제 성공 시 폼에서 공급업체 필드 초기화
+        form.setValue('supplier_id', '');
+        setIsDeleteSupplierOpen(false);
+      }
+    } catch (error) {
+      console.error('공급업체 삭제 오류:', error);
+    } finally {
+      setIsDeletingSupplier(false);
+    }
+  };
+
   // 실시간 코드명 중복 체크 함수
   const checkCodeName = async (code: string) => {
     if (!code || code.trim() === '') {
@@ -180,33 +270,58 @@ export function IngredientFormFields({
             <FormLabel>식재료 업체</FormLabel>
             <FormControl>
               <div className="space-y-2">
-                <Select
-                  onValueChange={(val) => {
-                    field.onChange(val);
-                    handleSupplierSelect(val);
-                  }}
-                  value={field.value || ""}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="업체를 선택하세요" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {suppliers.length > 0 ? (
-                      suppliers.map((supplier) => (
-                        <SelectItem 
-                          key={supplier.value} 
-                          value={supplier.value}
-                        >
-                          {supplier.label}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="text-center py-2 text-muted-foreground">
-                        {isLoadingSuppliers ? "로딩 중..." : "등록된 공급업체가 없습니다."}
-                      </div>
-                    )}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Select
+                      onValueChange={(val) => {
+                        field.onChange(val);
+                        handleSupplierSelect(val);
+                      }}
+                      value={field.value || ""}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="업체를 선택하세요" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {suppliers.length > 0 ? (
+                          suppliers.map((supplier) => (
+                            <SelectItem 
+                              key={supplier.value} 
+                              value={supplier.value}
+                            >
+                              {supplier.label}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="text-center py-2 text-muted-foreground">
+                            {isLoadingSuppliers ? "로딩 중..." : "등록된 공급업체가 없습니다."}
+                          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="icon"
+                    disabled={!currentSupplierId || !updateSupplier}
+                    onClick={handleEditSupplierClick}
+                    className="h-9 w-9 shrink-0"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="icon"
+                    disabled={!currentSupplierId || !deleteSupplier}
+                    onClick={handleDeleteSupplierClick}
+                    className="h-9 w-9 shrink-0"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
                 
                 <Button 
                   type="button" 
@@ -248,25 +363,13 @@ export function IngredientFormFields({
                   step="0.1"
                   min="0.1"
                   placeholder="1포장당 양을 입력하세요"
-                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                  value={field.value === 0 ? "" : field.value}
-                  onFocus={(e) => {
-                    if (parseFloat(e.target.value) === 0) {
-                      e.target.value = "";
-                    }
-                  }}
-                  onBlur={(e) => {
-                    if (e.target.value === "") {
-                      field.onChange(0);
-                    }
-                  }}
                 />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-
+        
         <FormField
           control={form.control}
           name="unit"
@@ -275,20 +378,9 @@ export function IngredientFormFields({
               <FormLabel className="flex items-center">
                 단위 <span className="text-red-500 ml-1">*</span>
               </FormLabel>
-              <Select
-                onValueChange={field.onChange}
-                value={field.value}
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="단위 선택" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="g">g</SelectItem>
-                  <SelectItem value="EA">EA</SelectItem>
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <Input {...field} placeholder="kg, g, ml 등" />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -406,6 +498,99 @@ export function IngredientFormFields({
           </FormItem>
         )}
       />
+
+      {/* 공급업체 수정 모달 */}
+      <Dialog open={isEditSupplierOpen} onOpenChange={setIsEditSupplierOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>공급업체 수정</DialogTitle>
+            <DialogDescription>
+              공급업체 이름을 수정하세요.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <FormLabel htmlFor="edit-supplier-name">공급업체 이름</FormLabel>
+              <Input
+                id="edit-supplier-name"
+                placeholder="공급업체 이름을 입력하세요"
+                value={editSupplierName}
+                onChange={(e) => setEditSupplierName(e.target.value)}
+                disabled={isEditingSupplier}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditSupplierOpen(false);
+                setEditSupplierName('');
+                setSelectedSupplierId(null);
+              }}
+              disabled={isEditingSupplier}
+            >
+              취소
+            </Button>
+            <Button 
+              type="button" 
+              onClick={handleUpdateSupplier}
+              disabled={!editSupplierName.trim() || isEditingSupplier}
+            >
+              {isEditingSupplier ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  저장 중...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  저장
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* 공급업체 삭제 확인 모달 */}
+      <AlertDialog open={isDeleteSupplierOpen} onOpenChange={setIsDeleteSupplierOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>공급업체를 삭제하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              이 작업은 되돌릴 수 없습니다. 이 공급업체가 다른 식재료에서 사용 중인 경우 삭제할 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={isDeletingSupplier}
+              onClick={() => {
+                setSelectedSupplierId(null);
+              }}
+            >
+              취소
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSupplier}
+              disabled={isDeletingSupplier}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isDeletingSupplier ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  삭제 중...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  삭제
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 } 
