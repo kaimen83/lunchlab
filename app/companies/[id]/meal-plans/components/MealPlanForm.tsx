@@ -134,8 +134,6 @@ export default function MealPlanForm({
   
   // 템플릿 선택 핸들러
   const handleTemplateSelect = async (templateId: string) => {
-    setSelectedTemplate(templateId);
-    
     try {
       // 템플릿 정보를 서버에서 가져오기
       const response = await fetch(`/api/companies/${companyId}/meal-templates/${templateId}`);
@@ -147,7 +145,13 @@ export default function MealPlanForm({
       const templateData = await response.json();
       console.log("템플릿 데이터 로드 성공:", templateData);
       
-      // 템플릿 ID 대신 템플릿 이름을 식단 이름으로 설정
+      // 템플릿 객체 저장 (ID와 이름)
+      setSelectedTemplate({
+        id: templateId,
+        name: templateData.name
+      });
+      
+      // 템플릿 이름을 식단 이름으로 설정 (ID 대신 이름 사용)
       setName(templateData.name);
       
       // 템플릿에 메뉴 정보가 있다면 컨테이너만 선택하고 메뉴는 선택하지 않음
@@ -360,6 +364,8 @@ export default function MealPlanForm({
             setActiveTab={setActiveTab}
             companyId={companyId}
             handleTemplateSelect={handleTemplateSelect}
+            selectedTemplate={selectedTemplate}
+            setSelectedTemplate={setSelectedTemplate}
           />
         </TabsContent>
         

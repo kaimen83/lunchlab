@@ -167,27 +167,33 @@ export default function MealPlanBasicInfo({
       );
       
       if (updatedTemplateId) {
-        if (name === selectedTemplateId) {
-          setName(updatedTemplateId);
-          
-          // 현재 선택된 용기와 수정된 용기를 비교하여 동기화
-          const currentSelectedContainers = new Set(selectedContainers);
-          const updatedContainers = new Set(selectedEditTemplateContainers);
-          
-          // 제거된 용기 처리
-          selectedContainers.forEach(containerId => {
-            if (!updatedContainers.has(containerId)) {
-              toggleContainerSelection(containerId);
-            }
+        // 현재 선택된 템플릿이 수정되는 템플릿인 경우, 업데이트된 이름 반영
+        if (selectedTemplate && selectedTemplate.id === selectedTemplateId) {
+          setSelectedTemplate({
+            id: selectedTemplateId,
+            name: editTemplateName.trim()
           });
-          
-          // 추가된 용기 처리
-          selectedEditTemplateContainers.forEach(containerId => {
-            if (!currentSelectedContainers.has(containerId)) {
-              toggleContainerSelection(containerId);
-            }
-          });
+          // 식단 이름도 업데이트
+          setName(editTemplateName.trim());
         }
+        
+        // 현재 선택된 용기와 수정된 용기를 비교하여 동기화
+        const currentSelectedContainers = new Set(selectedContainers);
+        const updatedContainers = new Set(selectedEditTemplateContainers);
+        
+        // 제거된 용기 처리
+        selectedContainers.forEach(containerId => {
+          if (!updatedContainers.has(containerId)) {
+            toggleContainerSelection(containerId);
+          }
+        });
+        
+        // 추가된 용기 처리
+        selectedEditTemplateContainers.forEach(containerId => {
+          if (!currentSelectedContainers.has(containerId)) {
+            toggleContainerSelection(containerId);
+          }
+        });
       }
       setIsEditTemplateOpen(false);
       setEditTemplateName('');
@@ -207,7 +213,9 @@ export default function MealPlanBasicInfo({
     try {
       const success = await deleteTemplate(selectedTemplateId);
       if (success) {
-        if (name === selectedTemplateId) {
+        // 현재 선택된 템플릿이 삭제되는 템플릿인 경우, 선택 초기화
+        if (selectedTemplate && selectedTemplate.id === selectedTemplateId) {
+          setSelectedTemplate(null);
           setName('');
         }
       }
@@ -289,7 +297,7 @@ export default function MealPlanBasicInfo({
               <div className="flex gap-2">
                 <div className="flex-1">
                   <Select
-                    value={name}
+                    value={selectedTemplate?.id || ''}
                     onValueChange={(val) => {
                       // 템플릿 선택시 템플릿 ID를 임시 저장하고, handleTemplateSelect에서 이름을 설정
                       const selectedTemplate = templates.find(t => t.value === val);
@@ -299,7 +307,9 @@ export default function MealPlanBasicInfo({
                     }}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="템플릿을 선택하세요" />
+                      <SelectValue placeholder="템플릿을 선택하세요">
+                        {selectedTemplate?.id ? templates.find(t => t.value === selectedTemplate.id)?.label : "템플릿을 선택하세요"}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {templates.length > 0 ? (
