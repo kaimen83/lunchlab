@@ -66,15 +66,41 @@ interface MealPlanMenu {
   };
 }
 
+// 확장된 메뉴와 컨테이너 정보
+interface ExtendedContainerInfo {
+  name: string;
+  headcount: number;
+}
+
+// 확장된 식재료 정보
+interface ExtendedIngredient {
+  id: string;
+  name: string;
+  amount: number;
+  unit: string;
+  containerName?: string | null;
+  headcount?: number;
+}
+
 // 메뉴-용기-식재료 정보를 포함한 확장된 메뉴 정보 타입
 interface ExtendedMenuPortion extends MenuPortion {
   mealPlans: string[];
-  ingredients?: {
+  container_names: string[];
+  containers_info: ExtendedContainerInfo[];
+  ingredients?: ExtendedIngredient[];
+}
+
+// 메뉴 컨테이너 타입 정의에서 용기 정보 인터페이스 추가
+interface ContainerInfo {
+  headcount: number, 
+  containerName: string | null,
+  mealPlans: Set<string>,
+  ingredients: {
     id: string;
     name: string;
     amount: number;
     unit: string;
-  }[];
+  }[] | undefined
 }
 
 export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: CookingPlanResultProps) {
@@ -160,52 +186,133 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
   };
 
   // 식사 시간별로 중복 메뉴를 통합하고 식단 정보 추가
-  const processedMenusByMealTime = Object.keys(menusByMealTime).reduce((acc, mealTime) => {
-    // 메뉴-용기 조합별로 그룹화 (용기별로 다른 식재료를 가질 수 있으므로)
-    const menuContainerMap = new Map<string, {
+  const processedMenusByMealTime = Object.keys(menusByMealTime).reduce<Record<string, ExtendedMenuPortion[]>>((acc, mealTime) => {
+    // 메뉴별로 그룹화 (동일 메뉴명은 같은 행으로 통합)
+    const menuMap = new Map<string, {
       menu: MenuPortion,
-      totalHeadcount: number,
-      mealPlans: Set<string>
+      containers: Map<string, ContainerInfo>
     }>();
     
     menusByMealTime[mealTime].forEach(menu => {
-      // 메뉴-용기 조합을 키로 사용
-      const key = `${menu.menu_id}-${menu.container_id || 'null'}`;
+      const menuName = menu.menu_name;
       
-      // 동일 메뉴-용기 조합이 있는지 확인
-      if (menuContainerMap.has(key)) {
-        const existingMenu = menuContainerMap.get(key)!;
-        // 식수 합산
-        existingMenu.totalHeadcount += menu.headcount;
-        // 식단 정보 추가 (meal_plan_id가 있을 경우)
-        if (menu.meal_plan_id) {
-          existingMenu.mealPlans.add(menu.meal_plan_id);
+      // 동일 메뉴가 있는지 확인
+      if (menuMap.has(menuName)) {
+        const existingMenu = menuMap.get(menuName)!;
+        
+        // 해당 용기가 있는지 확인
+        const containerKey = menu.container_id || 'null';
+        
+        if (existingMenu.containers.has(containerKey)) {
+          // 기존 용기에 식수 추가
+          const container = existingMenu.containers.get(containerKey)!;
+          container.headcount += menu.headcount;
+          
+          // 식단 정보 추가 (meal_plan_id가 있을 경우)
+          if (menu.meal_plan_id) {
+            container.mealPlans.add(menu.meal_plan_id);
+          }
+        } else {
+          // 새 용기 추가
+          const ingredients = getMenuIngredients(menu.menu_id, menu.container_id || null);
+          
+          existingMenu.containers.set(containerKey, {
+            headcount: menu.headcount,
+            containerName: menu.container_name ?? null, // undefined이면 null로 처리
+            mealPlans: menu.meal_plan_id ? new Set([menu.meal_plan_id]) : new Set(),
+            ingredients
+          });
         }
       } else {
-        // 새 메뉴-용기 조합 추가
-        menuContainerMap.set(key, {
+        // 새 메뉴 추가
+        const ingredients = getMenuIngredients(menu.menu_id, menu.container_id || null);
+        
+        const containers = new Map<string, ContainerInfo>();
+        
+        containers.set(menu.container_id || 'null', {
+          headcount: menu.headcount,
+          containerName: menu.container_name ?? null, // undefined이면 null로 처리
+          mealPlans: menu.meal_plan_id ? new Set([menu.meal_plan_id]) : new Set(),
+          ingredients
+        });
+        
+        menuMap.set(menuName, {
           menu: {...menu},
-          totalHeadcount: menu.headcount,
-          mealPlans: menu.meal_plan_id ? new Set([menu.meal_plan_id]) : new Set()
+          containers
         });
       }
     });
     
     // 통합된 메뉴 목록 생성
-    acc[mealTime] = Array.from(menuContainerMap.values()).map(item => {
-      // 메뉴-용기 조합에 따른 식재료 정보 추가
-      const ingredients = getMenuIngredients(item.menu.menu_id, item.menu.container_id || null);
+    acc[mealTime] = Array.from(menuMap.entries()).map(([menuName, item]) => {
+      // 용기별 정보 생성
+      const containers = Array.from(item.containers.values());
+      const containersInfo: ExtendedContainerInfo[] = containers.map(container => ({
+        name: container.containerName || '기본',
+        headcount: container.headcount
+      }));
+      
+      // 용기명 목록
+      const containerNames: string[] = [];
+      containers.forEach(container => {
+        if (container.containerName) {
+          containerNames.push(container.containerName);
+        }
+      });
+      
+      // 식단 ID 목록
+      const mealPlanIds = Array.from(
+        new Set(
+          containers.flatMap(container => 
+            Array.from(container.mealPlans)
+          )
+        )
+      );
+      
+      // 식재료 목록 취합 (중복 식재료는 수량 합산)
+      const ingredientMap = new Map<string, ExtendedIngredient>();
+      
+      containers.forEach(container => {
+        if (container.ingredients && container.ingredients.length > 0) {
+          container.ingredients.forEach(ingredient => {
+            const key = ingredient.id;
+            
+            if (ingredientMap.has(key)) {
+              // 기존 식재료가 있으면 수량 합산
+              const existingIngredient = ingredientMap.get(key)!;
+              existingIngredient.amount += ingredient.amount * container.headcount;
+            } else {
+              // 새 식재료 추가
+              ingredientMap.set(key, {
+                ...ingredient,
+                containerName: container.containerName,
+                headcount: container.headcount,
+                amount: ingredient.amount * container.headcount
+              });
+            }
+          });
+        }
+      });
+      
+      // 합산된 식재료 목록으로 변환
+      const allIngredients = Array.from(ingredientMap.values());
+      
+      // 전체 식수 계산
+      const totalHeadcount = containers.reduce((sum, container) => sum + container.headcount, 0);
       
       return {
         ...item.menu,
-        headcount: item.totalHeadcount,
-        mealPlans: Array.from(item.mealPlans),
-        ingredients // 식재료 정보 추가
+        menu_name: menuName,
+        container_names: containerNames,
+        containers_info: containersInfo,
+        headcount: totalHeadcount,
+        mealPlans: mealPlanIds,
+        ingredients: allIngredients
       } as ExtendedMenuPortion;
     });
     
     return acc;
-  }, {} as Record<string, ExtendedMenuPortion[]>);
+  }, {});
 
   // 식사 시간 한글화
   const getMealTimeName = (mealTime: string) => {
@@ -264,6 +371,17 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
     (sum, item) => sum + item.total_price, 0
   );
 
+  // 식수 포맷 (용기별로 구분)
+  const formatHeadcounts = (containersInfo: ExtendedContainerInfo[]) => {
+    // 용기가 하나인 경우 식수만 표시
+    if (containersInfo.length === 1) {
+      return `${containersInfo[0].headcount}명`;
+    }
+    
+    // 용기가 여러 개인 경우 '용기명: 식수' 형식으로 표시
+    return containersInfo.map(info => `${info.name}: ${info.headcount}명`).join(', ');
+  };
+
   return (
     <div className="space-y-6">
       {/* 헤더 */}
@@ -312,7 +430,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                       <TableHead>메뉴명</TableHead>
                       <TableHead>용기</TableHead>
                       <TableHead>사용 식단</TableHead>
-                      <TableHead className="text-right">식수 (명)</TableHead>
+                      <TableHead>식수</TableHead>
                       <TableHead>필요 식재료</TableHead>
                       <TableHead className="text-right">식재료 수량</TableHead>
                     </TableRow>
@@ -326,21 +444,22 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                             {idx === 0 && (
                               <>
                                 <TableCell className="font-medium" rowSpan={menuPortion.ingredients!.length}>
-                                  <div className="flex items-center">
-                                    {menuPortion.menu_name}
-                                    <Badge variant="outline" className="ml-2 text-xs">
-                                      식재료 {menuPortion.ingredients!.length}
-                                    </Badge>
-                                  </div>
+                                  {menuPortion.menu_name}
                                 </TableCell>
-                                <TableCell rowSpan={menuPortion.ingredients!.length}>{menuPortion.container_name || '-'}</TableCell>
+                                <TableCell rowSpan={menuPortion.ingredients!.length}>
+                                  {menuPortion.container_names.length > 0 
+                                    ? menuPortion.container_names.join(', ') 
+                                    : '-'}
+                                </TableCell>
                                 <TableCell rowSpan={menuPortion.ingredients!.length}>{getMealPlanNames(menuPortion.mealPlans)}</TableCell>
-                                <TableCell className="text-right" rowSpan={menuPortion.ingredients!.length}>{menuPortion.headcount}</TableCell>
+                                <TableCell rowSpan={menuPortion.ingredients!.length}>
+                                  {formatHeadcounts(menuPortion.containers_info)}
+                                </TableCell>
                               </>
                             )}
                             <TableCell>{ingredient.name}</TableCell>
                             <TableCell className="text-right">
-                              {formatAmount(ingredient.amount * menuPortion.headcount)} {ingredient.unit}
+                              {formatAmount(ingredient.amount)} {ingredient.unit}
                             </TableCell>
                           </TableRow>
                         ));
@@ -351,9 +470,13 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                             <TableCell className="font-medium">
                               {menuPortion.menu_name}
                             </TableCell>
-                            <TableCell>{menuPortion.container_name || '-'}</TableCell>
+                            <TableCell>
+                              {menuPortion.container_names.length > 0 
+                                ? menuPortion.container_names.join(', ') 
+                                : '-'}
+                            </TableCell>
                             <TableCell>{getMealPlanNames(menuPortion.mealPlans)}</TableCell>
-                            <TableCell className="text-right">{menuPortion.headcount}</TableCell>
+                            <TableCell>{formatHeadcounts(menuPortion.containers_info)}</TableCell>
                             <TableCell colSpan={2} className="text-center text-gray-500 text-sm">
                               등록된 식재료 정보가 없습니다.
                             </TableCell>
