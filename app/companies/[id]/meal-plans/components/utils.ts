@@ -51,31 +51,6 @@ export const getCaloriesForMenuAndContainer = (
   return menuContainer.calories;
 };
 
-// 메뉴가 호환되는 다른 용기 목록 찾기
-export const getCompatibleContainersForMenu = (
-  menuId: string,
-  currentContainerId: string,
-  menuContainers: MenuContainer[]
-) => {
-  return menuContainers
-    .filter(mc => 
-      mc.menu_id === menuId && 
-      mc.container_id !== currentContainerId && 
-      mc.total_cost > 0
-    )
-    .map(mc => ({
-      containerId: mc.container_id,
-      containerName: menuContainers.find(
-        container => container.container_id === mc.container_id
-      )?.container?.name,
-      costInfo: {
-        ingredients_cost: mc.ingredients_cost,
-        total_cost: mc.total_cost
-      },
-      calories: mc.calories || 0
-    }));
-};
-
 // 포맷된 가격 표시
 export const formatPrice = (price: number) => {
   return new Intl.NumberFormat('ko-KR', { 

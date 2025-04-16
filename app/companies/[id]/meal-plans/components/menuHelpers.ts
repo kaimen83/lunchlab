@@ -1,18 +1,5 @@
 import { Menu, MenuContainer } from './types';
 
-// 메뉴가 다른 용기와 호환되는지 확인하는 헬퍼 함수
-const hasCompatibleContainers = (
-  menuId: string,
-  currentContainerId: string,
-  menuContainers: MenuContainer[]
-): boolean => {
-  return menuContainers.some(mc => 
-    mc.menu_id === menuId && 
-    mc.container_id !== currentContainerId && 
-    mc.total_cost > 0
-  );
-};
-
 export const getFilteredMenusForContainer = (
   containerId: string,
   menuContainers: MenuContainer[],
