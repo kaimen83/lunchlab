@@ -433,36 +433,54 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                       <TableHead>식수</TableHead>
                       <TableHead>필요 식재료</TableHead>
                       <TableHead className="text-right">식재료 수량</TableHead>
+                      <TableHead className="text-right">포장단위</TableHead>
+                      <TableHead className="text-right">투입량</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {menus.map((menuPortion, index) => {
                       // 식재료가 있는 경우
                       if (menuPortion.ingredients && menuPortion.ingredients.length > 0) {
-                        return menuPortion.ingredients.map((ingredient, idx) => (
-                          <TableRow key={`${index}-${idx}`} className={idx > 0 ? "border-t-0" : ""}>
-                            {idx === 0 && (
-                              <>
-                                <TableCell className="font-medium" rowSpan={menuPortion.ingredients!.length}>
-                                  {menuPortion.menu_name}
-                                </TableCell>
-                                <TableCell rowSpan={menuPortion.ingredients!.length}>
-                                  {menuPortion.container_names.length > 0 
-                                    ? menuPortion.container_names.join(', ') 
-                                    : '-'}
-                                </TableCell>
-                                <TableCell rowSpan={menuPortion.ingredients!.length}>{getMealPlanNames(menuPortion.mealPlans)}</TableCell>
-                                <TableCell rowSpan={menuPortion.ingredients!.length}>
-                                  {formatHeadcounts(menuPortion.containers_info)}
-                                </TableCell>
-                              </>
-                            )}
-                            <TableCell>{ingredient.name}</TableCell>
-                            <TableCell className="text-right">
-                              {formatAmount(ingredient.amount)} {ingredient.unit}
-                            </TableCell>
-                          </TableRow>
-                        ));
+                        return menuPortion.ingredients.map((ingredient, idx) => {
+                          // 포장단위 기본값 설정 (실제로는 DB에서 가져와야 함)
+                          const packageAmount = 1000;
+                          
+                          // 투입량 계산 (필요 수량 / 포장단위)
+                          const unitsRequired = packageAmount > 0 
+                            ? (ingredient.amount / packageAmount).toFixed(1) 
+                            : "N/A";
+                            
+                          return (
+                            <TableRow key={`${index}-${idx}`} className={idx > 0 ? "border-t-0" : ""}>
+                              {idx === 0 && (
+                                <>
+                                  <TableCell className="font-medium" rowSpan={menuPortion.ingredients!.length}>
+                                    {menuPortion.menu_name}
+                                  </TableCell>
+                                  <TableCell rowSpan={menuPortion.ingredients!.length}>
+                                    {menuPortion.container_names.length > 0 
+                                      ? menuPortion.container_names.join(', ') 
+                                      : '-'}
+                                  </TableCell>
+                                  <TableCell rowSpan={menuPortion.ingredients!.length}>{getMealPlanNames(menuPortion.mealPlans)}</TableCell>
+                                  <TableCell rowSpan={menuPortion.ingredients!.length}>
+                                    {formatHeadcounts(menuPortion.containers_info)}
+                                  </TableCell>
+                                </>
+                              )}
+                              <TableCell>{ingredient.name}</TableCell>
+                              <TableCell className="text-right">
+                                {formatAmount(ingredient.amount)} {ingredient.unit}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {`${packageAmount} ${ingredient.unit}`}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {unitsRequired}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        });
                       } else {
                         // 식재료가 없는 경우
                         return (
@@ -477,7 +495,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                             </TableCell>
                             <TableCell>{getMealPlanNames(menuPortion.mealPlans)}</TableCell>
                             <TableCell>{formatHeadcounts(menuPortion.containers_info)}</TableCell>
-                            <TableCell colSpan={2} className="text-center text-gray-500 text-sm">
+                            <TableCell colSpan={4} className="text-center text-gray-500 text-sm">
                               등록된 식재료 정보가 없습니다.
                             </TableCell>
                           </TableRow>
@@ -488,6 +506,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                 </Table>
                 <p className="text-xs text-gray-500 mt-2">
                   * 식재료 수량은 각 메뉴의 식수에 맞게 계산된 값입니다.
+                  * 포장단위와 투입량은 예시로 표시된 값입니다. 실제 값은 식재료 정보에 따라 달라질 수 있습니다.
                 </p>
               </CardContent>
             </Card>
@@ -510,23 +529,49 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                   <TableRow>
                     <TableHead>식재료명</TableHead>
                     <TableHead className="text-right">필요 수량</TableHead>
+                    <TableHead className="text-right">포장단위</TableHead>
+                    <TableHead className="text-right">투입량</TableHead>
                     <TableHead className="text-right">단가</TableHead>
                     <TableHead className="text-right">총 비용</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {cookingPlan.ingredient_requirements.map((item, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{item.ingredient_name}</TableCell>
-                      <TableCell className="text-right">
-                        {formatAmount(item.total_amount)} {item.unit}
-                      </TableCell>
-                      <TableCell className="text-right">{formatUnitPrice(item.unit_price, item.unit)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(item.total_price)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {cookingPlan.ingredient_requirements.map((item, index) => {
+                    // 단순화된 방식으로 각 식재료의 포장단위 정보 찾기
+                    // ingredient_requirements 배열에는 package_amount가 포함되어 있지 않으므로
+                    // 이 정보는 다른 방식으로 찾거나 API에서 제공받아야 함
+                    
+                    // 예시로 모든 식재료에 기본 포장단위를 설정
+                    // 실제로는 DB에서 식재료 정보를 가져와서 사용해야 함
+                    const packageAmount = 1000; // 기본값 - 실제로는 서버에서 받아와야 함
+                    
+                    // 투입량 계산 (필요 수량 / 포장단위)
+                    const unitsRequired = packageAmount > 0 
+                      ? (item.total_amount / packageAmount).toFixed(1) 
+                      : "N/A";
+                    
+                    return (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium">{item.ingredient_name}</TableCell>
+                        <TableCell className="text-right">
+                          {formatAmount(item.total_amount)} {item.unit}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {`${packageAmount} ${item.unit}`}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {unitsRequired}
+                        </TableCell>
+                        <TableCell className="text-right">{formatUnitPrice(item.unit_price, item.unit)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(item.total_price)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
+              <p className="text-xs text-gray-500 mt-2">
+                * 포장단위와 투입량은 예시로 표시된 값입니다. 실제 값은 식재료 정보에 따라 달라질 수 있습니다.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
