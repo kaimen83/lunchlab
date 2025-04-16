@@ -257,17 +257,19 @@ export default function MealPlanBasicInfo({
   };
 
   const handleEditClick = () => {
-    if (selectedTemplate?.id) {
-      setSelectedTemplateId(selectedTemplate.id);
+    const selectedTemplate = templates.find(t => t.value === name);
+    if (selectedTemplate) {
+      setSelectedTemplateId(selectedTemplate.value);
       // 템플릿 상세 정보 로드 (용기 선택 정보 포함)
-      fetchTemplateDetails(selectedTemplate.id);
+      fetchTemplateDetails(selectedTemplate.value);
       setIsEditTemplateOpen(true);
     }
   };
 
   const handleDeleteClick = () => {
-    if (selectedTemplate?.id) {
-      setSelectedTemplateId(selectedTemplate.id);
+    const selectedTemplate = templates.find(t => t.value === name);
+    if (selectedTemplate) {
+      setSelectedTemplateId(selectedTemplate.value);
       setIsDeleteAlertOpen(true);
     }
   };
@@ -327,26 +329,29 @@ export default function MealPlanBasicInfo({
                     </SelectContent>
                   </Select>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="w-10 h-10"
-                  disabled={!selectedTemplate?.id}
-                  onClick={handleEditClick}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="w-10 h-10"
-                  disabled={!selectedTemplate?.id}
-                  onClick={handleDeleteClick}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {selectedTemplate && (
+                  <div className="flex gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      disabled={isLoading || !selectedTemplate}
+                      onClick={handleEditClick}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      disabled={isLoading || !selectedTemplate}
+                      onClick={handleDeleteClick}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
             
