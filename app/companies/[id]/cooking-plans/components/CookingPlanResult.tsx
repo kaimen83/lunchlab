@@ -2,12 +2,15 @@
 
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { FileText, Download, Printer } from 'lucide-react';
+import { FileText, Download, Printer, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CookingPlan, MenuPortion, IngredientRequirement } from '../types';
+import { useState } from 'react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Badge } from '@/components/ui/badge';
 
 interface CookingPlanResultProps {
   cookingPlan: CookingPlan;
@@ -15,7 +18,52 @@ interface CookingPlanResultProps {
   onDownload: () => void;
 }
 
+// 메뉴 컨테이너 타입 정의 (API route에서 복사)
+interface MenuContainer {
+  id: string;
+  menu_id: string;
+  container_id: string;
+  ingredients_cost: number;
+  menu_container_ingredients: Array<{
+    amount: number;
+    ingredient: {
+      id: string;
+      name: string;
+      package_amount: number;
+      unit: string;
+      price: number;
+    }
+  }>;
+  container?: {
+    id: string;
+    name: string;
+  };
+}
+
+// 메뉴-용기-식재료 정보를 포함한 확장된 메뉴 정보 타입
+interface ExtendedMenuPortion extends MenuPortion {
+  mealPlans: string[];
+  ingredients?: {
+    id: string;
+    name: string;
+    amount: number;
+    unit: string;
+  }[];
+}
+
 export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: CookingPlanResultProps) {
+  // 메뉴 확장 상태 관리
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
+
+  // 메뉴 확장 상태 토글
+  const toggleMenuExpand = (menuId: string, containerId: string | null) => {
+    const key = `${menuId}-${containerId || 'null'}`;
+    setExpandedMenus(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
   // 식사 시간별로 그룹화
   const menusByMealTime = cookingPlan.menu_portions.reduce((acc, menu) => {
     // meal_time이 없을 경우 '기타'로 처리
@@ -51,19 +99,50 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
     return acc;
   }, {} as Record<string, number>);
 
+  // 메뉴 정보에 식재료 정보를 추가하는 함수
+  const getMenuIngredients = (menuId: string, containerId: string | null) => {
+    // 해당 메뉴의 메뉴-용기 조합을 찾기 위해 meal_plans의 모든 메뉴를 검색
+    for (const mealPlan of cookingPlan.meal_plans) {
+      for (const mealPlanMenu of mealPlan.meal_plan_menus) {
+        const menu = mealPlanMenu.menu;
+        // 해당 메뉴인지 확인
+        if (menu.id === menuId) {
+          // 해당 용기에 맞는 menu_container 찾기
+          const menuContainer = menu.menu_containers?.find(
+            (mc: any) => mc.menu_id === menuId && mc.container_id === containerId
+          );
+          
+          if (menuContainer && menuContainer.menu_container_ingredients) {
+            // 식재료 정보 추출
+            return menuContainer.menu_container_ingredients.map((item: any) => ({
+              id: item.ingredient.id,
+              name: item.ingredient.name,
+              amount: item.amount,
+              unit: item.ingredient.unit
+            }));
+          }
+        }
+      }
+    }
+    return [];
+  };
+
   // 식사 시간별로 중복 메뉴를 통합하고 식단 정보 추가
   const processedMenusByMealTime = Object.keys(menusByMealTime).reduce((acc, mealTime) => {
-    // 메뉴 ID별로 그룹화
-    const menuMap = new Map<string, {
+    // 메뉴-용기 조합별로 그룹화 (용기별로 다른 식재료를 가질 수 있으므로)
+    const menuContainerMap = new Map<string, {
       menu: MenuPortion,
       totalHeadcount: number,
       mealPlans: Set<string>
     }>();
     
     menusByMealTime[mealTime].forEach(menu => {
-      // 동일 메뉴가 있는지 확인
-      if (menuMap.has(menu.menu_id)) {
-        const existingMenu = menuMap.get(menu.menu_id)!;
+      // 메뉴-용기 조합을 키로 사용
+      const key = `${menu.menu_id}-${menu.container_id || 'null'}`;
+      
+      // 동일 메뉴-용기 조합이 있는지 확인
+      if (menuContainerMap.has(key)) {
+        const existingMenu = menuContainerMap.get(key)!;
         // 식수 합산
         existingMenu.totalHeadcount += menu.headcount;
         // 식단 정보 추가 (meal_plan_id가 있을 경우)
@@ -71,8 +150,8 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
           existingMenu.mealPlans.add(menu.meal_plan_id);
         }
       } else {
-        // 새 메뉴 추가
-        menuMap.set(menu.menu_id, {
+        // 새 메뉴-용기 조합 추가
+        menuContainerMap.set(key, {
           menu: {...menu},
           totalHeadcount: menu.headcount,
           mealPlans: menu.meal_plan_id ? new Set([menu.meal_plan_id]) : new Set()
@@ -81,14 +160,20 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
     });
     
     // 통합된 메뉴 목록 생성
-    acc[mealTime] = Array.from(menuMap.values()).map(item => ({
-      ...item.menu,
-      headcount: item.totalHeadcount,
-      mealPlans: Array.from(item.mealPlans)
-    }));
+    acc[mealTime] = Array.from(menuContainerMap.values()).map(item => {
+      // 메뉴-용기 조합에 따른 식재료 정보 추가
+      const ingredients = getMenuIngredients(item.menu.menu_id, item.menu.container_id || null);
+      
+      return {
+        ...item.menu,
+        headcount: item.totalHeadcount,
+        mealPlans: Array.from(item.mealPlans),
+        ingredients // 식재료 정보 추가
+      } as ExtendedMenuPortion;
+    });
     
     return acc;
-  }, {} as Record<string, (MenuPortion & { mealPlans: string[] })[]>);
+  }, {} as Record<string, ExtendedMenuPortion[]>);
 
   // 식사 시간 한글화
   const getMealTimeName = (mealTime: string) => {
@@ -199,14 +284,66 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {menus.map((menuPortion, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{menuPortion.menu_name}</TableCell>
-                        <TableCell>{menuPortion.container_name || '-'}</TableCell>
-                        <TableCell>{getMealPlanNames(menuPortion.mealPlans)}</TableCell>
-                        <TableCell className="text-right">{menuPortion.headcount}</TableCell>
-                      </TableRow>
-                    ))}
+                    {menus.map((menuPortion, index) => {
+                      // 메뉴-용기 조합의 고유 키
+                      const menuKey = `${menuPortion.menu_id}-${menuPortion.container_id || 'null'}`;
+                      const isExpanded = expandedMenus[menuKey];
+                      
+                      return (
+                        <Collapsible 
+                          key={index} 
+                          open={isExpanded}
+                          className="w-full"
+                        >
+                          <CollapsibleTrigger asChild>
+                            <TableRow className="cursor-pointer hover:bg-gray-50" onClick={() => toggleMenuExpand(menuPortion.menu_id, menuPortion.container_id || null)}>
+                              <TableCell className="font-medium">
+                                <div className="flex items-center">
+                                  {isExpanded ? 
+                                    <ChevronUp className="h-4 w-4 mr-2 inline text-gray-500" /> : 
+                                    <ChevronDown className="h-4 w-4 mr-2 inline text-gray-500" />
+                                  }
+                                  {menuPortion.menu_name}
+                                  {menuPortion.ingredients && menuPortion.ingredients.length > 0 && (
+                                    <Badge variant="outline" className="ml-2 text-xs">
+                                      식재료 {menuPortion.ingredients.length}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>{menuPortion.container_name || '-'}</TableCell>
+                              <TableCell>{getMealPlanNames(menuPortion.mealPlans)}</TableCell>
+                              <TableCell className="text-right">{menuPortion.headcount}</TableCell>
+                            </TableRow>
+                          </CollapsibleTrigger>
+                          
+                          <CollapsibleContent>
+                            {menuPortion.ingredients && menuPortion.ingredients.length > 0 ? (
+                              <div className="bg-gray-50 px-4 py-3 border-t border-b">
+                                <h4 className="text-sm font-medium text-gray-700 mb-2">식재료 정보</h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                  {menuPortion.ingredients.map((ingredient, idx) => (
+                                    <div key={idx} className="flex justify-between text-sm">
+                                      <span className="text-gray-600">{ingredient.name}</span>
+                                      <span className="font-medium">
+                                        {formatAmount(ingredient.amount * menuPortion.headcount)} {ingredient.unit}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-2">
+                                  * 식수({menuPortion.headcount}명)에 맞게 계산된 수량입니다.
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="bg-gray-50 px-4 py-3 border-t border-b">
+                                <p className="text-sm text-gray-500">등록된 식재료 정보가 없습니다.</p>
+                              </div>
+                            )}
+                          </CollapsibleContent>
+                        </Collapsible>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
