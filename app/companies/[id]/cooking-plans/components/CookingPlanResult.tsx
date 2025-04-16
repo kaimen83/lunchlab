@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { FileText, Download, Printer, ChevronDown, ChevronUp } from 'lucide-react';
@@ -9,7 +10,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CookingPlan, MenuPortion, IngredientRequirement } from '../types';
 import { useState } from 'react';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 
 interface CookingPlanResultProps {
@@ -18,25 +18,51 @@ interface CookingPlanResultProps {
   onDownload: () => void;
 }
 
-// 메뉴 컨테이너 타입 정의 (API route에서 복사)
+// 식재료 타입 정의
+interface Ingredient {
+  id: string;
+  name: string;
+  package_amount: number;
+  unit: string;
+  price: number;
+}
+
+// 메뉴-용기-식재료 관계 타입 정의
+interface MenuContainerIngredient {
+  amount: number;
+  ingredient: Ingredient;
+}
+
+// 메뉴 컨테이너 타입 정의
 interface MenuContainer {
   id: string;
   menu_id: string;
   container_id: string;
   ingredients_cost: number;
-  menu_container_ingredients: Array<{
-    amount: number;
-    ingredient: {
-      id: string;
-      name: string;
-      package_amount: number;
-      unit: string;
-      price: number;
-    }
-  }>;
+  menu_container_ingredients: MenuContainerIngredient[];
   container?: {
     id: string;
     name: string;
+  };
+}
+
+// 메뉴 타입 정의
+interface Menu {
+  id: string;
+  name: string;
+  description?: string;
+  menu_price_history?: any[];
+  menu_containers?: MenuContainer[];
+}
+
+// 식단 메뉴 타입 정의
+interface MealPlanMenu {
+  menu: Menu;
+  container?: {
+    id: string;
+    name: string;
+    description?: string;
+    price?: number;
   };
 }
 
@@ -103,18 +129,24 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
   const getMenuIngredients = (menuId: string, containerId: string | null) => {
     // 해당 메뉴의 메뉴-용기 조합을 찾기 위해 meal_plans의 모든 메뉴를 검색
     for (const mealPlan of cookingPlan.meal_plans) {
+      // meal_plan_menus가 없는 경우 스킵
+      if (!mealPlan.meal_plan_menus) continue;
+      
       for (const mealPlanMenu of mealPlan.meal_plan_menus) {
-        const menu = mealPlanMenu.menu;
+        const menu = mealPlanMenu.menu as Menu;
         // 해당 메뉴인지 확인
         if (menu.id === menuId) {
+          // menu_containers가 없는 경우 스킵
+          if (!menu.menu_containers) continue;
+          
           // 해당 용기에 맞는 menu_container 찾기
-          const menuContainer = menu.menu_containers?.find(
-            (mc: any) => mc.menu_id === menuId && mc.container_id === containerId
+          const menuContainer = menu.menu_containers.find(
+            (mc: MenuContainer) => mc.menu_id === menuId && mc.container_id === containerId
           );
           
           if (menuContainer && menuContainer.menu_container_ingredients) {
             // 식재료 정보 추출
-            return menuContainer.menu_container_ingredients.map((item: any) => ({
+            return menuContainer.menu_container_ingredients.map((item) => ({
               id: item.ingredient.id,
               name: item.ingredient.name,
               amount: item.amount,
@@ -281,71 +313,59 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                       <TableHead>용기</TableHead>
                       <TableHead>사용 식단</TableHead>
                       <TableHead className="text-right">식수 (명)</TableHead>
+                      <TableHead>필요 식재료</TableHead>
+                      <TableHead className="text-right">식재료 수량</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {menus.map((menuPortion, index) => {
-                      // 메뉴-용기 조합의 고유 키
-                      const menuKey = `${menuPortion.menu_id}-${menuPortion.container_id || 'null'}`;
-                      const isExpanded = expandedMenus[menuKey];
-                      
-                      return (
-                        <Collapsible 
-                          key={index} 
-                          open={isExpanded}
-                          className="w-full"
-                        >
-                          <CollapsibleTrigger asChild>
-                            <TableRow className="cursor-pointer hover:bg-gray-50" onClick={() => toggleMenuExpand(menuPortion.menu_id, menuPortion.container_id || null)}>
-                              <TableCell className="font-medium">
-                                <div className="flex items-center">
-                                  {isExpanded ? 
-                                    <ChevronUp className="h-4 w-4 mr-2 inline text-gray-500" /> : 
-                                    <ChevronDown className="h-4 w-4 mr-2 inline text-gray-500" />
-                                  }
-                                  {menuPortion.menu_name}
-                                  {menuPortion.ingredients && menuPortion.ingredients.length > 0 && (
+                      // 식재료가 있는 경우
+                      if (menuPortion.ingredients && menuPortion.ingredients.length > 0) {
+                        return menuPortion.ingredients.map((ingredient, idx) => (
+                          <TableRow key={`${index}-${idx}`} className={idx > 0 ? "border-t-0" : ""}>
+                            {idx === 0 && (
+                              <>
+                                <TableCell className="font-medium" rowSpan={menuPortion.ingredients!.length}>
+                                  <div className="flex items-center">
+                                    {menuPortion.menu_name}
                                     <Badge variant="outline" className="ml-2 text-xs">
-                                      식재료 {menuPortion.ingredients.length}
+                                      식재료 {menuPortion.ingredients!.length}
                                     </Badge>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell>{menuPortion.container_name || '-'}</TableCell>
-                              <TableCell>{getMealPlanNames(menuPortion.mealPlans)}</TableCell>
-                              <TableCell className="text-right">{menuPortion.headcount}</TableCell>
-                            </TableRow>
-                          </CollapsibleTrigger>
-                          
-                          <CollapsibleContent>
-                            {menuPortion.ingredients && menuPortion.ingredients.length > 0 ? (
-                              <div className="bg-gray-50 px-4 py-3 border-t border-b">
-                                <h4 className="text-sm font-medium text-gray-700 mb-2">식재료 정보</h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                  {menuPortion.ingredients.map((ingredient, idx) => (
-                                    <div key={idx} className="flex justify-between text-sm">
-                                      <span className="text-gray-600">{ingredient.name}</span>
-                                      <span className="font-medium">
-                                        {formatAmount(ingredient.amount * menuPortion.headcount)} {ingredient.unit}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                                <p className="text-xs text-gray-500 mt-2">
-                                  * 식수({menuPortion.headcount}명)에 맞게 계산된 수량입니다.
-                                </p>
-                              </div>
-                            ) : (
-                              <div className="bg-gray-50 px-4 py-3 border-t border-b">
-                                <p className="text-sm text-gray-500">등록된 식재료 정보가 없습니다.</p>
-                              </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell rowSpan={menuPortion.ingredients!.length}>{menuPortion.container_name || '-'}</TableCell>
+                                <TableCell rowSpan={menuPortion.ingredients!.length}>{getMealPlanNames(menuPortion.mealPlans)}</TableCell>
+                                <TableCell className="text-right" rowSpan={menuPortion.ingredients!.length}>{menuPortion.headcount}</TableCell>
+                              </>
                             )}
-                          </CollapsibleContent>
-                        </Collapsible>
-                      );
+                            <TableCell>{ingredient.name}</TableCell>
+                            <TableCell className="text-right">
+                              {formatAmount(ingredient.amount * menuPortion.headcount)} {ingredient.unit}
+                            </TableCell>
+                          </TableRow>
+                        ));
+                      } else {
+                        // 식재료가 없는 경우
+                        return (
+                          <TableRow key={index}>
+                            <TableCell className="font-medium">
+                              {menuPortion.menu_name}
+                            </TableCell>
+                            <TableCell>{menuPortion.container_name || '-'}</TableCell>
+                            <TableCell>{getMealPlanNames(menuPortion.mealPlans)}</TableCell>
+                            <TableCell className="text-right">{menuPortion.headcount}</TableCell>
+                            <TableCell colSpan={2} className="text-center text-gray-500 text-sm">
+                              등록된 식재료 정보가 없습니다.
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
                     })}
                   </TableBody>
                 </Table>
+                <p className="text-xs text-gray-500 mt-2">
+                  * 식재료 수량은 각 메뉴의 식수에 맞게 계산된 값입니다.
+                </p>
               </CardContent>
             </Card>
           ))}
