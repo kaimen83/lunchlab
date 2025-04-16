@@ -20,6 +20,7 @@ export interface MenuContainer {
   ingredients_cost: number;
   container_price: number;
   total_cost: number;
+  calories?: number;
 }
 
 export interface MenuSelectionWithContainer {

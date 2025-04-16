@@ -34,6 +34,23 @@ export const getCostInfoForMenuAndContainer = (
   };
 };
 
+// 칼로리 정보 가져오기
+export const getCaloriesForMenuAndContainer = (
+  menuId: string,
+  containerId: string,
+  menuContainers: MenuContainer[]
+) => {
+  const menuContainer = menuContainers.find(
+    mc => mc.menu_id === menuId && mc.container_id === containerId
+  );
+  
+  if (!menuContainer || !menuContainer.calories) {
+    return 0;
+  }
+  
+  return menuContainer.calories;
+};
+
 // 메뉴가 호환되는 다른 용기 목록 찾기
 export const getCompatibleContainersForMenu = (
   menuId: string,
@@ -54,7 +71,8 @@ export const getCompatibleContainersForMenu = (
       costInfo: {
         ingredients_cost: mc.ingredients_cost,
         total_cost: mc.total_cost
-      }
+      },
+      calories: mc.calories || 0
     }));
 };
 
@@ -65,4 +83,9 @@ export const formatPrice = (price: number) => {
     currency: 'KRW',
     maximumFractionDigits: 1
   }).format(price);
+};
+
+// 칼로리 포맷
+export const formatCalories = (calories: number) => {
+  return `${calories.toLocaleString('ko-KR')} kcal`;
 }; 

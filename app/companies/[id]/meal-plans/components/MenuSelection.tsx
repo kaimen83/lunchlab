@@ -19,7 +19,8 @@ import {
   formatPrice, 
   isMenuCompatibleWithContainer, 
   getCostInfoForMenuAndContainer,
-  getCompatibleContainersForMenu
+  getCompatibleContainersForMenu,
+  formatCalories
 } from './utils';
 import { Button } from '@/components/ui/button';
 
@@ -32,7 +33,7 @@ interface MenuSelectionProps {
   setSearchTerm: Dispatch<SetStateAction<string>>;
   filteredMenus: Menu[];
   selectedMenuId: string | undefined;
-  onMenuSelect: (containerId: string, menuId: string) => void;
+  onMenuSelect: (containerId: string, menuId: string, compatibleContainerId?: string) => void;
   menuContainers: MenuContainer[];
 }
 
@@ -60,7 +61,10 @@ export default function MenuSelection({
     containerId: string;
     containerName: string | undefined;
     costInfo: { total_cost: number; ingredients_cost: number };
+    calories: number;
   }[]>([]);
+  // 선택된 호환 가능 용기 상태 추가
+  const [selectedCompatibleContainerId, setSelectedCompatibleContainerId] = useState<string | null>(null);
 
   // 메뉴 선택 핸들러
   const handleMenuSelect = (e: MouseEvent, menuId: string, menu: Menu) => {
@@ -89,6 +93,8 @@ export default function MenuSelection({
         // 다른 용기와 호환되는 경우 대화상자 표시
         setSelectedIncompatibleMenu(menu);
         setCompatibleContainers(compatibleWithOtherContainers);
+        // 첫 번째 호환 가능 용기를 기본 선택
+        setSelectedCompatibleContainerId(compatibleWithOtherContainers[0].containerId);
         setIncompatibleMenuDialogOpen(true);
       } else {
         // 다른 어떤 용기와도 호환되지 않는 경우 기본 선택 처리
@@ -106,11 +112,19 @@ export default function MenuSelection({
     if (selectedIncompatibleMenu && containerId) {
       setIsSelecting(true);
       setTimeout(() => {
-        onMenuSelect(containerId, selectedIncompatibleMenu.id);
+        // 선택한 호환 용기 ID를 추가 파라미터로 전달
+        onMenuSelect(containerId, selectedIncompatibleMenu.id, selectedCompatibleContainerId || undefined);
         setIncompatibleMenuDialogOpen(false);
         setIsSelecting(false);
+        // 선택된 호환 용기 ID 초기화
+        setSelectedCompatibleContainerId(null);
       }, 10);
     }
+  };
+
+  // 호환 가능 용기 선택 핸들러
+  const handleCompatibleContainerSelect = (containerId: string) => {
+    setSelectedCompatibleContainerId(containerId);
   };
 
   return (
@@ -294,17 +308,42 @@ export default function MenuSelection({
             </DialogTitle>
             <DialogDescription>
               선택하신 <span className="font-medium">{selectedIncompatibleMenu?.name}</span> 메뉴는 현재 용기 <span className="font-medium">{containerName}</span>와 호환되지 않습니다.
-              하지만 다른 용기에서는 사용 가능합니다.
+              하지만 다른 용기에서는 사용 가능합니다. 아래 호환되는 용기 중 하나를 선택하여 해당 용기의 용량 정보를 현재 용기에 적용할 수 있습니다.
             </DialogDescription>
           </DialogHeader>
           
           <div className="py-4">
-            <h4 className="text-sm font-medium mb-2">호환되는 용기:</h4>
+            <h4 className="text-sm font-medium mb-2">호환되는 용기를 선택하세요:</h4>
             <div className="space-y-2">
-              {compatibleContainers.map((container, index) => (
-                <div key={index} className="flex justify-between items-center p-2 border rounded-md">
-                  <span>{container.containerName}</span>
-                  <Badge variant="outline">{formatPrice(container.costInfo.total_cost)}</Badge>
+              {compatibleContainers.map((container) => (
+                <div 
+                  key={container.containerId} 
+                  className={cn(
+                    "flex flex-col p-2 border rounded-md cursor-pointer transition-colors",
+                    selectedCompatibleContainerId === container.containerId 
+                      ? "bg-blue-50 border-blue-300" 
+                      : "hover:bg-accent/10"
+                  )}
+                  onClick={() => handleCompatibleContainerSelect(container.containerId)}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className={cn(
+                      "font-medium",
+                      selectedCompatibleContainerId === container.containerId && "text-blue-600"
+                    )}>
+                      {container.containerName}
+                    </span>
+                    <Badge 
+                      variant={selectedCompatibleContainerId === container.containerId ? "default" : "outline"}
+                    >
+                      {formatPrice(container.costInfo.total_cost)}
+                    </Badge>
+                  </div>
+                  {container.calories > 0 && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {formatCalories(container.calories)}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -314,8 +353,8 @@ export default function MenuSelection({
             <Button variant="outline" onClick={() => setIncompatibleMenuDialogOpen(false)}>
               취소
             </Button>
-            <Button onClick={handleSelectWithOtherContainer}>
-              선택하기
+            <Button onClick={handleSelectWithOtherContainer} disabled={!selectedCompatibleContainerId}>
+              선택한 용기 용량으로 적용하기
             </Button>
           </DialogFooter>
         </DialogContent>

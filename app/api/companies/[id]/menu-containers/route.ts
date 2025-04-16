@@ -27,6 +27,7 @@ interface Ingredient {
   price: number;
   package_amount: number;
   unit: string;
+  calories?: number;
 }
 
 // 회사별 메뉴-용기 연결 정보 조회
@@ -34,6 +35,9 @@ export async function GET(request: Request, context: RouteContext) {
   try {
     const { userId } = await auth();
     const { id: companyId } = await context.params;
+    const url = new URL(request.url);
+    const menuId = url.searchParams.get('menuId');
+    const containerId = url.searchParams.get('containerId');
     
     if (!userId) {
       return NextResponse.json({ error: '인증되지 않은 요청입니다.' }, { status: 401 });
@@ -58,11 +62,18 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: '해당 회사에 접근 권한이 없습니다.' }, { status: 403 });
     }
     
-    // 먼저 회사의 모든 메뉴 ID 조회
-    const { data: menus, error: menusError } = await supabase
+    // 메뉴 조회 쿼리
+    let menusQuery = supabase
       .from('menus')
       .select('id, name, description')
       .eq('company_id', companyId);
+    
+    // 특정 메뉴 ID가 제공된 경우 해당 메뉴만 조회
+    if (menuId) {
+      menusQuery = menusQuery.eq('id', menuId);
+    }
+    
+    const { data: menus, error: menusError } = await menusQuery;
     
     if (menusError) {
       console.error('메뉴 ID 조회 오류:', menusError);
@@ -76,8 +87,8 @@ export async function GET(request: Request, context: RouteContext) {
     // 메뉴 ID 배열 추출
     const menuIds = menus.map(menu => menu.id);
     
-    // 회사의 모든 메뉴-용기 연결 정보 조회
-    const { data: menuContainers, error: menuContainersError } = await supabase
+    // 회사의 메뉴-용기 연결 정보 조회 쿼리 구성
+    let menuContainersQuery = supabase
       .from('menu_containers')
       .select(`
         id,
@@ -86,6 +97,13 @@ export async function GET(request: Request, context: RouteContext) {
         container:containers(id, name, description, price)
       `)
       .in('menu_id', menuIds);
+    
+    // 특정 용기 ID가 제공된 경우 해당 용기만 필터링
+    if (containerId) {
+      menuContainersQuery = menuContainersQuery.eq('container_id', containerId);
+    }
+    
+    const { data: menuContainers, error: menuContainersError } = await menuContainersQuery;
     
     if (menuContainersError) {
       console.error('메뉴-용기 연결 정보 조회 오류:', menuContainersError);
@@ -109,7 +127,7 @@ export async function GET(request: Request, context: RouteContext) {
             id,
             ingredient_id,
             amount,
-            ingredient:ingredients(id, name, price, package_amount, unit)
+            ingredient:ingredients(id, name, price, package_amount, unit, calories)
           `)
           .eq('menu_container_id', menuContainer.id);
         
@@ -119,7 +137,10 @@ export async function GET(request: Request, context: RouteContext) {
             ...menuContainer,
             menu: menu || { id: menuContainer.menu_id, name: '알 수 없는 메뉴', description: null },
             ingredients: [],
-            total_cost: 0
+            ingredients_cost: 0,
+            container_price: 0,
+            total_cost: 0,
+            calories: 0
           };
         }
         
@@ -132,12 +153,44 @@ export async function GET(request: Request, context: RouteContext) {
           return total + (unitPrice * item.amount);
         }, 0);
         
+        // 칼로리 계산
+        let totalCalories = 0;
+        (ingredients || []).forEach(item => {
+          if (!item.ingredient) return;
+          
+          const ingredientData = item.ingredient as unknown as Ingredient;
+          if (ingredientData.calories) {
+            const unitCalories = ingredientData.calories / ingredientData.package_amount;
+            totalCalories += (unitCalories * item.amount);
+          }
+        });
+        
+        // 메뉴의 기본 칼로리가 있다면 추가
+        const { data: menuCalories } = await supabase
+          .from('menus')
+          .select('base_calories')
+          .eq('id', menuContainer.menu_id)
+          .single();
+        
+        if (menuCalories && menuCalories.base_calories) {
+          totalCalories += menuCalories.base_calories;
+        }
+        
         // 용기 자체 가격 - 원가에서 제외
         const containerData = menuContainer.container as unknown as Container;
         
-        // 총 원가 = 식재료 원가만 포함
-        const totalCost = ingredientsCost;
+        // 기존에 저장된 칼로리 값이 있는지 확인
+        const { data: existingData } = await supabase
+          .from('menu_containers')
+          .select('calories, cost')
+          .eq('id', menuContainer.id)
+          .single();
         
+        // DB에 저장된 값이 있으면 해당 값 사용, 없으면 계산한 값 사용
+        const finalCalories = (existingData && existingData.calories) ? existingData.calories : totalCalories;
+        const finalCost = (existingData && existingData.cost) ? existingData.cost : ingredientsCost;
+        
+        // 현재 계산한 총 원가 = 식재료 원가만 포함
         return {
           id: menuContainer.id,
           menu_id: menuContainer.menu_id,
@@ -145,9 +198,10 @@ export async function GET(request: Request, context: RouteContext) {
           menu: menu || { id: menuContainer.menu_id, name: '알 수 없는 메뉴', description: null },
           container: menuContainer.container,
           ingredients: ingredients || [],
-          ingredients_cost: ingredientsCost,
+          ingredients_cost: finalCost, // DB 값 또는 계산 값
           container_price: 0, // 용기 가격은 원가에 포함하지 않음
-          total_cost: totalCost
+          total_cost: finalCost, // DB 값 또는 계산 값
+          calories: finalCalories // DB 값 또는 계산 값
         };
       })
     );

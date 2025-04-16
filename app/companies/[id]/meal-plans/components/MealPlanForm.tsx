@@ -288,7 +288,79 @@ export default function MealPlanForm({
   };
 
   // 용기에 메뉴 할당
-  const handleMenuSelection = (containerId: string, menuId: string) => {
+  const handleMenuSelection = async (containerId: string, menuId: string, compatibleContainerId?: string) => {
+    // 호환 용기 ID가 있는 경우, 해당 용기의 식재료 정보를 기존 용기에 적용
+    if (compatibleContainerId) {
+      try {
+        setIsLoadingMenuContainers(true); // 로딩 상태 시작
+        
+        // 호환 용기의 메뉴 식재료 정보 가져오기
+        const response = await fetch(`/api/companies/${companyId}/menu-containers?menuId=${menuId}&containerId=${compatibleContainerId}`);
+        
+        if (!response.ok) {
+          throw new Error('호환 용기 정보를 가져오는데 실패했습니다.');
+        }
+        
+        const compatibleMenuContainerData = await response.json();
+        console.log('호환 용기 데이터:', compatibleMenuContainerData);
+        
+        // 호환 용기의 식재료 정보를 적용하는 API 호출
+        const applyResponse = await fetch(`/api/companies/${companyId}/menu-containers/apply-compatible`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            menuId,
+            targetContainerId: containerId,
+            sourceContainerId: compatibleContainerId,
+          }),
+        });
+        
+        // 상세 에러 정보 확인을 위해 응답 처리
+        const responseText = await applyResponse.text();
+        
+        try {
+          // JSON으로 파싱 시도
+          const responseData = JSON.parse(responseText);
+          
+          if (!applyResponse.ok) {
+            console.error('호환 용기 API 오류 응답:', responseData);
+            throw new Error(responseData.error || '호환 용기 정보를 적용하는데 실패했습니다.');
+          }
+          
+          console.log('호환 용기 적용 성공:', responseData);
+        } catch (jsonError) {
+          console.error('응답 파싱 오류:', jsonError);
+          console.error('원본 응답 텍스트:', responseText);
+          
+          if (!applyResponse.ok) {
+            throw new Error(`호환 용기 정보를 적용하는데 실패했습니다. 상태 코드: ${applyResponse.status}`);
+          }
+        }
+        
+        // 메뉴 컨테이너 정보 새로고침
+        await loadMenuContainers();
+        
+        // 성공 메시지 표시
+        toast({
+          title: '호환 용기 적용 완료',
+          description: `선택한 용기의 정보가 성공적으로 적용되었습니다.`,
+          variant: 'default'
+        });
+      } catch (error) {
+        console.error('호환 용기 정보 적용 오류:', error);
+        // 에러가 있을 때 알림
+        toast({
+          title: '호환 용기 적용 오류',
+          description: error instanceof Error ? error.message : '호환 용기 정보를 적용하는데 실패했습니다.',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoadingMenuContainers(false); // 로딩 상태 종료
+      }
+    }
+    
     // 메뉴 선택 정보 업데이트
     setContainerMenuSelections(prev => ({
       ...prev,
