@@ -33,17 +33,18 @@ export const calculateMealPlanCost = (mealPlan: MealPlan): number => {
         mc => mc.menu_id === item.menu_id && mc.container_id === containerId
       );
       
-      if (menuContainer) {
+      if (menuContainer && menuContainer.ingredients_cost > 0) {
         // 특정 메뉴-용기 조합에 대한 원가 사용
-        itemCost = menuContainer.ingredients_cost || 0;
+        itemCost = menuContainer.ingredients_cost;
       } else {
-        // 메뉴-용기 조합 정보가 없는 경우 menu_price_history에서 가져옴
+        // 메뉴-용기 조합 정보가 없거나 원가가 0인 경우 (비호환 메뉴) menu_price_history에서 가져옴
         if (item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
           const sortedHistory = [...item.menu.menu_price_history].sort((a, b) => {
             if (!a.recorded_at || !b.recorded_at) return 0;
             return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
           });
-          itemCost = sortedHistory[0].cost_price || 0;
+          const latestPrice = sortedHistory[0].cost_price;
+          itemCost = typeof latestPrice === 'number' ? latestPrice : 0;
         }
       }
     } else {

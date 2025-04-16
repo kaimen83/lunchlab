@@ -262,11 +262,27 @@ export default function MenuSelection({
                             return !isCompatible && getCompatibleContainersForMenu(menu.id, containerId, menuContainers).length === 0;
                           })
                           .map(menu => {
+                            // 메뉴-용기 원가 정보 가져오기
+                            const costInfo = getCostInfoForMenuAndContainer(menu.id, containerId, menuContainers);
+                            
+                            // 메뉴 자체의 원가 가져오기 (menu_price_history에서 가져올 수 있다면)
+                            let menuCost = '';
+                            if (menu.menu_price_history && menu.menu_price_history.length > 0) {
+                              const sortedHistory = [...menu.menu_price_history].sort((a, b) => {
+                                if (!a.recorded_at || !b.recorded_at) return 0;
+                                return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
+                              });
+                              const latestPrice = sortedHistory[0].cost_price;
+                              if (typeof latestPrice === 'number' && latestPrice > 0) {
+                                menuCost = formatPrice(latestPrice);
+                              }
+                            }
+                            
                             return (
                               <div 
                                 key={menu.id} 
                                 className={cn(
-                                  "flex flex-col p-3 border-b last:border-0 cursor-pointer hover:bg-accent/20",
+                                  "flex flex-col p-3 border-b cursor-pointer hover:bg-accent/20",
                                   selectedMenuId === menu.id && "bg-accent/30"
                                 )}
                                 onClick={(e) => handleMenuSelect(e, menu.id, menu)}
@@ -274,7 +290,13 @@ export default function MenuSelection({
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center">
                                     <span className="font-medium">{menu.name}</span>
+                                    <Badge variant="outline" className="ml-2 text-xs border-red-500 text-red-600">
+                                      호환 안됨
+                                    </Badge>
                                   </div>
+                                  <span className="text-sm font-medium">
+                                    {menuCost || (costInfo.total_cost > 0 ? formatPrice(costInfo.total_cost) : '')}
+                                  </span>
                                 </div>
                                 {menu.description && (
                                   <p className="text-xs text-muted-foreground mt-1">

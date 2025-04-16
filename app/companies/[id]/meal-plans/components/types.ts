@@ -2,6 +2,10 @@ export interface Menu {
   id: string;
   name: string;
   description: string | null;
+  menu_price_history?: {
+    cost_price: number;
+    recorded_at?: string;
+  }[];
 }
 
 export interface Container {

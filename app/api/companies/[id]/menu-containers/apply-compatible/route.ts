@@ -206,44 +206,24 @@ export async function POST(request: NextRequest, context: RouteContext) {
       totalCalories += menuData.base_calories;
     }
     
-    // menu_containers 테이블 업데이트를 안전하게 시도
+    // menu_containers 테이블 업데이트 수정 - 원가 정보 확실히 업데이트
     try {
-      // 안전하게 업데이트하기 위해 기존 레코드 조회
-      const { data: existingRecord, error: getError } = await supabase
-        .from('menu_containers')
-        .select('*')
-        .eq('id', targetMenuContainerId)
-        .single();
+      // 원가 정보 업데이트
+      const updateData: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+        calories: totalCalories,
+        ingredients_cost: ingredientsCost, // 항상 ingredients_cost 필드 업데이트
+        total_cost: ingredientsCost       // 항상 total_cost 필드 업데이트
+      };
       
-      if (getError) {
-        console.error('메뉴-용기 정보 조회 오류:', getError);
-      } else if (existingRecord) {
-        // 존재하는 필드만 업데이트하기 위해 객체를 생성
-        const updateData: Record<string, any> = {
-          updated_at: new Date().toISOString()
-        };
-        
-        // Object.keys를 사용해 실제 테이블에 있는 필드만 업데이트
-        if ('calories' in existingRecord) {
-          updateData.calories = totalCalories;
-        }
-        
-        if ('cost' in existingRecord) {
-          updateData.cost = ingredientsCost;
-        } else if ('total_cost' in existingRecord) {
-          updateData.total_cost = ingredientsCost;
-        }
-        
-        if (Object.keys(updateData).length > 1) { // updated_at만 있는 경우 제외
-          const { error: updateError } = await supabase
-            .from('menu_containers')
-            .update(updateData)
-            .eq('id', targetMenuContainerId);
-          
-          if (updateError) {
-            console.error('메뉴-용기 정보 업데이트 오류:', updateError);
-          }
-        }
+      const { error: updateError } = await supabase
+        .from('menu_containers')
+        .update(updateData)
+        .eq('id', targetMenuContainerId);
+      
+      if (updateError) {
+        console.error('메뉴-용기 원가 정보 업데이트 오류:', updateError);
+        // API 자체는 계속 진행 (원가 정보 업데이트는 중요하지만 API 호출 성공 여부에 영향을 주지 않음)
       }
     } catch (error) {
       console.error('메뉴-용기 정보 업데이트 중 오류:', error);

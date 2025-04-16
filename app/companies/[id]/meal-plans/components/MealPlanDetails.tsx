@@ -211,16 +211,17 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
           mc => mc.menu_id === item.menu_id && mc.container_id === containerId
         );
         
-        if (menuContainer) {
+        if (menuContainer && menuContainer.ingredients_cost > 0) {
           // 특정 메뉴-용기 조합에 대한 원가 사용
-          itemCost = menuContainer.ingredients_cost || 0;
+          itemCost = menuContainer.ingredients_cost;
         } else if (item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
-          // 가격 이력에서 가져옴
+          // 원가가 0이거나 없는 경우 가격 이력에서 가져옴
           const sortedHistory = [...item.menu.menu_price_history].sort((a, b) => {
             if (!a.recorded_at || !b.recorded_at) return 0;
             return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
           });
-          itemCost = sortedHistory[0].cost_price || 0;
+          const latestPrice = sortedHistory[0].cost_price;
+          itemCost = typeof latestPrice === 'number' ? latestPrice : 0;
         }
       } else if (item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
         // 가격 이력에서 가져옴
@@ -228,7 +229,8 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
           if (!a.recorded_at || !b.recorded_at) return 0;
           return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
         });
-        itemCost = sortedHistory[0].cost_price || 0;
+        const latestPrice = sortedHistory[0].cost_price;
+        itemCost = typeof latestPrice === 'number' ? latestPrice : 0;
       }
       
       return totalCost + itemCost;
