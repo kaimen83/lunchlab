@@ -149,7 +149,7 @@ export default function MealPlanMenuSelection({
             setSearchTerm={setMenuSearchTerm}
             filteredMenus={getFilteredMenusForContainer(selectedContainerForMenu)}
             selectedMenuId={containerMenuSelections[selectedContainerForMenu]}
-            onMenuSelect={handleMenuSelection}
+            onMenuSelect={(containerId, menuId) => handleMenuSelection(containerId, menuId)}
             menuContainers={menuContainers}
           />
         )}

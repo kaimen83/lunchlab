@@ -18,21 +18,16 @@ export const getFilteredMenusForContainer = (
   menuContainers: MenuContainer[],
   menuSearchTerm: string
 ): Menu[] => {
-  // 먼저 해당 용기와 연결된 모든 메뉴 조회
+  // 해당 용기와 연결된 모든 메뉴 조회
   const compatibleMenuContainers = menuContainers.filter(
     mc => mc.container_id === containerId
-  );
-  
-  // 모든 메뉴 ID 추출 (모든 메뉴 사용 가능)
-  const allMenuIds = Array.from(
-    new Set(menuContainers.map(mc => mc.menu_id))
   );
   
   // 호환되는 메뉴 ID 추출
   const compatibleMenuIds = compatibleMenuContainers.map(mc => mc.menu_id);
   
-  // 모든 메뉴를 가져오되, 검색어로 필터링하고 호환되는 메뉴를 우선 정렬
-  return allMenuIds
+  // 호환되는 메뉴만 가져오고, 검색어로 필터링
+  return compatibleMenuIds
     .map(menuId => {
       const menuContainer = menuContainers.find(mc => mc.menu_id === menuId);
       return menuContainer?.menu;
@@ -47,29 +42,7 @@ export const getFilteredMenusForContainer = (
       
       return nameMatch || descriptionMatch;
     })
-    .sort((a, b) => {
-      // 1. 현재 용기와 호환되는 메뉴를 가장 먼저 표시
-      const aIsCompatible = compatibleMenuIds.includes(a.id);
-      const bIsCompatible = compatibleMenuIds.includes(b.id);
-      
-      if (aIsCompatible && !bIsCompatible) return -1;
-      if (!aIsCompatible && bIsCompatible) return 1;
-      
-      // 2. 둘 다 호환되면 이름순 정렬
-      if (aIsCompatible && bIsCompatible) {
-        return a.name.localeCompare(b.name);
-      }
-      
-      // 3. 둘 다 호환되지 않는 경우, 다른 용기와 호환되는 메뉴 우선
-      const aCompatibleWithOthers = hasCompatibleContainers(a.id, containerId, menuContainers);
-      const bCompatibleWithOthers = hasCompatibleContainers(b.id, containerId, menuContainers);
-      
-      if (aCompatibleWithOthers && !bCompatibleWithOthers) return -1;
-      if (!aCompatibleWithOthers && bCompatibleWithOthers) return 1;
-      
-      // 4. 그 외에는 이름순 정렬
-      return a.name.localeCompare(b.name);
-    });
+    .sort((a, b) => a.name.localeCompare(b.name)); // 이름순 정렬
 };
 
 // 용기 정보 가져오기
