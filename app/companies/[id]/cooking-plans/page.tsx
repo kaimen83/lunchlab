@@ -68,18 +68,20 @@ export default async function CookingPlanPage({ params }: CookingPlanPageProps) 
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* 채널 헤더 */}
-      <header className="border-b border-gray-200 bg-white p-3 flex items-center">
-        <div className="flex items-center">
-          <FileText className="h-5 w-5 text-gray-500 mr-2" />
-          <h1 className="text-xl font-bold">조리계획서</h1>
+    <div className="flex flex-col h-full w-full">
+      {/* 채널 헤더 - 모바일 최적화 */}
+      <header className="border-b border-gray-200 bg-white px-3 py-3 sticky top-0 z-10 shadow-sm">
+        <div className="flex items-center justify-between max-w-screen-xl mx-auto">
+          <div className="flex items-center space-x-2">
+            <FileText className="h-5 w-5 text-gray-500" />
+            <h1 className="text-lg md:text-xl font-bold">조리계획서</h1>
+          </div>
         </div>
       </header>
       
-      {/* 채널 콘텐츠 */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-4xl mx-auto">
+      {/* 채널 콘텐츠 - 모바일 최적화 */}
+      <div className="flex-1 overflow-y-auto px-3 py-4 md:px-6 md:py-6">
+        <div className="w-full max-w-4xl mx-auto">
           <CookingPlanList companyId={id} />
         </div>
       </div>

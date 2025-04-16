@@ -271,7 +271,7 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
   }, []);
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <Tabs value={activeTab} onValueChange={(value) => {
         // 탭 변경 전에 캘린더 닫기
         setShowCalendar(false);
@@ -279,20 +279,20 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
       }}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="list">조리계획서 목록</TabsTrigger>
-          <TabsTrigger value="create">새 조리계획서 작성</TabsTrigger>
+          <TabsTrigger value="create">새 작성</TabsTrigger>
         </TabsList>
         
         {/* 조리계획서 목록 */}
         <TabsContent value="list" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle>조리계획서 목록</CardTitle>
-                <div className="flex space-x-2">
-                  <Button variant="outline" size="sm" onClick={handleFilterThisMonth}>
+          <Card className="overflow-hidden">
+            <CardHeader className="p-3 md:p-6">
+              <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-3 md:space-y-0">
+                <CardTitle className="text-base md:text-xl">조리계획서 목록</CardTitle>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={handleFilterThisMonth} className="text-xs md:text-sm h-8 md:h-9">
                     이번 달
                   </Button>
-                  <Button variant="outline" size="sm" onClick={handleFilterLastMonth}>
+                  <Button variant="outline" size="sm" onClick={handleFilterLastMonth} className="text-xs md:text-sm h-8 md:h-9">
                     지난 달
                   </Button>
                   <div className="relative">
@@ -301,26 +301,27 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
                       variant="outline" 
                       size="sm" 
                       onClick={toggleCalendar}
+                      className="text-xs md:text-sm h-8 md:h-9"
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      <CalendarIcon className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
                       날짜 선택
                     </Button>
                     
                     {showCalendar && (
                       <div 
                         ref={calendarRef} 
-                        className="absolute z-50 right-0 mt-2 bg-white border rounded-md shadow-md"
+                        className="absolute z-50 right-0 mt-2 bg-white border rounded-md shadow-md w-[280px] md:w-auto"
                       >
                         <div className="flex justify-between items-center p-2 border-b">
-                          <span className="text-sm font-medium">날짜 범위 선택</span>
+                          <span className="text-xs md:text-sm font-medium">날짜 범위 선택</span>
                           <Button 
                             type="button"
                             variant="ghost" 
                             size="sm" 
-                            className="h-8 w-8 p-0"
+                            className="h-6 w-6 md:h-8 md:w-8 p-0"
                             onClick={() => setShowCalendar(false)}
                           >
-                            <X className="h-4 w-4" />
+                            <X className="h-3 w-3 md:h-4 md:w-4" />
                           </Button>
                         </div>
                         <Calendar
@@ -332,6 +333,7 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
                           onSelect={handleCalendarSelect}
                           locale={ko}
                           disabled={isLoading}
+                          className="rounded-md"
                         />
                       </div>
                     )}
@@ -339,71 +341,77 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
               {isLoading ? (
-                <p className="text-center text-gray-500 py-8">조리계획서 목록을 불러오는 중...</p>
+                <p className="text-center text-gray-500 py-6 md:py-8">조리계획서 목록을 불러오는 중...</p>
               ) : cookingPlans.length === 0 ? (
-                <div className="text-center py-8">
+                <div className="text-center py-6 md:py-8">
                   <p className="text-gray-500 mb-4">조리계획서가 없습니다.</p>
-                  <Button onClick={handleCreateNewClick}>
-                    <FilePlus className="mr-2 h-4 w-4" />
+                  <Button onClick={handleCreateNewClick} size="sm" className="md:size-md">
+                    <FilePlus className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
                     새 조리계획서 작성
                   </Button>
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>날짜</TableHead>
-                      <TableHead>식사 시간</TableHead>
-                      <TableHead className="text-right">총 식수</TableHead>
-                      <TableHead className="text-right">관리</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {cookingPlans.map((plan) => (
-                      <TableRow key={plan.date}>
-                        <TableCell>
-                          {format(new Date(plan.date), 'yyyy년 MM월 dd일 (EEE)', { locale: ko })}
-                        </TableCell>
-                        <TableCell>
-                          {plan.meal_times.map(meal => getMealTimeName(meal)).join(', ')}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {plan.total_headcount}명
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end space-x-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleViewCookingPlan(plan.date)}
-                            >
-                              <FileText className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleEditCookingPlan(plan.date)}
-                            >
-                              <FileEdit className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => {
-                                setDeletingDate(plan.date);
-                                setShowDeleteDialog(true);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                <div className="overflow-x-auto -mx-3 md:mx-0">
+                  <Table className="min-w-full">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="whitespace-nowrap text-xs md:text-sm">날짜</TableHead>
+                        <TableHead className="whitespace-nowrap text-xs md:text-sm">식사 시간</TableHead>
+                        <TableHead className="text-right whitespace-nowrap text-xs md:text-sm">총 식수</TableHead>
+                        <TableHead className="text-right whitespace-nowrap text-xs md:text-sm">관리</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {cookingPlans.map((plan) => (
+                        <TableRow key={plan.date} className="text-xs md:text-sm">
+                          <TableCell className="py-2 md:py-3">
+                            <span className="hidden md:inline">{format(new Date(plan.date), 'yyyy년 MM월 dd일 (EEE)', { locale: ko })}</span>
+                            <span className="md:hidden">{format(new Date(plan.date), 'MM/dd (EEE)', { locale: ko })}</span>
+                          </TableCell>
+                          <TableCell className="py-2 md:py-3">
+                            {plan.meal_times.map(meal => getMealTimeName(meal)).join(', ')}
+                          </TableCell>
+                          <TableCell className="text-right py-2 md:py-3">
+                            {plan.total_headcount}명
+                          </TableCell>
+                          <TableCell className="text-right py-2 md:py-3">
+                            <div className="flex justify-end space-x-1 md:space-x-2">
+                              <Button 
+                                variant="outline" 
+                                size="icon"
+                                className="h-7 w-7 md:h-8 md:w-8"
+                                onClick={() => handleViewCookingPlan(plan.date)}
+                              >
+                                <FileText className="h-3 w-3 md:h-4 md:w-4" />
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="icon"
+                                className="h-7 w-7 md:h-8 md:w-8"
+                                onClick={() => handleEditCookingPlan(plan.date)}
+                              >
+                                <FileEdit className="h-3 w-3 md:h-4 md:w-4" />
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="icon"
+                                className="h-7 w-7 md:h-8 md:w-8"
+                                onClick={() => {
+                                  setDeletingDate(plan.date);
+                                  setShowDeleteDialog(true);
+                                }}
+                              >
+                                <Trash2 className="h-3 w-3 md:h-4 md:w-4 text-red-500" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -427,7 +435,7 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
       
       {/* 삭제 확인 다이얼로그 */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
+        <DialogContent className="w-[90vw] max-w-md">
           <DialogHeader>
             <DialogTitle>조리계획서 삭제</DialogTitle>
             <DialogDescription>
@@ -437,11 +445,11 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
               <br />이 작업은 되돌릴 수 없습니다.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end sm:space-x-2">
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} className="w-full sm:w-auto">
               취소
             </Button>
-            <Button variant="destructive" onClick={handleDeleteCookingPlan} disabled={isLoading}>
+            <Button variant="destructive" onClick={handleDeleteCookingPlan} disabled={isLoading} className="w-full sm:w-auto">
               삭제
             </Button>
           </DialogFooter>
@@ -453,7 +461,7 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
         setShowEditModal(open);
         if (!open) setEditingDate(null);
       }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[90vw] max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>조리계획서 수정</DialogTitle>
             <DialogDescription>
@@ -464,7 +472,7 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
           </DialogHeader>
           
           {editingDate && (
-            <div className="py-4">
+            <div className="py-2 md:py-4">
               <CookingPlanForm
                 companyId={companyId}
                 initialDate={editingDate}
@@ -475,7 +483,7 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
           )}
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditModal(false)}>
+            <Button variant="outline" onClick={() => setShowEditModal(false)} className="w-full sm:w-auto">
               취소
             </Button>
           </DialogFooter>
