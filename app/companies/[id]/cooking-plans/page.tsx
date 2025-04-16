@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { auth } from '@clerk/nextjs/server';
 import { notFound, redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase';
-import { FileText } from 'lucide-react';
+import { FileText, Plus, Search } from 'lucide-react';
 import CookingPlanList from './components/CookingPlanList';
 
 export const metadata: Metadata = {
@@ -68,23 +68,32 @@ export default async function CookingPlanPage({ params }: CookingPlanPageProps) 
   }
 
   return (
-    <div className="flex flex-col h-full w-full">
-      {/* 채널 헤더 - 모바일 최적화 */}
-      <header className="border-b border-gray-200 bg-white px-3 py-3 sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center justify-between max-w-screen-xl mx-auto">
-          <div className="flex items-center space-x-2">
-            <FileText className="h-5 w-5 text-gray-500" />
-            <h1 className="text-lg md:text-xl font-bold">조리계획서</h1>
+    <div className="flex flex-col h-full w-full bg-gray-50">
+      {/* 페이지 헤더 */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center justify-center h-10 w-10 rounded-md bg-blue-50">
+                <FileText className="h-5 w-5 text-blue-600" />
+              </div>
+              <h1 className="text-xl font-bold text-gray-900">조리계획서</h1>
+            </div>
+            <div className="flex items-center space-x-2">
+              {/* 추가적인 액션 버튼이 필요하면 이곳에 배치 */}
+            </div>
           </div>
         </div>
       </header>
       
-      {/* 채널 콘텐츠 - 모바일 최적화 */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 md:px-6 md:py-6">
-        <div className="w-full max-w-4xl mx-auto">
-          <CookingPlanList companyId={id} />
+      {/* 페이지 콘텐츠 */}
+      <main className="flex-1 overflow-y-auto py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white rounded-lg shadow">
+            <CookingPlanList companyId={id} />
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 } 

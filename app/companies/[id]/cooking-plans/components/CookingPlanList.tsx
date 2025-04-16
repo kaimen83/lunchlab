@@ -8,7 +8,21 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CalendarIcon, FileText, FilePlus, Trash2, FileEdit, X } from 'lucide-react';
+import { 
+  CalendarIcon, 
+  FileText, 
+  FilePlus, 
+  Trash2, 
+  FileEdit, 
+  X, 
+  Filter,
+  Search,
+  Plus,
+  ChevronDown,
+  Download,
+  Calendar,
+  Clock
+} from 'lucide-react';
 import { 
   Table, 
   TableBody, 
@@ -22,7 +36,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { 
   Dialog, 
   DialogContent, 
@@ -31,10 +45,19 @@ import {
   DialogDescription,
   DialogFooter
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { cn } from '@/lib/utils';
 import CookingPlanContainer from './CookingPlanContainer';
 import CookingPlanForm from './CookingPlanForm';
 import { CookingPlanFormData } from '../types';
+import { Badge } from '@/components/ui/badge';
 
 // 식사 시간 한글화
 const getMealTimeName = (mealTime: string) => {
@@ -68,6 +91,9 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
   const [deletingDate, setDeletingDate] = useState<string | null>(null);
   const [showCalendar, setShowCalendar] = useState<boolean>(false);
+  
+  // 검색 필터링을 위한 상태
+  const [searchTerm, setSearchTerm] = useState<string>('');
   
   // 수정 모달 관련 상태
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
@@ -270,160 +296,236 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
     setShowCalendar(prev => !prev);
   }, []);
   
+  // 검색어 기반 필터링된.
+  const filteredCookingPlans = cookingPlans.filter(plan => {
+    if (!searchTerm.trim()) return true;
+    
+    const searchTermLower = searchTerm.toLowerCase();
+    const dateStr = format(new Date(plan.date), 'yyyy년 MM월 dd일', { locale: ko });
+    const mealTimesStr = plan.meal_times.map(meal => getMealTimeName(meal)).join(' ');
+    
+    return (
+      dateStr.includes(searchTermLower) ||
+      mealTimesStr.toLowerCase().includes(searchTermLower) ||
+      plan.total_headcount.toString().includes(searchTermLower)
+    );
+  });
+  
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="p-0">
       <Tabs value={activeTab} onValueChange={(value) => {
-        // 탭 변경 전에 캘린더 닫기
         setShowCalendar(false);
         setActiveTab(value);
-      }}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="list">조리계획서 목록</TabsTrigger>
-          <TabsTrigger value="create">새 작성</TabsTrigger>
-        </TabsList>
+      }} className="w-full">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 pt-4 pb-2">
+          <TabsList className="grid w-full sm:w-80 grid-cols-2 h-10 mb-2 sm:mb-0">
+            <TabsTrigger value="list" className="rounded-md">
+              목록 보기
+            </TabsTrigger>
+            <TabsTrigger value="create" className="rounded-md">
+              새 작성
+            </TabsTrigger>
+          </TabsList>
+          
+          {activeTab === 'list' && (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+              <div className="relative w-full sm:max-w-xs">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                <Input
+                  type="search"
+                  placeholder="검색..."
+                  className="pl-9 h-9 text-sm focus-visible:ring-1 w-full"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center space-x-2 justify-end">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-9">
+                      <Filter className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">필터</span>
+                      <ChevronDown className="h-4 w-4 ml-1" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem onClick={handleFilterThisMonth}>
+                        <Calendar className="h-4 w-4 mr-2" />
+                        이번 달
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleFilterLastMonth}>
+                        <Calendar className="h-4 w-4 mr-2" />
+                        지난 달
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={toggleCalendar}>
+                        <CalendarIcon className="h-4 w-4 mr-2" />
+                        날짜 범위 선택
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                
+                <Button 
+                  onClick={handleCreateNewClick} 
+                  size="sm" 
+                  className="h-9"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">새 작성</span>
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* 캘린더 팝오버 */}
+        {showCalendar && (
+          <div 
+            ref={calendarRef} 
+            className="absolute z-50 right-4 sm:right-6 mt-2 bg-white border rounded-md shadow-md w-[calc(100%-2rem)] sm:w-[280px] md:w-auto"
+          >
+            <div className="flex justify-between items-center p-2 border-b">
+              <span className="text-sm font-medium">날짜 범위 선택</span>
+              <Button 
+                type="button"
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 p-0"
+                onClick={() => setShowCalendar(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <CalendarComponent
+              mode="range"
+              selected={{
+                from: filterStartDate,
+                to: filterEndDate
+              }}
+              onSelect={handleCalendarSelect}
+              locale={ko}
+              disabled={isLoading}
+              className="rounded-md"
+            />
+          </div>
+        )}
         
         {/* 조리계획서 목록 */}
-        <TabsContent value="list" className="space-y-4">
-          <Card className="overflow-hidden">
-            <CardHeader className="p-3 md:p-6">
-              <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-3 md:space-y-0">
-                <CardTitle className="text-base md:text-xl">조리계획서 목록</CardTitle>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" onClick={handleFilterThisMonth} className="text-xs md:text-sm h-8 md:h-9">
-                    이번 달
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleFilterLastMonth} className="text-xs md:text-sm h-8 md:h-9">
-                    지난 달
-                  </Button>
-                  <div className="relative">
-                    <Button 
-                      ref={calendarButtonRef}
-                      variant="outline" 
-                      size="sm" 
-                      onClick={toggleCalendar}
-                      className="text-xs md:text-sm h-8 md:h-9"
-                    >
-                      <CalendarIcon className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
-                      날짜 선택
-                    </Button>
-                    
-                    {showCalendar && (
-                      <div 
-                        ref={calendarRef} 
-                        className="absolute z-50 right-0 mt-2 bg-white border rounded-md shadow-md w-[280px] md:w-auto"
-                      >
-                        <div className="flex justify-between items-center p-2 border-b">
-                          <span className="text-xs md:text-sm font-medium">날짜 범위 선택</span>
-                          <Button 
-                            type="button"
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-6 w-6 md:h-8 md:w-8 p-0"
-                            onClick={() => setShowCalendar(false)}
-                          >
-                            <X className="h-3 w-3 md:h-4 md:w-4" />
-                          </Button>
-                        </div>
-                        <Calendar
-                          mode="range"
-                          selected={{
-                            from: filterStartDate,
-                            to: filterEndDate
-                          }}
-                          onSelect={handleCalendarSelect}
-                          locale={ko}
-                          disabled={isLoading}
-                          className="rounded-md"
-                        />
-                      </div>
-                    )}
-                  </div>
+        <TabsContent value="list" className="m-0">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="flex flex-col items-center">
+                <div className="animate-spin h-8 w-8 border-t-2 border-b-2 border-blue-500 rounded-full"></div>
+                <p className="mt-4 text-sm text-gray-500">조리계획서 목록을 불러오는 중...</p>
+              </div>
+            </div>
+          ) : filteredCookingPlans.length === 0 ? (
+            <div className="flex flex-col items-center justify-center px-4 py-8 h-64 text-center">
+              <div className="bg-blue-50 rounded-full p-3 mb-4">
+                <FileText className="h-8 w-8 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">조리계획서가 없습니다</h3>
+              <p className="text-sm text-gray-500 mb-4 max-w-xs">
+                {searchTerm ? 
+                  '검색 조건에 맞는 조리계획서가 없습니다. 다른 검색어를 시도해보세요.' : 
+                  '선택한 기간에 생성된 조리계획서가 없습니다. 새 조리계획서를 작성해보세요.'}
+              </p>
+              <Button onClick={handleCreateNewClick} size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                새 조리계획서 작성
+              </Button>
+            </div>
+          ) : (
+            <div className="p-4">
+              <div className="rounded-lg border overflow-x-auto">
+                <Table className="min-w-full">
+                  <TableHeader>
+                    <TableRow className="bg-slate-50">
+                      <TableHead className="px-4 py-3 font-medium text-sm">날짜</TableHead>
+                      <TableHead className="px-4 py-3 font-medium text-sm">식사 시간</TableHead>
+                      <TableHead className="px-4 py-3 font-medium text-sm text-right">총 식수</TableHead>
+                      <TableHead className="px-4 py-3 text-right font-medium text-sm">관리</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCookingPlans.map((plan) => (
+                      <TableRow key={plan.date} className="hover:bg-slate-50 text-sm">
+                        <TableCell className="px-4 py-3 font-medium whitespace-nowrap">
+                          <span className="hidden md:inline">{format(new Date(plan.date), 'yyyy년 MM월 dd일 (EEE)', { locale: ko })}</span>
+                          <span className="md:hidden">{format(new Date(plan.date), 'MM/dd(EEE)', { locale: ko })}</span>
+                        </TableCell>
+                        <TableCell className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {plan.meal_times.map((meal, index) => (
+                              <Badge key={index} variant="outline" className="bg-blue-50 text-blue-600 border-blue-100 text-xs px-2 py-0.5">
+                                <Clock className="h-3 w-3 mr-1" />
+                                {getMealTimeName(meal)}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right font-medium whitespace-nowrap">
+                          {plan.total_headcount}명
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right">
+                          <div className="flex justify-end space-x-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => handleViewCookingPlan(plan.date)}
+                              className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => handleEditCookingPlan(plan.date)}
+                              className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                            >
+                              <FileEdit className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => {
+                                setDeletingDate(plan.date);
+                                setShowDeleteDialog(true);
+                              }}
+                              className="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              
+              <div className="mt-4 flex flex-col sm:flex-row items-center justify-between p-2 text-xs sm:text-sm text-gray-500 gap-2">
+                <div>
+                  총 {filteredCookingPlans.length}개의 조리계획서
+                </div>
+                <div className="flex items-center space-x-1">
+                  <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
+                  <span className="whitespace-nowrap">
+                    {format(filterStartDate, 'yyyy.MM.dd', { locale: ko })} - {format(filterEndDate, 'yyyy.MM.dd', { locale: ko })}
+                  </span>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
-              {isLoading ? (
-                <p className="text-center text-gray-500 py-6 md:py-8">조리계획서 목록을 불러오는 중...</p>
-              ) : cookingPlans.length === 0 ? (
-                <div className="text-center py-6 md:py-8">
-                  <p className="text-gray-500 mb-4">조리계획서가 없습니다.</p>
-                  <Button onClick={handleCreateNewClick} size="sm" className="md:size-md">
-                    <FilePlus className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
-                    새 조리계획서 작성
-                  </Button>
-                </div>
-              ) : (
-                <div className="overflow-x-auto -mx-3 md:mx-0">
-                  <Table className="min-w-full">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="whitespace-nowrap text-xs md:text-sm">날짜</TableHead>
-                        <TableHead className="whitespace-nowrap text-xs md:text-sm">식사 시간</TableHead>
-                        <TableHead className="text-right whitespace-nowrap text-xs md:text-sm">총 식수</TableHead>
-                        <TableHead className="text-right whitespace-nowrap text-xs md:text-sm">관리</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {cookingPlans.map((plan) => (
-                        <TableRow key={plan.date} className="text-xs md:text-sm">
-                          <TableCell className="py-2 md:py-3">
-                            <span className="hidden md:inline">{format(new Date(plan.date), 'yyyy년 MM월 dd일 (EEE)', { locale: ko })}</span>
-                            <span className="md:hidden">{format(new Date(plan.date), 'MM/dd (EEE)', { locale: ko })}</span>
-                          </TableCell>
-                          <TableCell className="py-2 md:py-3">
-                            {plan.meal_times.map(meal => getMealTimeName(meal)).join(', ')}
-                          </TableCell>
-                          <TableCell className="text-right py-2 md:py-3">
-                            {plan.total_headcount}명
-                          </TableCell>
-                          <TableCell className="text-right py-2 md:py-3">
-                            <div className="flex justify-end space-x-1 md:space-x-2">
-                              <Button 
-                                variant="outline" 
-                                size="icon"
-                                className="h-7 w-7 md:h-8 md:w-8"
-                                onClick={() => handleViewCookingPlan(plan.date)}
-                              >
-                                <FileText className="h-3 w-3 md:h-4 md:w-4" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="icon"
-                                className="h-7 w-7 md:h-8 md:w-8"
-                                onClick={() => handleEditCookingPlan(plan.date)}
-                              >
-                                <FileEdit className="h-3 w-3 md:h-4 md:w-4" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="icon"
-                                className="h-7 w-7 md:h-8 md:w-8"
-                                onClick={() => {
-                                  setDeletingDate(plan.date);
-                                  setShowDeleteDialog(true);
-                                }}
-                              >
-                                <Trash2 className="h-3 w-3 md:h-4 md:w-4 text-red-500" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            </div>
+          )}
         </TabsContent>
         
         {/* 새 조리계획서 작성 */}
-        <TabsContent value="create">
+        <TabsContent value="create" className="m-0 px-4 py-6">
           <CookingPlanContainer 
             companyId={companyId} 
             initialDate={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined}
             onComplete={() => {
-              // 탭 전환 전에 모든 캘린더 상태 초기화
               setShowCalendar(false);
               setActiveTab('list');
               setSelectedDate(null);
