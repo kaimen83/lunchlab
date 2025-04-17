@@ -27,6 +27,7 @@ interface MenuContainer {
       package_amount: number;
       unit: string;
       price: number;
+      code_name?: string;
     }
   }>;
 }
@@ -117,7 +118,7 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
               container:containers(id, name),
               menu_container_ingredients(
                 amount,
-                ingredient:ingredients(id, name, package_amount, unit, price)
+                ingredient:ingredients(id, name, package_amount, unit, price, code_name)
               )
             )
           ),
@@ -188,7 +189,8 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
                 total_amount: 0,
                 unit_price: ingredient.price / ingredient.package_amount,
                 total_price: 0,
-                package_amount: ingredient.package_amount
+                package_amount: ingredient.package_amount,
+                code_name: ingredient.code_name
               };
             }
             

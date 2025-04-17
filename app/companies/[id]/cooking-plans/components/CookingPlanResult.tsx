@@ -433,14 +433,15 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                   <Table className="w-full border-collapse">
                     <TableHeader>
                       <TableRow className="bg-slate-50">
-                        <TableHead className="font-semibold text-sm w-[16%]">메뉴명</TableHead>
-                        <TableHead className="font-semibold text-sm w-[12%]">용기</TableHead>
-                        <TableHead className="font-semibold text-sm w-[16%]">사용 식단</TableHead>
-                        <TableHead className="font-semibold text-sm w-[10%]">식수</TableHead>
-                        <TableHead className="font-semibold text-sm w-[14%]">필요 식재료</TableHead>
-                        <TableHead className="font-semibold text-sm text-right w-[12%]">식재료 수량</TableHead>
+                        <TableHead className="font-semibold text-sm w-[14%]">메뉴명</TableHead>
+                        <TableHead className="font-semibold text-sm w-[10%]">용기</TableHead>
+                        <TableHead className="font-semibold text-sm w-[14%]">사용 식단</TableHead>
+                        <TableHead className="font-semibold text-sm w-[8%]">식수</TableHead>
+                        <TableHead className="font-semibold text-sm w-[10%]">필요 식재료</TableHead>
+                        <TableHead className="font-semibold text-sm w-[10%]">품목코드</TableHead>
+                        <TableHead className="font-semibold text-sm text-right w-[10%]">식재료 양</TableHead>
                         <TableHead className="font-semibold text-sm text-right w-[10%]">포장단위</TableHead>
-                        <TableHead className="font-semibold text-sm text-right w-[10%]">투입량</TableHead>
+                        <TableHead className="font-semibold text-sm text-right w-[14%]">투입량</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -498,6 +499,9 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                                 <TableCell className="border-l-0">
                                   <span className="text-sm">{ingredient.name}</span>
                                 </TableCell>
+                                <TableCell className="text-sm text-gray-600">
+                                  {ingredientReq?.code_name || "-"}
+                                </TableCell>
                                 <TableCell className="text-right font-medium text-sm">
                                   {formatAmount(ingredient.amount)} {ingredient.unit}
                                 </TableCell>
@@ -538,7 +542,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                                   {formatHeadcounts(menuPortion.containers_info)}
                                 </Badge>
                               </TableCell>
-                              <TableCell colSpan={4} className="text-center text-gray-500 text-sm italic">
+                              <TableCell colSpan={5} className="text-center text-gray-500 text-sm italic">
                                 등록된 식재료 정보가 없습니다.
                               </TableCell>
                             </TableRow>
@@ -547,7 +551,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                       })}
                       {menus.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                          <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                             등록된 메뉴가 없습니다.
                           </TableCell>
                         </TableRow>
@@ -580,6 +584,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                 <TableHeader>
                   <TableRow>
                     <TableHead>식재료명</TableHead>
+                    <TableHead>품목코드</TableHead>
                     <TableHead className="text-right">필요 수량</TableHead>
                     <TableHead className="text-right">포장단위</TableHead>
                     <TableHead className="text-right">투입량</TableHead>
@@ -601,6 +606,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                     return (
                       <TableRow key={index}>
                         <TableCell className="font-medium">{item.ingredient_name}</TableCell>
+                        <TableCell>{item.code_name || "-"}</TableCell>
                         <TableCell className="text-right">
                           {formatAmount(item.total_amount)} {item.unit}
                         </TableCell>
