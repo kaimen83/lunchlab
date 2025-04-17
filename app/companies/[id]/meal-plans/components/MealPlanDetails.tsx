@@ -79,8 +79,8 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
       setIsLoadingCalories(true);
       
       try {
-        // 배치 API를 사용하는 대신 순차적으로 처리
-        const loadedDetails = await loadMenuDetailsSequentially();
+        // 병렬로 메뉴 상세 정보를 로드
+        const loadedDetails = await loadMenuDetailsInParallel();
         
         // 총 칼로리 계산
         const caloriesSum = Object.values(loadedDetails).reduce(
@@ -97,12 +97,13 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
       }
     };
     
-    // 메뉴 상세 정보를 순차적으로 로드하는 함수
-    const loadMenuDetailsSequentially = async () => {
+    // 메뉴 상세 정보를 병렬로 로드하는 함수
+    const loadMenuDetailsInParallel = async () => {
       const detailsMap: Record<string, MenuDetailsResponse> = {};
       const companyId = mealPlan.company_id;
       
-      for (const item of mealPlan.meal_plan_menus) {
+      // 모든 메뉴에 대한 API 요청 배열 생성
+      const requests = mealPlan.meal_plan_menus.map(async (item) => {
         const cacheKey = `${item.menu_id}-${item.container_id}`;
         
         try {
@@ -119,14 +120,26 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
           
           if (response.ok) {
             const data = await response.json();
-            detailsMap[cacheKey] = data;
+            return { cacheKey, data };
           } else {
             console.warn(`메뉴 ${item.menu_id} 상세 정보 로드 실패:`, await response.text());
+            return { cacheKey, data: null };
           }
         } catch (error) {
           console.error(`메뉴 ${item.menu_id} 상세 정보 로드 오류:`, error);
+          return { cacheKey, data: null };
         }
-      }
+      });
+      
+      // 모든 요청을 병렬로 처리
+      const results = await Promise.all(requests);
+      
+      // 결과를 detailsMap에 병합
+      results.forEach(result => {
+        if (result.data) {
+          detailsMap[result.cacheKey] = result.data;
+        }
+      });
       
       setMenuDetails(detailsMap);
       return detailsMap;

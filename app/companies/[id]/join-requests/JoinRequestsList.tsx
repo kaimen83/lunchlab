@@ -68,7 +68,36 @@ export default function JoinRequestsList({ companyId: _companyId, requests, curr
           return;
         }
         
-        // 사용자 정보 조회 API 호출
+        // 사용자 정보 조회 API 호출 - 메모리 캐싱 추가
+        const cacheKey = userIds.sort().join(',');
+        // 메모리 캐시 접근 (window 객체는 클라이언트에서만 사용 가능)
+        if (typeof window !== 'undefined') {
+          // @ts-ignore
+          window.__userCache = window.__userCache || {};
+          // @ts-ignore
+          if (window.__userCache[cacheKey]) {
+            // 캐시에서 데이터 사용
+            // @ts-ignore
+            const cachedData = window.__userCache[cacheKey];
+            
+            // 가입 신청과 사용자 정보 결합
+            const requestsWithUserInfo = requests.map((request) => {
+              const userInfo = cachedData.users.find((u: UserInfo) => u.id === request.user_id);
+              return {
+                request,
+                displayName: userInfo ? `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim() : '알 수 없음',
+                email: userInfo?.email || '',
+                imageUrl: userInfo?.imageUrl,
+              };
+            });
+            
+            setRequestsWithUsers(requestsWithUserInfo);
+            setIsLoading(false);
+            return;
+          }
+        }
+        
+        // 캐시에 없는 경우 API 호출
         const response = await fetch('/api/users/batch', {
           method: 'POST',
           headers: {
@@ -82,6 +111,14 @@ export default function JoinRequestsList({ companyId: _companyId, requests, curr
         }
         
         const data = await response.json();
+        
+        // 캐시에 저장
+        if (typeof window !== 'undefined') {
+          // @ts-ignore
+          window.__userCache = window.__userCache || {};
+          // @ts-ignore
+          window.__userCache[cacheKey] = data;
+        }
         
         // 가입 신청과 사용자 정보 결합
         const requestsWithUserInfo = requests.map((request) => {

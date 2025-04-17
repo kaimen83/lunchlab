@@ -25,35 +25,46 @@ export default async function InventoryPage({ params, searchParams }: InventoryP
   
   const supabase = createServerSupabaseClient();
   
-  // 회사 조회
-  const { data: company, error: companyError } = await supabase
-    .from('companies')
-    .select('*')
-    .eq('id', companyId)
-    .single();
+  // Promise.all을 사용하여 모든 쿼리를 병렬로 처리
+  // 회사 정보, 멤버십, 기능 활성화 여부를 동시에 조회
+  const [companyResult, membershipResult, featuresResult] = await Promise.all([
+    // 회사 조회
+    supabase
+      .from('companies')
+      .select('*')
+      .eq('id', companyId)
+      .single(),
+    
+    // 멤버십 확인
+    supabase
+      .from('company_memberships')
+      .select('role')
+      .eq('company_id', companyId)
+      .eq('user_id', userId)
+      .single(),
+    
+    // 식재료 및 메뉴 기능 활성화 여부 확인
+    supabase
+      .from('company_features')
+      .select('feature_name, is_enabled')
+      .eq('company_id', companyId)
+      .in('feature_name', ['ingredients', 'menus'])
+  ]);
   
+  // 결과 구조 분해 할당
+  const { data: company, error: companyError } = companyResult;
+  const { data: membership, error: membershipError } = membershipResult;
+  const { data: features, error: featuresError } = featuresResult;
+  
+  // 회사가 없는 경우 404 페이지로 이동
   if (companyError || !company) {
     notFound();
   }
   
-  // 멤버십 확인
-  const { data: membership, error: membershipError } = await supabase
-    .from('company_memberships')
-    .select('role')
-    .eq('company_id', companyId)
-    .eq('user_id', userId)
-    .single();
-  
+  // 멤버십이 없는 경우 회사 상세 페이지로 리다이렉트
   if (membershipError || !membership) {
     redirect(`/companies/${companyId}`);
   }
-  
-  // 식재료 및 메뉴 기능 활성화 여부 확인
-  const { data: features, error: featuresError } = await supabase
-    .from('company_features')
-    .select('feature_name, is_enabled')
-    .eq('company_id', companyId)
-    .in('feature_name', ['ingredients', 'menus']);
   
   // 기능 데이터 로드 중 오류 발생 시 콘솔에 출력
   if (featuresError) {
@@ -67,7 +78,35 @@ export default async function InventoryPage({ params, searchParams }: InventoryP
   const ingredientsExists = hasFeatures && features.some(f => f.feature_name === 'ingredients');
   const menusExists = hasFeatures && features.some(f => f.feature_name === 'menus');
   
-  // 테이블에서 누락된 기능이 있을 경우 콘솔에 로그 출력 및 누락된 기능 추가 시도
+  /**
+   * 누락된 기능을 비동기적으로 추가하는 함수
+   * 페이지 로딩을 차단하지 않고 백그라운드에서 실행됨
+   * @param companyId 회사 ID
+   * @param missingFeatures 추가할 기능 목록
+   */
+  const addMissingFeatures = (companyId: string, missingFeatures: any[]) => {
+    if (missingFeatures.length === 0) return;
+    
+    // 비동기적으로 실행하되 await 하지 않음 (페이지 로딩 차단 방지)
+    // Promise를 반환하도록 명시적으로 처리하여 타입 오류 방지
+    void Promise.resolve().then(async () => {
+      try {
+        const { error } = await supabase
+          .from('company_features')
+          .insert(missingFeatures);
+        
+        if (error) {
+          console.error('누락된 기능 추가 오류:', error);
+        } else {
+          console.log('누락된 기능이 성공적으로 추가되었습니다:', missingFeatures.map(f => f.feature_name).join(', '));
+        }
+      } catch (error: unknown) {
+        console.error('누락된 기능 추가 중 예외 발생:', error);
+      }
+    });
+  };
+  
+  // 테이블에서 누락된 기능이 있을 경우 로그 출력 및 누락된 기능 추가 시도
   if (!ingredientsExists || !menusExists) {
     const missingFeatures = [];
     
@@ -89,21 +128,9 @@ export default async function InventoryPage({ params, searchParams }: InventoryP
       });
     }
     
-    // 누락된 기능을 데이터베이스에 추가 시도
+    // 누락된 기능을 비동기적으로 추가 (페이지 로딩을 차단하지 않음)
     if (missingFeatures.length > 0) {
-      try {
-        const { error: insertError } = await supabase
-          .from('company_features')
-          .insert(missingFeatures);
-          
-        if (insertError) {
-          console.error('누락된 기능 추가 오류:', insertError);
-        } else {
-          console.log('누락된 기능이 성공적으로 추가되었습니다:', missingFeatures.map(f => f.feature_name).join(', '));
-        }
-      } catch (error) {
-        console.error('누락된 기능 추가 중 예외 발생:', error);
-      }
+      addMissingFeatures(companyId, missingFeatures);
     }
   }
   
