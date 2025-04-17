@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameDay } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -85,12 +85,19 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [cookingPlans, setCookingPlans] = useState<CookingPlanSummary[]>([]);
   const [activeTab, setActiveTab] = useState<string>('list');
-  const [filterStartDate, setFilterStartDate] = useState<Date>(subDays(new Date(), 30));
-  const [filterEndDate, setFilterEndDate] = useState<Date>(new Date());
+  
+  // 필터 관련 상태 및 설정
+  // ---------------------------------------------
+  // 필터 기본값을 이번 주로 설정 (월요일 ~ 일요일)
+  const now = new Date();
+  const [filterStartDate, setFilterStartDate] = useState<Date>(startOfWeek(now, { weekStartsOn: 1 }));
+  const [filterEndDate, setFilterEndDate] = useState<Date>(endOfWeek(now, { weekStartsOn: 1 }));
+  const [showCalendar, setShowCalendar] = useState<boolean>(false);
+  // ---------------------------------------------
+  
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
   const [deletingDate, setDeletingDate] = useState<string | null>(null);
-  const [showCalendar, setShowCalendar] = useState<boolean>(false);
   
   // 검색 필터링을 위한 상태
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -263,18 +270,64 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
     }
   };
   
-  const handleFilterThisMonth = () => {
+  // ===== 필터 관련 유틸리티 함수 =====
+  
+  // 이번 주 필터 핸들러
+  const handleFilterThisWeek = () => {
     const now = new Date();
-    setFilterStartDate(startOfMonth(now));
-    setFilterEndDate(endOfMonth(now));
+    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+    
+    setFilterStartDate(weekStart);
+    setFilterEndDate(weekEnd);
+    
+    // 필터 적용 알림
+    toast({
+      title: '필터 적용',
+      description: '이번 주 데이터만 표시합니다.',
+      variant: 'default',
+    });
   };
   
+  // 이번 달 필터 핸들러
+  const handleFilterThisMonth = () => {
+    const now = new Date();
+    const monthStart = startOfMonth(now);
+    const monthEnd = endOfMonth(now);
+    
+    setFilterStartDate(monthStart);
+    setFilterEndDate(monthEnd);
+    
+    // 필터 적용 알림
+    toast({
+      title: '필터 적용',
+      description: '이번 달 데이터만 표시합니다.',
+      variant: 'default',
+    });
+  };
+  
+  // 지난 달 필터 핸들러
   const handleFilterLastMonth = () => {
     const now = new Date();
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    setFilterStartDate(startOfMonth(lastMonth));
-    setFilterEndDate(endOfMonth(lastMonth));
+    const monthStart = startOfMonth(lastMonth);
+    const monthEnd = endOfMonth(lastMonth);
+    
+    setFilterStartDate(monthStart);
+    setFilterEndDate(monthEnd);
+    
+    // 필터 적용 알림
+    toast({
+      title: '필터 적용',
+      description: '지난 달 데이터만 표시합니다.',
+      variant: 'default',
+    });
   };
+  
+  // 캘린더 토글
+  const toggleCalendar = useCallback(() => {
+    setShowCalendar(prev => !prev);
+  }, []);
   
   // 캘린더 선택 처리
   const handleCalendarSelect = useCallback((range: { from?: Date; to?: Date } | undefined) => {
@@ -283,18 +336,22 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
     if (range.from) setFilterStartDate(range.from);
     if (range.to) setFilterEndDate(range.to);
     
+    // 사용자 정의 필터 적용 알림
+    if (range.from && range.to) {
+      toast({
+        title: '필터 적용',
+        description: `${format(range.from, 'yyyy.MM.dd')} ~ ${format(range.to, 'yyyy.MM.dd')} 기간의 데이터만 표시합니다.`,
+        variant: 'default',
+      });
+    }
+    
     // 캘린더 닫기
     setTimeout(() => {
       if (isMountedRef.current) {
         setShowCalendar(false);
       }
     }, 10);
-  }, [isMountedRef]);
-  
-  // 캘린더 토글
-  const toggleCalendar = useCallback(() => {
-    setShowCalendar(prev => !prev);
-  }, []);
+  }, [isMountedRef, toast]);
   
   // 검색어 기반 필터링된.
   const filteredCookingPlans = cookingPlans.filter(plan => {
@@ -310,6 +367,31 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
       plan.total_headcount.toString().includes(searchTermLower)
     );
   });
+  
+  // 현재 적용된 필터가 이번 주인지 확인하는 함수
+  const isThisWeekFilter = () => {
+    const thisWeekStart = startOfWeek(now, { weekStartsOn: 1 });
+    const thisWeekEnd = endOfWeek(now, { weekStartsOn: 1 });
+    
+    return isSameDay(filterStartDate, thisWeekStart) && isSameDay(filterEndDate, thisWeekEnd);
+  };
+  
+  // 현재 적용된 필터가 이번 달인지 확인하는 함수
+  const isThisMonthFilter = () => {
+    const thisMonthStart = startOfMonth(now);
+    const thisMonthEnd = endOfMonth(now);
+    
+    return isSameDay(filterStartDate, thisMonthStart) && isSameDay(filterEndDate, thisMonthEnd);
+  };
+  
+  // 현재 적용된 필터가 지난 달인지 확인하는 함수
+  const isLastMonthFilter = () => {
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthStart = startOfMonth(lastMonth);
+    const lastMonthEnd = endOfMonth(lastMonth);
+    
+    return isSameDay(filterStartDate, lastMonthStart) && isSameDay(filterEndDate, lastMonthEnd);
+  };
   
   return (
     <div className="p-0">
@@ -344,19 +426,54 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="h-9">
                       <Filter className="h-4 w-4 mr-1" />
-                      <span className="hidden sm:inline">필터</span>
+                      <span className="hidden sm:inline">
+                        필터: {
+                          isThisWeekFilter()
+                            ? '이번 주'
+                            : isThisMonthFilter()
+                              ? '이번 달'
+                              : isLastMonthFilter()
+                                ? '지난 달'
+                                : '사용자 지정'
+                        }
+                      </span>
                       <ChevronDown className="h-4 w-4 ml-1" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
                     <DropdownMenuGroup>
-                      <DropdownMenuItem onClick={handleFilterThisMonth}>
-                        <Calendar className="h-4 w-4 mr-2" />
-                        이번 달
+                      <DropdownMenuItem onClick={handleFilterThisWeek} className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          이번 주
+                        </div>
+                        {isThisWeekFilter() && (
+                          <Badge variant="outline" className="ml-2 h-5 bg-blue-50 text-blue-600 text-[10px] px-1.5">
+                            선택됨
+                          </Badge>
+                        )}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleFilterLastMonth}>
-                        <Calendar className="h-4 w-4 mr-2" />
-                        지난 달
+                      <DropdownMenuItem onClick={handleFilterThisMonth} className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          이번 달
+                        </div>
+                        {isThisMonthFilter() && (
+                          <Badge variant="outline" className="ml-2 h-5 bg-blue-50 text-blue-600 text-[10px] px-1.5">
+                            선택됨
+                          </Badge>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleFilterLastMonth} className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          지난 달
+                        </div>
+                        {isLastMonthFilter() && (
+                          <Badge variant="outline" className="ml-2 h-5 bg-blue-50 text-blue-600 text-[10px] px-1.5">
+                            선택됨
+                          </Badge>
+                        )}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={toggleCalendar}>
                         <CalendarIcon className="h-4 w-4 mr-2" />
@@ -408,6 +525,9 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
               disabled={isLoading}
               className="rounded-md"
             />
+            <div className="p-2 text-xs text-muted-foreground border-t">
+              <p>시작일과 종료일을 선택하여 사용자 지정 기간을 설정할 수 있습니다.</p>
+            </div>
           </div>
         )}
         
