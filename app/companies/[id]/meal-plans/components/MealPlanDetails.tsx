@@ -224,31 +224,45 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
       return 0;
     }
     
-    return mealPlan.meal_plan_menus.reduce((totalCost, item) => {
+    // 식재료 원가 계산
+    let ingredientsCost = 0;
+    // 사용된 용기 ID 추적 (중복 계산 방지)
+    const usedContainers = new Set<string>();
+    
+    mealPlan.meal_plan_menus.forEach(item => {
       const cacheKey = `${item.menu_id}-${item.container_id}`;
       
-      // 캐시된 상세 정보가 있으면 사용
+      // 식재료 원가 계산
       if (menuDetails[cacheKey]) {
-        return totalCost + menuDetails[cacheKey].cost;
-      }
-      
-      // 캐시된 정보가 없으면 기존 방식대로 계산
-      let itemCost = 0;
-      
-      // 용기 ID 확인
-      const containerId = item.container_id;
-      
-      if (containerId && item.menu.menu_containers) {
-        // 현재 메뉴와 용기에 해당하는 원가 정보 찾기
-        const menuContainer = item.menu.menu_containers.find(
-          mc => mc.menu_id === item.menu_id && mc.container_id === containerId
-        );
+        // 캐시된 상세 정보가 있으면 사용
+        ingredientsCost += menuDetails[cacheKey].cost;
+      } else {
+        // 캐시된 정보가 없으면 기존 방식대로 계산
+        let itemCost = 0;
         
-        if (menuContainer && menuContainer.ingredients_cost > 0) {
-          // 특정 메뉴-용기 조합에 대한 원가 사용
-          itemCost = menuContainer.ingredients_cost;
-        } else if (item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
-          // 원가가 0이거나 없는 경우 가격 이력에서 가져옴
+        // 용기 ID 확인
+        const containerId = item.container_id;
+        
+        if (containerId && item.menu.menu_containers) {
+          // 현재 메뉴와 용기에 해당하는 원가 정보 찾기
+          const menuContainer = item.menu.menu_containers.find(
+            mc => mc.menu_id === item.menu_id && mc.container_id === containerId
+          );
+          
+          if (menuContainer && menuContainer.ingredients_cost > 0) {
+            // 특정 메뉴-용기 조합에 대한 원가 사용
+            itemCost = menuContainer.ingredients_cost;
+          } else if (item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
+            // 메뉴 원가 기록 사용
+            const sortedHistory = [...item.menu.menu_price_history].sort((a, b) => {
+              if (!a.recorded_at || !b.recorded_at) return 0;
+              return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
+            });
+            const latestPrice = sortedHistory[0].cost_price;
+            itemCost = typeof latestPrice === 'number' ? latestPrice : 0;
+          }
+        } else if (item.menu && item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
+          // 메뉴 원가 기록 사용
           const sortedHistory = [...item.menu.menu_price_history].sort((a, b) => {
             if (!a.recorded_at || !b.recorded_at) return 0;
             return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
@@ -256,18 +270,67 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
           const latestPrice = sortedHistory[0].cost_price;
           itemCost = typeof latestPrice === 'number' ? latestPrice : 0;
         }
-      } else if (item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
-        // 가격 이력에서 가져옴
-        const sortedHistory = [...item.menu.menu_price_history].sort((a, b) => {
-          if (!a.recorded_at || !b.recorded_at) return 0;
-          return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
-        });
-        const latestPrice = sortedHistory[0].cost_price;
-        itemCost = typeof latestPrice === 'number' ? latestPrice : 0;
+        
+        ingredientsCost += itemCost;
       }
       
-      return totalCost + itemCost;
-    }, 0);
+      // 용기 ID 추적 (중복 계산 방지)
+      if (item.container_id) {
+        usedContainers.add(item.container_id);
+      }
+    });
+    
+    // 용기 원가 계산 (중복 없이)
+    let containersCost = 0;
+    
+    usedContainers.forEach(containerId => {
+      // 해당 용기 ID를 가진 메뉴 아이템 찾기
+      const menuItemWithContainer = mealPlan.meal_plan_menus.find(
+        item => item.container_id === containerId
+      );
+      
+      // 용기 가격 추가
+      if (menuItemWithContainer?.container?.price) {
+        containersCost += menuItemWithContainer.container.price;
+      }
+    });
+    
+    // 총 원가 = 식재료 원가 + 용기 원가
+    return ingredientsCost + containersCost;
+  };
+  
+  // 용기 원가만 계산하는 함수
+  const calculateContainersCost = () => {
+    if (!mealPlan.meal_plan_menus) {
+      return 0;
+    }
+    
+    // 사용된 용기 ID 추적 (중복 계산 방지)
+    const usedContainers = new Set<string>();
+    
+    // 사용된 모든 용기 ID 수집
+    mealPlan.meal_plan_menus.forEach(item => {
+      if (item.container_id) {
+        usedContainers.add(item.container_id);
+      }
+    });
+    
+    // 용기 원가 계산
+    let containersCost = 0;
+    
+    usedContainers.forEach(containerId => {
+      // 해당 용기 ID를 가진 메뉴 아이템 찾기
+      const menuItemWithContainer = mealPlan.meal_plan_menus.find(
+        item => item.container_id === containerId
+      );
+      
+      // 용기 가격 추가
+      if (menuItemWithContainer?.container?.price) {
+        containersCost += menuItemWithContainer.container.price;
+      }
+    });
+    
+    return containersCost;
   };
   
   // 총 칼로리 계산 함수 - 캐시된 값 사용
@@ -412,66 +475,6 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
   // 데스크탑 버전 렌더링
   return (
     <div className="space-y-6 py-2 overflow-y-auto px-1 md:px-4">
-      {/* 요약 정보 카드 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border border-gray-200 shadow-sm bg-white">
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-medium text-muted-foreground">식단 타입</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-2xl font-bold">{mealPlan.name}</div>
-          </CardContent>
-        </Card>
-      
-        <Card className="border border-gray-200 shadow-sm bg-white">
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
-              <CircleDollarSign className="h-4 w-4 mr-1 text-muted-foreground" />
-              총 비용
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-2xl font-bold">{formatCurrency(calculateTotalCost())}</div>
-          </CardContent>
-        </Card>
-        
-        <Card className="border border-gray-200 shadow-sm bg-white">
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
-              <Gauge className="h-4 w-4 mr-1 text-muted-foreground" />
-              총 칼로리
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {isLoadingCalories ? (
-              <div className="flex items-center space-x-2">
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">로딩 중...</span>
-              </div>
-            ) : (
-              <div className="text-2xl font-bold">{Math.round(calculateTotalCalories())} kcal</div>
-            )}
-          </CardContent>
-        </Card>
-        
-        <Card className="border border-gray-200 shadow-sm bg-white">
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
-              <Calendar className="h-4 w-4 mr-1 text-muted-foreground" />
-              날짜 및 시간
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="font-medium">{format(new Date(mealPlan.date), 'yyyy년 MM월 dd일')}</div>
-            <div className="text-sm text-muted-foreground mt-1">
-              <Badge variant="secondary" className="font-normal bg-gray-100 hover:bg-gray-200 text-gray-700">
-                {getMealTimeName(mealPlan.meal_time)}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      
       {/* 포함 메뉴 목록 */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
@@ -570,26 +573,80 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
         )}
       </div>
       
-      {/* 작업 버튼 영역 */}
-      <div className="flex justify-end gap-3 pt-2">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="h-10 px-4 gap-2 shadow-sm hover:bg-gray-100 font-medium" 
-          onClick={onEdit}
-        >
-          <FilePen className="h-4 w-4" />
-          수정하기
-        </Button>
-        <Button 
-          variant="destructive" 
-          size="sm" 
-          className="h-10 px-4 gap-2 shadow-sm hover:bg-red-700 font-medium" 
-          onClick={() => setShowDeleteAlert(true)}
-        >
-          <Trash2 className="h-4 w-4" />
-          삭제하기
-        </Button>
+      {/* 식단 원가 정보 */}
+      <div className="space-y-2">       
+        {/* 영양 정보 */}
+        <div className="mt-4 flex flex-col gap-2">
+          <div className="flex items-center space-x-2">
+            <Gauge className="h-5 w-5 text-blue-500" />
+            <h3 className="text-md font-semibold">영양 정보</h3>
+          </div>
+          
+          <div className="flex flex-col gap-1 text-gray-700 ml-7">
+            <div className="flex justify-between text-sm">
+              <span>총 칼로리:</span>
+              <span>{isLoadingCalories ? (
+                <span className="flex items-center text-gray-500">
+                  <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                  계산 중...
+                </span>
+              ) : (
+                `${totalCalories.toFixed(1)} kcal`
+              )}</span>
+            </div>
+          </div>
+        </div>
+        
+        {/* 식단 원가 정보 */}
+        <div className="mt-4 flex flex-col gap-2">
+          <div className="flex items-center space-x-2">
+            <CircleDollarSign className="h-5 w-5 text-blue-500" />
+            <h3 className="text-md font-semibold">원가 정보</h3>
+          </div>
+          
+          <div className="flex flex-col gap-1 text-gray-700 ml-7">
+            <div className="flex justify-between text-sm">
+              <span>식재료 원가:</span>
+              <span>{isLoadingCalories ? '계산 중...' : formatCurrency(calculateTotalCost() - calculateContainersCost())}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span>용기 원가:</span>
+              <span>{isLoadingCalories ? '계산 중...' : formatCurrency(calculateContainersCost())}</span>
+            </div>
+            <Separator className="my-1" />
+            <div className="flex justify-between font-medium">
+              <span>총 원가:</span>
+              <span>{isLoadingCalories ? '계산 중...' : formatCurrency(calculateTotalCost())}</span>
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              ※ 용기가 중복 사용되는 경우 원가는 한 번만 계산됩니다.
+            </div>
+          </div>
+        </div>
+        
+        {/* 작업 버튼 영역 */}
+        <div className="flex justify-end space-x-2 mt-4 mb-6">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onEdit}
+            className="flex items-center"
+          >
+            <FilePen className="h-4 w-4 mr-1" />
+            수정
+          </Button>
+          <Button 
+            variant="destructive" 
+            size="sm" 
+            onClick={() => setShowDeleteAlert(true)}
+            className="flex items-center"
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            삭제
+          </Button>
+        </div>
+        
+        <Separator className="mt-2 mb-4" />
       </div>
       
       {/* 삭제 확인 모달 */}

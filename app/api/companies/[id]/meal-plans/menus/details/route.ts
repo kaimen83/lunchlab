@@ -198,6 +198,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
     }
 
+    // 응답에 메뉴 원가(식재료 원가)와 용기 정보를 함께 반환
+    // 참고: 클라이언트에서 용기 원가를 계산할 때 같은 용기에 여러 메뉴가 담기는 경우
+    // 용기 원가는 한 번만 계산하도록 처리해야 함
     return NextResponse.json({
       menu_id,
       container_id,

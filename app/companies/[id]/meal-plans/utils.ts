@@ -21,7 +21,13 @@ export const calculateMealPlanCost = (mealPlan: MealPlan): number => {
     return 0;
   }
   
-  return mealPlan.meal_plan_menus.reduce((totalCost, item) => {
+  // 식재료 원가 계산
+  let ingredientsCost = 0;
+  // 사용된 용기 ID 추적 (중복 계산 방지)
+  const usedContainers = new Set<string>();
+  
+  // 각 메뉴의 식재료 원가 계산
+  mealPlan.meal_plan_menus.forEach(item => {
     let itemCost = 0;
     
     // 용기 ID 확인
@@ -47,6 +53,11 @@ export const calculateMealPlanCost = (mealPlan: MealPlan): number => {
           itemCost = typeof latestPrice === 'number' ? latestPrice : 0;
         }
       }
+      
+      // 사용된 용기 추적 (중복 계산 방지)
+      if (containerId) {
+        usedContainers.add(containerId);
+      }
     } else {
       // 용기 ID가 없거나 menu_containers가 없는 경우 menu_price_history에서 가져옴
       if (item.menu && item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
@@ -60,8 +71,26 @@ export const calculateMealPlanCost = (mealPlan: MealPlan): number => {
       }
     }
     
-    return totalCost + itemCost;
-  }, 0);
+    ingredientsCost += itemCost;
+  });
+  
+  // 용기 원가 계산 (중복 없이)
+  let containersCost = 0;
+  
+  usedContainers.forEach(containerId => {
+    // 해당 용기 ID를 가진 메뉴 아이템 찾기
+    const menuItemWithContainer = mealPlan.meal_plan_menus.find(
+      item => item.container_id === containerId
+    );
+    
+    // 용기 가격 추가
+    if (menuItemWithContainer?.container?.price) {
+      containersCost += menuItemWithContainer.container.price;
+    }
+  });
+  
+  // 식재료 원가와 용기 원가의 합계 반환
+  return ingredientsCost + containersCost;
 };
 
 // 식단에 포함된 메뉴 이름 렌더링

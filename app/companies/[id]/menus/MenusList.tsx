@@ -657,6 +657,19 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
           </AccordionItem>
         </Accordion>
       </CardContent>
+      
+      <CardFooter className="px-4 py-2 text-xs text-muted-foreground border-t bg-slate-50">
+        {menu.containers && menu.containers.length > 0 ? (
+          <div className="flex items-center gap-1 w-full">
+            <Package className="h-3 w-3 mr-1 text-slate-400" />
+            <span className="truncate text-gray-500">
+              {menu.containers.map(c => c.container.name).join(', ')}
+            </span>
+          </div>
+        ) : (
+          <span className="text-gray-500">등록된 용기 없음</span>
+        )}
+      </CardFooter>
     </Card>
   );
 
@@ -913,10 +926,17 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                   </div>
                 )}
               </CardContent>
-              <CardFooter className="px-4 py-2 text-xs text-muted-foreground border-t bg-slate-50 flex justify-between">
-                <span className="text-gray-500">
-                  {menu.containers?.length || 0}개 용기 사용
-                </span>
+              <CardFooter className="px-4 py-2 text-xs text-muted-foreground border-t bg-slate-50">
+                {menu.containers && menu.containers.length > 0 ? (
+                  <div className="flex items-center gap-1 w-full">
+                    <Package className="h-3 w-3 mr-1 text-slate-400" />
+                    <span className="truncate text-gray-500">
+                      {menu.containers.map(c => c.container.name).join(', ')}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-gray-500">등록된 용기 없음</span>
+                )}
               </CardFooter>
             </Card>
           ))}

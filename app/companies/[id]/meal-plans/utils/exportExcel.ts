@@ -13,6 +13,79 @@ const getMealPlanMenusText = (mealPlan: MealPlan | undefined): string => {
   return mealPlan.meal_plan_menus.map(menu => menu.menu.name).join(', ');
 };
 
+// 식단 원가를 계산하여 반환 (용기 원가 포함)
+const calculateMealPlanCost = (mealPlan: MealPlan | undefined): number => {
+  if (!mealPlan || !mealPlan.meal_plan_menus || mealPlan.meal_plan_menus.length === 0) {
+    return 0;
+  }
+  
+  // 식재료 원가 계산
+  let ingredientsCost = 0;
+  // 사용된 용기 ID 추적 (중복 계산 방지)
+  const usedContainers = new Set<string>();
+  
+  // 각 메뉴의 식재료 원가 계산
+  mealPlan.meal_plan_menus.forEach(item => {
+    let itemCost = 0;
+    
+    // 용기 ID 확인
+    const containerId = item.container_id;
+    
+    if (containerId && item.menu.menu_containers) {
+      // 현재 메뉴와 용기에 해당하는 원가 정보 찾기
+      const menuContainer = item.menu.menu_containers.find(
+        mc => mc.menu_id === item.menu_id && mc.container_id === containerId
+      );
+      
+      if (menuContainer && menuContainer.ingredients_cost > 0) {
+        // 특정 메뉴-용기 조합에 대한 원가 사용
+        itemCost = menuContainer.ingredients_cost;
+      } else if (item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
+        // 메뉴-용기 조합 정보가 없거나 원가가 0인 경우 price_history에서 가져옴
+        const sortedHistory = [...item.menu.menu_price_history].sort((a, b) => {
+          if (!a.recorded_at || !b.recorded_at) return 0;
+          return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
+        });
+        const latestPrice = sortedHistory[0].cost_price;
+        itemCost = typeof latestPrice === 'number' ? latestPrice : 0;
+      }
+      
+      // 사용된 용기 추적 (중복 계산 방지)
+      if (containerId) {
+        usedContainers.add(containerId);
+      }
+    } else if (item.menu.menu_price_history && item.menu.menu_price_history.length > 0) {
+      // 용기 ID가 없는 경우 price_history에서 가져옴
+      const sortedHistory = [...item.menu.menu_price_history].sort((a, b) => {
+        if (!a.recorded_at || !b.recorded_at) return 0;
+        return new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime();
+      });
+      const latestPrice = sortedHistory[0].cost_price;
+      itemCost = typeof latestPrice === 'number' ? latestPrice : 0;
+    }
+    
+    ingredientsCost += itemCost;
+  });
+  
+  // 용기 원가 계산 (중복 없이)
+  let containersCost = 0;
+  
+  usedContainers.forEach(containerId => {
+    // 해당 용기 ID를 가진 메뉴 아이템 찾기
+    const menuItemWithContainer = mealPlan.meal_plan_menus.find(
+      item => item.container_id === containerId
+    );
+    
+    // 용기 가격 추가
+    if (menuItemWithContainer?.container?.price) {
+      containersCost += menuItemWithContainer.container.price;
+    }
+  });
+  
+  // 식재료 원가와 용기 원가의 합계 반환
+  return ingredientsCost + containersCost;
+};
+
 // 날짜별 식단을 찾아 반환
 const getMealPlanForDateAndTime = (
   mealPlans: MealPlan[], 
@@ -32,7 +105,7 @@ export const exportWeeklyMealPlans = (
   // 워크시트 데이터 준비
   const wsData = [
     // 첫 번째 행: 헤더
-    ['요일', '식사 시간', '메뉴'],
+    ['요일', '식사 시간', '메뉴', '원가 (원)'],
   ];
   
   // 셀 병합을 위한 정보
@@ -50,15 +123,30 @@ export const exportWeeklyMealPlans = (
     
     // 아침
     const breakfastPlan = getMealPlanForDateAndTime(mealPlans, day, 'breakfast');
-    wsData.push([dateLabel, '아침', getMealPlanMenusText(breakfastPlan)]);
+    wsData.push([
+      dateLabel, 
+      '아침', 
+      getMealPlanMenusText(breakfastPlan),
+      breakfastPlan ? Math.round(calculateMealPlanCost(breakfastPlan)).toLocaleString() : ''
+    ]);
     
     // 점심
     const lunchPlan = getMealPlanForDateAndTime(mealPlans, day, 'lunch');
-    wsData.push(['', '점심', getMealPlanMenusText(lunchPlan)]);
+    wsData.push([
+      '', 
+      '점심', 
+      getMealPlanMenusText(lunchPlan),
+      lunchPlan ? Math.round(calculateMealPlanCost(lunchPlan)).toLocaleString() : ''
+    ]);
     
     // 저녁
     const dinnerPlan = getMealPlanForDateAndTime(mealPlans, day, 'dinner');
-    wsData.push(['', '저녁', getMealPlanMenusText(dinnerPlan)]);
+    wsData.push([
+      '', 
+      '저녁', 
+      getMealPlanMenusText(dinnerPlan),
+      dinnerPlan ? Math.round(calculateMealPlanCost(dinnerPlan)).toLocaleString() : ''
+    ]);
     
     // 첫 번째 열 셀 병합 (3개 행을 하나로)
     merges.push({
@@ -76,7 +164,7 @@ export const exportWeeklyMealPlans = (
   ws['!merges'] = merges;
   
   // 셀 너비 자동 조정
-  const colWidths = [13, 10, 60];
+  const colWidths = [13, 10, 50, 12];
   ws['!cols'] = colWidths.map(width => ({ width }));
   
   // 워크북 생성
@@ -120,6 +208,10 @@ export const exportMonthlyMealPlans = (
     const breakfastRow: (string | null)[] = ['아침'];
     const lunchRow: (string | null)[] = ['점심'];
     const dinnerRow: (string | null)[] = ['저녁'];
+    // 원가 행 추가
+    const breakfastCostRow: (string | null)[] = ['아침 원가'];
+    const lunchCostRow: (string | null)[] = ['점심 원가'];
+    const dinnerCostRow: (string | null)[] = ['저녁 원가'];
     
     // 각 요일에 대해
     week.forEach(day => {
@@ -129,6 +221,9 @@ export const exportMonthlyMealPlans = (
         breakfastRow.push(null);
         lunchRow.push(null);
         dinnerRow.push(null);
+        breakfastCostRow.push(null);
+        lunchCostRow.push(null);
+        dinnerCostRow.push(null);
         return;
       }
       
@@ -140,12 +235,19 @@ export const exportMonthlyMealPlans = (
       const lunchPlan = getMealPlanForDateAndTime(mealPlans, day, 'lunch');
       const dinnerPlan = getMealPlanForDateAndTime(mealPlans, day, 'dinner');
       
+      // 메뉴 이름 추가
       breakfastRow.push(getMealPlanMenusText(breakfastPlan));
       lunchRow.push(getMealPlanMenusText(lunchPlan));
       dinnerRow.push(getMealPlanMenusText(dinnerPlan));
+      
+      // 원가 데이터 추가
+      breakfastCostRow.push(breakfastPlan ? Math.round(calculateMealPlanCost(breakfastPlan)).toLocaleString() : null);
+      lunchCostRow.push(lunchPlan ? Math.round(calculateMealPlanCost(lunchPlan)).toLocaleString() : null);
+      dinnerCostRow.push(dinnerPlan ? Math.round(calculateMealPlanCost(dinnerPlan)).toLocaleString() : null);
     });
     
-    monthlyRows.push([dateRow, breakfastRow, lunchRow, dinnerRow]);
+    // 원가 행 추가
+    monthlyRows.push([dateRow, breakfastRow, lunchRow, dinnerRow, breakfastCostRow, lunchCostRow, dinnerCostRow]);
   });
   
   // 3. 모든 주 데이터를 워크시트 데이터에 추가
@@ -160,7 +262,7 @@ export const exportMonthlyMealPlans = (
   const ws = utils.aoa_to_sheet(wsData);
   
   // 셀 너비 자동 조정
-  const colWidths = [6, 12, 12, 12, 12, 12, 12, 12];
+  const colWidths = [12, 12, 12, 12, 12, 12, 12, 12];
   ws['!cols'] = colWidths.map(width => ({ width }));
   
   // 워크북 생성
