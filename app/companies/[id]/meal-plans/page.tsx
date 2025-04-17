@@ -493,9 +493,16 @@ export default function MealPlansPage() {
                 mealPlan={selectedMealPlan}
                 onEdit={() => {
                   setShowMealPlanDetails(false);
-                  handleEditMealPlan(selectedMealPlan);
+                  setTimeout(() => {
+                    handleEditMealPlan(selectedMealPlan);
+                  }, 0);
                 }}
-                onDelete={() => handleDeleteMealPlan(selectedMealPlan.id)}
+                onDelete={() => {
+                  setShowMealPlanDetails(false);
+                  setTimeout(() => {
+                    handleDeleteMealPlan(selectedMealPlan.id);
+                  }, 0);
+                }}
               />
             )}
           </div>
@@ -511,15 +518,21 @@ export default function MealPlansPage() {
         mealPlans={selectedPlansForSlot}
         onView={(plan) => {
           setShowMealPlanListModal(false);
-          handleViewMealPlan(plan);
+          setTimeout(() => {
+            handleViewMealPlan(plan);
+          }, 0);
         }}
         onEdit={(plan) => {
           setShowMealPlanListModal(false);
-          handleEditMealPlan(plan);
+          setTimeout(() => {
+            handleEditMealPlan(plan);
+          }, 0);
         }}
         onDelete={(planId) => {
           setShowMealPlanListModal(false);
-          handleDeleteMealPlan(planId);
+          setTimeout(() => {
+            handleDeleteMealPlan(planId);
+          }, 0);
         }}
       />
     </div>

@@ -59,10 +59,9 @@ export function DangerZone({ companyId, companyName }: DangerZoneProps) {
         method: 'DELETE',
       });
       
-      const data = await response.json();
-      
       if (!response.ok) {
-        throw new Error(data.error || '회사 삭제에 실패했습니다.');
+        const errorData = await response.json().catch(() => ({ error: '응답 처리 중 오류가 발생했습니다.' }));
+        throw new Error(errorData.error || '회사 삭제에 실패했습니다.');
       }
       
       // 회사 삭제 이벤트 발생
@@ -73,9 +72,8 @@ export function DangerZone({ companyId, companyName }: DangerZoneProps) {
     } catch (err) {
       console.error('회사 삭제 중 오류:', err);
       setError(err instanceof Error ? err.message : '오류가 발생했습니다.');
-      setShowDeleteConfirm(false);
-    } finally {
       setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
