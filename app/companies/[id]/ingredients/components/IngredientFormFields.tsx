@@ -388,7 +388,21 @@ export function IngredientFormFields({
                 단위 <span className="text-red-500 ml-1">*</span>
               </FormLabel>
               <FormControl>
-                <Input {...field} placeholder="kg, g, ml 등" />
+                <Select
+                  onValueChange={field.onChange}
+                  value={field.value || ""}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="단위 선택" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="g">g</SelectItem>
+                    <SelectItem value="ea">EA</SelectItem>
+                    <SelectItem value="l">l</SelectItem>
+                  </SelectContent>
+                </Select>
               </FormControl>
               <FormMessage />
             </FormItem>
