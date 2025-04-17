@@ -123,7 +123,8 @@ export default function ContainersList({ companyId }: ContainersListProps) {
   // 필터링된 용기 목록
   const filteredContainers = containers.filter(container =>
     container.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (container.description && container.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    (container.description && container.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (container.code_name && container.code_name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
@@ -160,11 +161,18 @@ export default function ContainersList({ companyId }: ContainersListProps) {
                       <Package className="h-4 w-4 mr-2 text-primary" />
                       {container.name}
                     </CardTitle>
-                    {container.price !== null && container.price !== undefined && (
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-50">
-                        {container.price.toLocaleString()}원
-                      </Badge>
-                    )}
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {container.code_name && (
+                        <Badge variant="secondary" className="bg-purple-50 text-purple-700 hover:bg-purple-50">
+                          {container.code_name}
+                        </Badge>
+                      )}
+                      {container.price !== null && container.price !== undefined && (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-50">
+                          {container.price.toLocaleString()}원
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <div className="flex space-x-1">
                     <Button

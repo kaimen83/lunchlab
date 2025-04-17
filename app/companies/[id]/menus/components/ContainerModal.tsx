@@ -29,6 +29,7 @@ import { Textarea } from '@/components/ui/textarea';
 export interface Container {
   id: string;
   name: string;
+  code_name?: string;
   description?: string;
   price?: number;
   created_at: string;
@@ -38,15 +39,13 @@ export interface Container {
 // 폼 스키마
 const containerSchema = z.object({
   name: z.string().min(1, { message: '용기 이름은 필수입니다.' }),
+  code_name: z.string().max(50, { message: '코드명은 50자 이하여야 합니다.' }).optional(),
   description: z.string().max(200, { message: '설명은 200자 이하여야 합니다.' }).optional(),
-  price: z.preprocess(
-    (val) => (val === '' ? undefined : Number(val)),
-    z.number().nonnegative({ message: '가격은 0 이상이어야 합니다.' }).optional()
-  ),
+  price: z.union([
+    z.number().nonnegative({ message: '가격은 0 이상이어야 합니다.' }),
+    z.undefined()
+  ])
 });
-
-// ContainerFormValues 타입 정의
-type ContainerFormValues = z.infer<typeof containerSchema>;
 
 interface ContainerModalProps {
   open: boolean;
@@ -68,12 +67,13 @@ export default function ContainerModal({
   const isEditMode = !!container;
 
   // 폼 초기화
-  const form = useForm<ContainerFormValues>({
+  const form = useForm<z.infer<typeof containerSchema>>({
     resolver: zodResolver(containerSchema),
     defaultValues: {
       name: container?.name || '',
+      code_name: container?.code_name || '',
       description: container?.description || '',
-      price: container?.price || undefined,
+      price: container?.price,
     }
   });
 
@@ -82,14 +82,15 @@ export default function ContainerModal({
     if (open) {
       form.reset({
         name: container?.name || '',
+        code_name: container?.code_name || '',
         description: container?.description || '',
-        price: container?.price || undefined,
+        price: container?.price,
       });
     }
   }, [container, open, form]);
 
   // 폼 제출 처리
-  const onSubmit = async (data: ContainerFormValues) => {
+  const onSubmit = async (data: z.infer<typeof containerSchema>) => {
     setIsSubmitting(true);
 
     try {
@@ -155,7 +156,29 @@ export default function ContainerModal({
                 <FormItem>
                   <FormLabel>용기 이름</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="예: 소형 플라스틱 용기, 대형 종이 도시락" />
+                    <Input 
+                      {...field} 
+                      placeholder="예: 소형 플라스틱 용기, 대형 종이 도시락" 
+                      value={field.value ?? ''} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="code_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>코드명</FormLabel>
+                  <FormControl>
+                    <Input 
+                      {...field} 
+                      placeholder="예: CT001, 소플라용기" 
+                      value={field.value ?? ''} 
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -173,7 +196,7 @@ export default function ContainerModal({
                       {...field}
                       placeholder="용기에 대한 설명이나 메모를 입력하세요"
                       rows={2}
-                      value={field.value || ''}
+                      value={field.value ?? ''}
                     />
                   </FormControl>
                   <FormMessage />
@@ -190,13 +213,15 @@ export default function ContainerModal({
                   <FormControl>
                     <div className="relative">
                       <Input
-                        {...field}
                         type="number"
                         min="0"
                         step="1"
                         placeholder="용기 가격"
-                        value={field.value || ''}
-                        onChange={(e) => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}
+                        value={field.value === undefined ? '' : field.value}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          field.onChange(value === '' ? undefined : Number(value));
+                        }}
                         className="pl-10"
                       />
                       <div className="absolute left-3 top-0 h-full flex items-center text-muted-foreground">

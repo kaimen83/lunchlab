@@ -61,6 +61,7 @@ export async function POST(
       .insert({
         company_id: companyId,
         name: body.name,
+        code_name: body.code_name || null,
         description: body.description || null,
         price: body.price || null,
       })

@@ -62,6 +62,7 @@ export async function PATCH(
       .from('containers')
       .update({
         name: body.name,
+        code_name: body.code_name || null,
         description: body.description || null,
         category: body.category || null,
         price: body.price || null,
