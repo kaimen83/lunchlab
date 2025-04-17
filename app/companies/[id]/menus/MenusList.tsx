@@ -532,12 +532,12 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                                   <TooltipProvider delayDuration={100}>
                                     <Tooltip>
                                       <TooltipTrigger>
-                                        <Badge variant="outline" className="bg-white border-amber-300 text-amber-700">
+                                        <Badge variant="outline" className="bg-slate-50">
                                           {Math.round(detail.calories)} kcal
                                         </Badge>
                                       </TooltipTrigger>
                                       <TooltipContent>
-                                        <p>칼로리 합계</p>
+                                        <p className="text-white">칼로리 합계</p>
                                       </TooltipContent>
                                     </Tooltip>
                                   </TooltipProvider>
@@ -545,17 +545,29 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                                 <TooltipProvider delayDuration={100}>
                                   <Tooltip>
                                     <TooltipTrigger>
-                                      <Badge variant="secondary" className="bg-white border-green-300 text-green-700 flex items-center">
+                                      <Badge variant="secondary" className="flex items-center">
                                         <DollarSign className="h-3 w-3 mr-1"/> 
                                         {formatCurrency(detail.total_cost || (detail.ingredients_cost + detail.container_price))}
                                       </Badge>
                                     </TooltipTrigger>
-                                    <TooltipContent side="bottom" align="end">
-                                      <div className="text-xs space-y-1">
-                                        <p>식재료: {formatCurrency(detail.ingredients_cost)}</p>
-                                        <p>용기: {formatCurrency(detail.container_price)}</p>
-                                        <hr className="my-1"/>
-                                        <p className="font-medium">총 원가: {formatCurrency(detail.total_cost || (detail.ingredients_cost + detail.container_price))}</p>
+                                    <TooltipContent side="bottom" align="end" className="p-3 text-white">
+                                      <div className="text-xs space-y-2">
+                                        <div className="flex justify-between gap-2">
+                                          <span className="text-white opacity-80">식재료:</span> 
+                                          <span className="text-white">{formatCurrency(detail.ingredients_cost)}</span>
+                                        </div>
+                                        <div className="flex justify-between gap-2 font-medium">
+                                          <span className="text-white opacity-80">용기:</span> 
+                                          <span className="text-white">{formatCurrency(detail.container_price)}</span>
+                                        </div>
+                                        <hr className="my-1 border-white border-opacity-20"/>
+                                        <div className="flex justify-between gap-2 font-semibold">
+                                          <span className="text-white">총 원가:</span>
+                                          <span className="text-white">{formatCurrency(detail.total_cost || (detail.ingredients_cost + detail.container_price))}</span>
+                                        </div>
+                                        <p className="text-[10px] text-white opacity-70 mt-1 pt-1 border-t border-dashed border-white border-opacity-20">
+                                          * 용기 가격이 포함된 총 원가입니다
+                                        </p>
                                       </div>
                                     </TooltipContent>
                                   </Tooltip>
@@ -775,12 +787,12 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                                             <TooltipProvider delayDuration={100}>
                                               <Tooltip>
                                                 <TooltipTrigger>
-                                                  <Badge variant="outline" className="bg-white border-amber-300 text-amber-700">
+                                                  <Badge variant="outline" className="bg-slate-50">
                                                     {Math.round(detail.calories)} kcal
                                                   </Badge>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                  <p>칼로리 합계</p>
+                                                  <p className="text-white">칼로리 합계</p>
                                                 </TooltipContent>
                                               </Tooltip>
                                             </TooltipProvider>
@@ -788,17 +800,29 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                                           <TooltipProvider delayDuration={100}>
                                             <Tooltip>
                                               <TooltipTrigger>
-                                                <Badge variant="secondary" className="bg-white border-green-300 text-green-700 flex items-center">
+                                                <Badge variant="secondary" className="flex items-center">
                                                   <DollarSign className="h-3 w-3 mr-1"/> 
                                                   {formatCurrency(detail.total_cost || (detail.ingredients_cost + detail.container_price))}
                                                 </Badge>
                                               </TooltipTrigger>
-                                              <TooltipContent side="bottom" align="end">
-                                                <div className="text-xs space-y-1">
-                                                  <p>식재료: {formatCurrency(detail.ingredients_cost)}</p>
-                                                  <p>용기: {formatCurrency(detail.container_price)}</p>
-                                                  <hr className="my-1"/>
-                                                  <p className="font-medium">총 원가: {formatCurrency(detail.total_cost || (detail.ingredients_cost + detail.container_price))}</p>
+                                              <TooltipContent side="bottom" align="end" className="p-3 text-white">
+                                                <div className="text-xs space-y-2">
+                                                  <div className="flex justify-between gap-2">
+                                                    <span className="text-white opacity-80">식재료:</span> 
+                                                    <span className="text-white">{formatCurrency(detail.ingredients_cost)}</span>
+                                                  </div>
+                                                  <div className="flex justify-between gap-2 font-medium">
+                                                    <span className="text-white opacity-80">용기:</span> 
+                                                    <span className="text-white">{formatCurrency(detail.container_price)}</span>
+                                                  </div>
+                                                  <hr className="my-1 border-white border-opacity-20"/>
+                                                  <div className="flex justify-between gap-2 font-semibold">
+                                                    <span className="text-white">총 원가:</span>
+                                                    <span className="text-white">{formatCurrency(detail.total_cost || (detail.ingredients_cost + detail.container_price))}</span>
+                                                  </div>
+                                                  <p className="text-[10px] text-white opacity-70 mt-1 pt-1 border-t border-dashed border-white border-opacity-20">
+                                                    * 용기 가격이 포함된 총 원가입니다
+                                                  </p>
                                                 </div>
                                               </TooltipContent>
                                             </Tooltip>
