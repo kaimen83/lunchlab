@@ -40,7 +40,7 @@ export default function MealPlanForm({
   const [containerSearchTerm, setContainerSearchTerm] = useState<string>('');
   const [menuSearchTerm, setMenuSearchTerm] = useState<string>('');
   const [selectedContainers, setSelectedContainers] = useState<string[]>([]);
-  const [containerMenuSelections, setContainerMenuSelections] = useState<Record<string, string>>({});
+  const [containerMenuSelections, setContainerMenuSelections] = useState<Record<string, string[]>>({});
   const [activeTab, setActiveTab] = useState<string>('basic');
   const [selectedContainerForMenu, setSelectedContainerForMenu] = useState<string | null>(null);
   const [isMenuSelectOpen, setIsMenuSelectOpen] = useState<boolean>(false);
@@ -60,12 +60,20 @@ export default function MealPlanForm({
       if (initialData.meal_plan_menus?.length) {
         // 기존 식단에서 사용된 용기 목록 추출
         const selectedContainerIds: string[] = [];
-        const containerMenuMap: Record<string, string> = {};
+        const containerMenuMap: Record<string, string[]> = {};
         
         initialData.meal_plan_menus.forEach(item => {
           if (item.container_id) {
-            selectedContainerIds.push(item.container_id);
-            containerMenuMap[item.container_id] = item.menu_id;
+            // 아직 추가되지 않은 용기면 배열과 ID 초기화
+            if (!selectedContainerIds.includes(item.container_id)) {
+              selectedContainerIds.push(item.container_id);
+              containerMenuMap[item.container_id] = [];
+            }
+            
+            // 메뉴 ID 추가
+            if (item.menu_id) {
+              containerMenuMap[item.container_id].push(item.menu_id);
+            }
           }
         });
         
@@ -160,7 +168,7 @@ export default function MealPlanForm({
         
         const containerIds: string[] = [];
         // 메뉴 선택 정보를 초기화 (빈 객체로 설정)
-        const menuSelections: Record<string, string> = {};
+        const menuSelections: Record<string, string[]> = {};
         
         templateData.template_selections.forEach((selection: any) => {
           if (selection.container_id) {
@@ -223,7 +231,7 @@ export default function MealPlanForm({
     /* 메뉴 선택 검사 주석 처리 - 메뉴가 선택되지 않은 용기 허용
     // 선택된 모든 용기에 메뉴가 할당되었는지 확인
     const unassignedContainers = selectedContainers.filter(
-      containerId => !containerMenuSelections[containerId]
+      containerId => !containerMenuSelections[containerId] || containerMenuSelections[containerId].length === 0
     );
     
     if (unassignedContainers.length > 0) {
@@ -240,10 +248,27 @@ export default function MealPlanForm({
     
     try {
       // 메뉴 선택과 용기 선택을 API 요구 형식으로 변환
-      const menu_selections = selectedContainers.map(containerId => ({
-        menuId: containerMenuSelections[containerId] || null, // 메뉴가 없는 경우 null 처리
-        containerId
-      }));
+      const menu_selections = [];
+      
+      selectedContainers.forEach(containerId => {
+        const menuIds = containerMenuSelections[containerId] || [];
+        
+        // 각 메뉴 ID마다 별도의 항목 생성
+        if (menuIds.length > 0) {
+          menuIds.forEach(menuId => {
+            menu_selections.push({
+              menuId,
+              containerId
+            });
+          });
+        } else {
+          // 메뉴가 하나도 선택되지 않은 경우
+          menu_selections.push({
+            menuId: null,
+            containerId
+          });
+        }
+      });
       
       const data = {
         name,
@@ -284,6 +309,11 @@ export default function MealPlanForm({
     } else {
       // 선택 추가: 선택된 용기 목록에 추가
       setSelectedContainers(prev => [...prev, containerId]);
+      // 해당 용기의 메뉴 배열 초기화
+      setContainerMenuSelections(prev => ({
+        ...prev,
+        [containerId]: []
+      }));
     }
   };
 
@@ -361,11 +391,27 @@ export default function MealPlanForm({
       }
     }
     
-    // 메뉴 선택 정보 업데이트
-    setContainerMenuSelections(prev => ({
-      ...prev,
-      [containerId]: menuId
-    }));
+    // 메뉴 선택 정보 업데이트 - 이미 선택된 메뉴인지 확인하고 토글
+    setContainerMenuSelections(prev => {
+      const updated = { ...prev };
+      // 해당 용기에 대한 메뉴 배열이 없으면 초기화
+      if (!updated[containerId]) {
+        updated[containerId] = [];
+      }
+      
+      // 이미 선택된 메뉴인지 확인
+      const menuIndex = updated[containerId].indexOf(menuId);
+      
+      if (menuIndex === -1) {
+        // 선택되지 않은 경우 추가
+        updated[containerId] = [...updated[containerId], menuId];
+      } else {
+        // 이미 선택된 경우 제거 (토글)
+        updated[containerId] = updated[containerId].filter(id => id !== menuId);
+      }
+      
+      return updated;
+    });
     
     // 선택 후 모달을 안전하게 닫기 위해 지연 처리
     setTimeout(() => {

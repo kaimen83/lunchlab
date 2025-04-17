@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -31,6 +32,7 @@ interface MenuSelectionProps {
   setSearchTerm: Dispatch<SetStateAction<string>>;
   filteredMenus: Menu[];
   selectedMenuId: string | undefined;
+  selectedMenuIds: string[];
   onMenuSelect: (containerId: string, menuId: string) => void;
   menuContainers: MenuContainer[];
 }
@@ -44,6 +46,7 @@ export default function MenuSelection({
   setSearchTerm,
   filteredMenus,
   selectedMenuId,
+  selectedMenuIds = [],
   onMenuSelect,
   menuContainers
 }: MenuSelectionProps) {
@@ -88,6 +91,9 @@ export default function MenuSelection({
           <DialogTitle className="text-base">
             {containerName}에 담을 메뉴 선택
           </DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground">
+            메뉴를 여러 개 선택할 수 있습니다. 선택된 메뉴를 다시 클릭하면 선택이 해제됩니다.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-2 pt-2">
           <div className="relative">
@@ -105,6 +111,7 @@ export default function MenuSelection({
               {compatibleMenus.length > 0 ? (
                 <div>
                   {compatibleMenus.map(menu => {
+                    const isSelected = selectedMenuIds.includes(menu.id);
                     const costInfo = getCostInfoForMenuAndContainer(menu.id, containerId, menuContainers);
                     
                     return (
@@ -112,12 +119,25 @@ export default function MenuSelection({
                         key={menu.id} 
                         className={cn(
                           "flex flex-col p-3 border-b cursor-pointer hover:bg-accent/20",
-                          selectedMenuId === menu.id && "bg-accent/30"
+                          isSelected && "bg-accent/30"
                         )}
                         onClick={(e) => handleMenuSelect(e, menu.id)}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
+                            <Checkbox 
+                              checked={isSelected} 
+                              className="mr-2" 
+                              onClick={(e) => {
+                                // 버블링 방지를 위한 중복 클릭 처리 방지
+                                e.stopPropagation();
+                                // 부모의 클릭 이벤트가 처리하도록 함
+                              }}
+                              onCheckedChange={() => {
+                                // 체크박스 변경 시 부모 요소 클릭 이벤트 사용
+                                // 별도 처리 안함 - 상위 div의 onClick 핸들러가 처리
+                              }}
+                            />
                             <span className="font-medium">{menu.name}</span>
                             <Badge variant="secondary" className="ml-2 text-xs">
                               호환
@@ -128,7 +148,7 @@ export default function MenuSelection({
                           </span>
                         </div>
                         {menu.description && (
-                          <p className="text-xs text-muted-foreground mt-1">
+                          <p className="text-xs text-muted-foreground mt-1 ml-6">
                             {menu.description}
                           </p>
                         )}

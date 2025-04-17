@@ -2,7 +2,7 @@
 
 import { Dispatch, SetStateAction, MouseEvent } from 'react';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Container, Menu, MenuContainer } from './types';
 import { formatPrice, getCostInfoForMenuAndContainer } from './utils';
@@ -19,7 +19,7 @@ import {
 interface MealPlanMenuSelectionProps {
   selectedContainers: string[];
   sortedSelectedContainers: string[];
-  containerMenuSelections: Record<string, string>;
+  containerMenuSelections: Record<string, string[]>;
   isLoadingMenus: boolean;
   isLoadingMenuContainers: boolean;
   getContainerDetailsById: (containerId: string) => Container | undefined;
@@ -79,7 +79,7 @@ export default function MealPlanMenuSelection({
     <Card>
       <CardHeader>
         <CardTitle>메뉴 선택</CardTitle>
-        <CardDescription>각 용기에 담을 메뉴를 선택해주세요.</CardDescription>
+        <CardDescription>각 용기에 담을 메뉴를 선택해주세요. 각 용기에 여러 메뉴를 선택할 수 있습니다.</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoadingMenus || isLoadingMenuContainers ? (
@@ -87,46 +87,72 @@ export default function MealPlanMenuSelection({
             <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
           </div>
         ) : (
-          <div className="space-y-1.5">
+          <div className="space-y-3">
             {sortedSelectedContainers.map(containerId => {
               const containerDetails = getContainerDetailsById(containerId);
-              const selectedMenuId = containerMenuSelections[containerId];
-              const menuDetails = selectedMenuId ? getMenuDetailsById(selectedMenuId) : null;
-              const costInfo = selectedMenuId 
-                ? getCostInfoForMenuAndContainer(selectedMenuId, containerId, menuContainers)
-                : { total_cost: 0, ingredients_cost: 0 };
+              const selectedMenuIds = containerMenuSelections[containerId] || [];
+              
+              // 총 비용 계산
+              const totalCost = selectedMenuIds.reduce((sum, menuId) => {
+                const costInfo = getCostInfoForMenuAndContainer(menuId, containerId, menuContainers);
+                return sum + costInfo.total_cost;
+              }, 0);
               
               return (
                 <div 
                   key={containerId}
-                  className="flex items-center justify-between p-2 border rounded-md hover:bg-accent/10"
+                  className="border rounded-md p-3 hover:bg-accent/5"
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate">{containerDetails?.name}</div>
-                    {selectedMenuId ? (
-                      <div className="text-sm text-muted-foreground flex items-center mt-0.5">
-                        <span className="mr-2 truncate">{menuDetails?.name}</span>
-                        {costInfo.total_cost > 0 && (
-                          <Badge variant="outline" className="text-xs">
-                            {formatPrice(costInfo.total_cost)}
-                          </Badge>
-                        )}
-                      </div>
-                    ) : (
-                      <Badge variant="destructive" className="text-xs mt-0.5">
-                        메뉴 미선택
-                      </Badge>
-                    )}
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <div className="font-medium text-sm">{containerDetails?.name}</div>
+                      {totalCost > 0 && (
+                        <Badge variant="outline" className="mt-1">
+                          총 {formatPrice(totalCost)}
+                        </Badge>
+                      )}
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="whitespace-nowrap"
+                      onClick={(e) => handleOpenMenuSelect(e as MouseEvent, containerId)}
+                    >
+                      {selectedMenuIds.length > 0 ? '메뉴 추가/변경' : '메뉴 선택'}
+                    </Button>
                   </div>
                   
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="ml-2 whitespace-nowrap"
-                    onClick={(e) => handleOpenMenuSelect(e as MouseEvent, containerId)}
-                  >
-                    {selectedMenuId ? '변경' : '선택'}
-                  </Button>
+                  {selectedMenuIds.length > 0 ? (
+                    <div className="space-y-1 mt-2">
+                      {selectedMenuIds.map(menuId => {
+                        const menuDetails = getMenuDetailsById(menuId);
+                        const costInfo = getCostInfoForMenuAndContainer(menuId, containerId, menuContainers);
+                        
+                        return (
+                          <div key={menuId} className="flex justify-between items-center p-2 bg-accent/10 rounded">
+                            <span className="text-sm">{menuDetails?.name}</span>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {formatPrice(costInfo.total_cost)}
+                              </Badge>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => handleMenuSelection(containerId, menuId)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground py-2">
+                      메뉴가 선택되지 않았습니다.
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -148,7 +174,8 @@ export default function MealPlanMenuSelection({
             searchTerm={menuSearchTerm}
             setSearchTerm={setMenuSearchTerm}
             filteredMenus={getFilteredMenusForContainer(selectedContainerForMenu)}
-            selectedMenuId={containerMenuSelections[selectedContainerForMenu]}
+            selectedMenuId={undefined} // 단일 메뉴 선택이 아닌 복수 메뉴 선택으로 변경
+            selectedMenuIds={containerMenuSelections[selectedContainerForMenu] || []} // 복수 메뉴 ID 전달
             onMenuSelect={(containerId, menuId) => handleMenuSelection(containerId, menuId)}
             menuContainers={menuContainers}
           />

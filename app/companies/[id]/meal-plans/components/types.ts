@@ -28,6 +28,11 @@ export interface MenuContainer {
 }
 
 export interface MenuSelectionWithContainer {
-  menuId: string;
+  menuId: string | null;
   containerId: string;
+}
+
+// 복수 메뉴 선택 지원을 위한 타입 추가
+export interface MenuContainerSelectionsMap {
+  [containerId: string]: string[];
 } 
