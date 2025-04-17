@@ -283,7 +283,7 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 w-8 p-0"
+                      className="h-8 w-8 p-0 hover:bg-gray-100 rounded-full"
                       onClick={() => toggleMenuExpand(item.menu_id, item.container_id)}
                       aria-expanded={isExpanded}
                       disabled={isLoading}
@@ -336,11 +336,11 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
       </div>
       
       <div className="flex justify-end gap-2 pt-4">
-        <Button variant="outline" size="sm" className="gap-1" onClick={onEdit}>
+        <Button variant="secondary" size="sm" className="gap-1 shadow-sm hover:bg-gray-100" onClick={onEdit}>
           <FilePen className="h-4 w-4" />
           수정
         </Button>
-        <Button variant="destructive" size="sm" className="gap-1" onClick={() => setShowDeleteAlert(true)}>
+        <Button variant="destructive" size="sm" className="gap-1 shadow-sm hover:bg-red-700" onClick={() => setShowDeleteAlert(true)}>
           <Trash2 className="h-4 w-4" />
           삭제
         </Button>
@@ -357,13 +357,13 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogCancel className="border border-gray-200 shadow-sm hover:bg-gray-100">취소</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setShowDeleteAlert(false);
                 onDelete();
               }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-red-600 text-white shadow-sm hover:bg-red-700"
             >
               삭제
             </AlertDialogAction>

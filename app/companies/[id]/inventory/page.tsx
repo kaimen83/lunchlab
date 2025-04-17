@@ -121,70 +121,83 @@ export default async function InventoryPage({ params, searchParams }: InventoryP
     (hasIngredientsFeature ? 'ingredients' : hasMenusFeature ? 'menus' : 'ingredients');
   
   return (
-    <div className="flex flex-col h-full">
-      <header className="border-b border-gray-200 bg-white p-2 sm:p-3 flex items-center justify-between">
-        <h1 className="text-lg sm:text-xl font-bold">식자재/메뉴 관리</h1>
+    <div className="flex flex-col h-full w-full bg-gray-50">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center justify-center h-10 w-10 rounded-md bg-blue-50">
+                <ClipboardList className="h-5 w-5 text-blue-600" />
+              </div>
+              <h1 className="text-xl font-bold text-gray-900">식자재/메뉴 관리</h1>
+            </div>
+          </div>
+        </div>
       </header>
       
-      <div className="flex-1 overflow-y-auto p-2 sm:p-4">
-        <Tabs defaultValue={initialTab} className="w-full">
-          <TabsList className="mb-2 sm:mb-4 w-full sm:w-auto">
+      <main className="flex-1 overflow-y-auto py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Tabs defaultValue={initialTab} className="w-full">
+            <TabsList className="mb-4 w-full sm:w-auto">
+              {hasIngredientsFeature && (
+                <TabsTrigger value="ingredients" className="flex-1 sm:flex-initial items-center">
+                  <ClipboardList className="h-4 w-4 mr-2 hidden sm:inline" />
+                  <ClipboardList className="h-4 w-4 sm:hidden mb-1" />
+                  <span className="text-xs sm:text-sm">식재료</span>
+                </TabsTrigger>
+              )}
+              
+              {hasMenusFeature && (
+                <TabsTrigger value="menus" className="flex-1 sm:flex-initial items-center">
+                  <BookOpen className="h-4 w-4 mr-2 hidden sm:inline" />
+                  <BookOpen className="h-4 w-4 sm:hidden mb-1" />
+                  <span className="text-xs sm:text-sm">메뉴</span>
+                </TabsTrigger>
+              )}
+
+              {hasMenusFeature && (
+                <TabsTrigger value="containers" className="flex-1 sm:flex-initial items-center">
+                  <Package className="h-4 w-4 mr-2 hidden sm:inline" />
+                  <Package className="h-4 w-4 sm:hidden mb-1" />
+                  <span className="text-xs sm:text-sm">용기설정</span>
+                </TabsTrigger>
+              )}
+            </TabsList>
+            
             {hasIngredientsFeature && (
-              <TabsTrigger value="ingredients" className="flex-1 sm:flex-initial items-center">
-                <ClipboardList className="h-4 w-4 mr-2 hidden sm:inline" />
-                <ClipboardList className="h-4 w-4 sm:hidden mb-1" />
-                <span className="text-xs sm:text-sm">식재료</span>
-              </TabsTrigger>
+              <TabsContent value="ingredients">
+                <div className="bg-white p-4 rounded-lg shadow">
+                  <IngredientsList companyId={companyId} userRole={membership.role} />
+                </div>
+              </TabsContent>
             )}
             
             {hasMenusFeature && (
-              <TabsTrigger value="menus" className="flex-1 sm:flex-initial items-center">
-                <BookOpen className="h-4 w-4 mr-2 hidden sm:inline" />
-                <BookOpen className="h-4 w-4 sm:hidden mb-1" />
-                <span className="text-xs sm:text-sm">메뉴</span>
-              </TabsTrigger>
+              <TabsContent value="menus">
+                <div className="bg-white p-4 rounded-lg shadow border">
+                  <h2 className="text-xl font-semibold mb-4">메뉴 관리</h2>
+                  <p className="text-muted-foreground mb-6">
+                    식당에서 제공하는 메뉴를 등록하고 관리하세요. 등록된 메뉴는 식단 계획과 원가 관리에 활용됩니다.
+                  </p>
+                  <MenusList companyId={companyId} userRole={membership.role} />
+                </div>
+              </TabsContent>
             )}
 
             {hasMenusFeature && (
-              <TabsTrigger value="containers" className="flex-1 sm:flex-initial items-center">
-                <Package className="h-4 w-4 mr-2 hidden sm:inline" />
-                <Package className="h-4 w-4 sm:hidden mb-1" />
-                <span className="text-xs sm:text-sm">용기설정</span>
-              </TabsTrigger>
+              <TabsContent value="containers">
+                <div className="bg-white p-4 rounded-lg shadow border">
+                  <h2 className="text-xl font-semibold mb-4">용기 관리</h2>
+                  <p className="text-muted-foreground mb-6">
+                    메뉴에 사용할 용기를 등록하고 관리하세요. 용기 정보는 원가 계산과 메뉴 구성에 활용됩니다.
+                  </p>
+                  <ContainersList companyId={companyId} />
+                </div>
+              </TabsContent>
             )}
-          </TabsList>
-          
-          {hasIngredientsFeature && (
-            <TabsContent value="ingredients">
-              <IngredientsList companyId={companyId} userRole={membership.role} />
-            </TabsContent>
-          )}
-          
-          {hasMenusFeature && (
-            <TabsContent value="menus">
-              <div className="bg-white p-4 rounded-lg shadow-sm border">
-                <h2 className="text-xl font-semibold mb-4">메뉴 관리</h2>
-                <p className="text-muted-foreground mb-6">
-                  식당에서 제공하는 메뉴를 등록하고 관리하세요. 등록된 메뉴는 식단 계획과 원가 관리에 활용됩니다.
-                </p>
-                <MenusList companyId={companyId} userRole={membership.role} />
-              </div>
-            </TabsContent>
-          )}
-
-          {hasMenusFeature && (
-            <TabsContent value="containers">
-              <div className="bg-white p-4 rounded-lg shadow-sm border">
-                <h2 className="text-xl font-semibold mb-4">용기 관리</h2>
-                <p className="text-muted-foreground mb-6">
-                  메뉴에 사용할 용기를 등록하고 관리하세요. 용기 정보는 원가 계산과 메뉴 구성에 활용됩니다.
-                </p>
-                <ContainersList companyId={companyId} />
-              </div>
-            </TabsContent>
-          )}
-        </Tabs>
-      </div>
+          </Tabs>
+        </div>
+      </main>
     </div>
   );
 } 

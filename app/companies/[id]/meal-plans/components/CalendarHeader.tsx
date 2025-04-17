@@ -43,27 +43,27 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
         {/* PC에서는 표시, 모바일에서는 숨김 */}
         <div className="hidden md:flex items-center gap-4">
           <Tabs value={viewType} onValueChange={(value) => onViewTypeChange(value as ViewType)}>
-            <TabsList>
-              <TabsTrigger value="week">주간</TabsTrigger>
-              <TabsTrigger value="month">월간</TabsTrigger>
+            <TabsList className="bg-gray-100 rounded-md p-1">
+              <TabsTrigger value="week" className="rounded-sm data-[state=active]:bg-white data-[state=active]:shadow-sm">주간</TabsTrigger>
+              <TabsTrigger value="month" className="rounded-sm data-[state=active]:bg-white data-[state=active]:shadow-sm">월간</TabsTrigger>
             </TabsList>
           </Tabs>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={onPreviousPeriod} aria-label="Previous period">
+            <Button variant="secondary" size="icon" onClick={onPreviousPeriod} aria-label="Previous period" className="rounded-md shadow-sm hover:bg-gray-100">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" onClick={onToday} aria-label="Today">
+            <Button variant="secondary" size="icon" onClick={onToday} aria-label="Today" className="rounded-md shadow-sm hover:bg-gray-100">
               <CalendarIcon className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" onClick={onNextPeriod} aria-label="Next period">
+            <Button variant="secondary" size="icon" onClick={onNextPeriod} aria-label="Next period" className="rounded-md shadow-sm hover:bg-gray-100">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
           
           {/* PC에서만 보이는 내보내기 버튼 */}
           <Button
-            variant="outline"
-            className="h-9 text-xs md:text-sm"
+            variant="secondary"
+            className="h-9 text-xs md:text-sm shadow-sm hover:bg-gray-100"
             onClick={onExportToExcel}
           >
             <Download className="mr-1 h-4 w-4" />
@@ -76,18 +76,18 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
       <div className="md:hidden">
         {/* 현재 기간 및 네비게이션 */}
         <div className="flex items-center justify-between mb-3 bg-gray-50 rounded-md border p-3">
-          <Button variant="ghost" size="icon" onClick={onPreviousPeriod} className="h-8 w-8">
+          <Button variant="ghost" size="icon" onClick={onPreviousPeriod} className="h-8 w-8 hover:bg-gray-100 rounded-full">
             <ChevronLeft className="h-4 w-4" />
           </Button>
           
           <div className="flex items-center">
-            <Button variant="ghost" size="sm" onClick={onToday} className="text-sm font-medium">
+            <Button variant="ghost" size="sm" onClick={onToday} className="text-sm font-medium hover:bg-gray-100 rounded-md">
               <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
               <span>{periodText}</span>
             </Button>
           </div>
           
-          <Button variant="ghost" size="icon" onClick={onNextPeriod} className="h-8 w-8">
+          <Button variant="ghost" size="icon" onClick={onNextPeriod} className="h-8 w-8 hover:bg-gray-100 rounded-full">
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -98,9 +98,9 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           onValueChange={(value) => onViewTypeChange(value as ViewType)}
           className="w-full"
         >
-          <TabsList className="w-full">
-            <TabsTrigger value="week" className="flex-1">주간 보기</TabsTrigger>
-            <TabsTrigger value="month" className="flex-1">월간 보기</TabsTrigger>
+          <TabsList className="w-full bg-gray-100 rounded-md p-1">
+            <TabsTrigger value="week" className="flex-1 rounded-sm data-[state=active]:bg-white data-[state=active]:shadow-sm">주간 보기</TabsTrigger>
+            <TabsTrigger value="month" className="flex-1 rounded-sm data-[state=active]:bg-white data-[state=active]:shadow-sm">월간 보기</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>

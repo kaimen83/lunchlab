@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, isSameDay } from 'date-fns';
@@ -378,56 +378,85 @@ export default function MealPlansPage() {
   };
 
   return (
-    <div className="container mx-auto py-4 md:py-8 px-3 md:px-6 lg:px-8 relative pb-20 md:pb-10">
-      <CalendarHeader 
-        viewType={viewType}
-        currentWeek={currentWeek}
-        onViewTypeChange={handleViewTypeChange}
-        onPreviousPeriod={handlePreviousPeriod}
-        onNextPeriod={handleNextPeriod}
-        onToday={handleGoToToday}
-        onExportToExcel={handleExportToExcel}
-      />
-      
-      <Card className="shadow-sm">
-        <CardHeader className="border-b px-4 md:px-6 py-3 md:py-4">
-          <CardTitle className="text-base md:text-lg font-medium">
-            {viewType === 'week'
-              ? `${format(weekStart, 'yyyy년 MM월 dd일')} - ${format(weekEnd, 'MM월 dd일')}`
-              : format(currentWeek, 'yyyy년 MM월')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0 md:p-2 lg:p-4">
-          {isLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+    <div className="flex flex-col h-full w-full bg-gray-50">
+      {/* 페이지 헤더 */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center justify-center h-10 w-10 rounded-md bg-blue-50">
+                <Calendar className="h-5 w-5 text-blue-600" />
+              </div>
+              <h1 className="text-xl font-bold text-gray-900">식단 계획</h1>
             </div>
-          ) : viewType === 'week' ? (
-            <WeekView 
-              daysOfWeek={daysOfWeek}
-              mealPlans={mealPlans}
-              companyId={companyId as string}
-              onViewMealPlan={handleViewMealPlan}
-              onAddMealPlan={handleAddMealPlanForDateAndTime}
-            />
-          ) : (
-            <MonthView 
-              weeks={getMonthWeeks()}
-              mealPlans={mealPlans}
-              currentMonth={currentWeek.getMonth()}
-              onViewMealTimeSlot={handleViewMealTimeSlot}
-              onAddMealPlan={handleAddMealPlanFromMonthView}
-            />
-          )}
-        </CardContent>
-      </Card>
+            <div className="hidden md:flex items-center">
+              <button
+                type="button"
+                onClick={handleAddMealPlan}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                식단 추가
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+      
+      {/* 페이지 콘텐츠 */}
+      <main className="flex-1 overflow-y-auto py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <CalendarHeader 
+            viewType={viewType}
+            currentWeek={currentWeek}
+            onViewTypeChange={handleViewTypeChange}
+            onPreviousPeriod={handlePreviousPeriod}
+            onNextPeriod={handleNextPeriod}
+            onToday={handleGoToToday}
+            onExportToExcel={handleExportToExcel}
+          />
+          
+          <Card className="shadow mt-4">
+            <CardHeader className="border-b px-4 md:px-6 py-3 md:py-4">
+              <CardTitle className="text-base md:text-lg font-medium">
+                {viewType === 'week'
+                  ? `${format(weekStart, 'yyyy년 MM월 dd일')} - ${format(weekEnd, 'MM월 dd일')}`
+                  : format(currentWeek, 'yyyy년 MM월')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 md:p-2 lg:p-4">
+              {isLoading ? (
+                <div className="flex justify-center items-center h-64">
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                </div>
+              ) : viewType === 'week' ? (
+                <WeekView 
+                  daysOfWeek={daysOfWeek}
+                  mealPlans={mealPlans}
+                  companyId={companyId as string}
+                  onViewMealPlan={handleViewMealPlan}
+                  onAddMealPlan={handleAddMealPlanForDateAndTime}
+                />
+              ) : (
+                <MonthView 
+                  weeks={getMonthWeeks()}
+                  mealPlans={mealPlans}
+                  currentMonth={currentWeek.getMonth()}
+                  onViewMealTimeSlot={handleViewMealTimeSlot}
+                  onAddMealPlan={handleAddMealPlanFromMonthView}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </main>
 
       {/* 모바일 화면용 떠 있는 추가 버튼 */}
       <div className="md:hidden fixed bottom-6 right-6 z-10">
         <button
           type="button"
           onClick={handleAddMealPlan}
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-colors"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-colors"
         >
           <Plus className="h-6 w-6" />
         </button>

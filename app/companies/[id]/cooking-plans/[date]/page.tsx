@@ -214,26 +214,36 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
     };
     
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full w-full bg-gray-50">
         {/* 페이지 헤더 */}
-        <header className="border-b border-gray-200 bg-white p-3 flex items-center justify-between">
-          <div className="flex items-center">
-            <FileText className="h-5 w-5 text-gray-500 mr-2" />
-            <h1 className="text-xl font-bold">조리계획서</h1>
+        <header className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center justify-center h-10 w-10 rounded-md bg-blue-50">
+                  <FileText className="h-5 w-5 text-blue-600" />
+                </div>
+                <h1 className="text-xl font-bold text-gray-900">조리계획서</h1>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button variant="secondary" size="sm" className="rounded-md shadow-sm hover:bg-gray-100" asChild>
+                  <Link href={`/companies/${companyId}/cooking-plans`}>
+                    목록으로 돌아가기
+                  </Link>
+                </Button>
+              </div>
+            </div>
           </div>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/companies/${companyId}/cooking-plans`}>
-              목록으로 돌아가기
-            </Link>
-          </Button>
         </header>
         
         {/* 페이지 콘텐츠 */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-4xl mx-auto">
-            <CookingPlanClientWrapper cookingPlan={cookingPlan} />
+        <main className="flex-1 overflow-y-auto py-6">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="bg-white rounded-lg shadow p-6">
+              <CookingPlanClientWrapper cookingPlan={cookingPlan} />
+            </div>
           </div>
-        </div>
+        </main>
       </div>
     );
     
