@@ -16,6 +16,8 @@ interface CookingPlanResultProps {
   cookingPlan: CookingPlan;
   onPrint: () => void;
   onDownload: () => void;
+  onTabChange?: (value: string) => void;
+  activeTab?: 'menu-portions' | 'ingredients';
 }
 
 // 식재료 타입 정의
@@ -103,7 +105,7 @@ interface ContainerInfo {
   }[] | undefined
 }
 
-export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: CookingPlanResultProps) {
+export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, onTabChange, activeTab = 'menu-portions' }: CookingPlanResultProps) {
   // 메뉴 확장 상태 관리
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
 
@@ -407,7 +409,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
         </div>
       </div>
 
-      <Tabs defaultValue="menu-portions">
+      <Tabs defaultValue="menu-portions" value={activeTab} onValueChange={onTabChange}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="menu-portions">식단별 식수</TabsTrigger>
           <TabsTrigger value="ingredients">필요 식재료</TabsTrigger>
