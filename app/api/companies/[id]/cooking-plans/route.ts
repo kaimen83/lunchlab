@@ -18,6 +18,7 @@ interface IngredientRequirement {
   total_amount: number;
   unit_price: number;
   total_price: number;
+  package_amount: number;
 }
 
 // 조리계획서 생성 요청 스키마
@@ -267,7 +268,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
                 unit: ingredient.unit,
                 total_amount: 0,
                 unit_price: ingredient.price / ingredient.package_amount,
-                total_price: 0
+                total_price: 0,
+                package_amount: ingredient.package_amount
               };
             }
             

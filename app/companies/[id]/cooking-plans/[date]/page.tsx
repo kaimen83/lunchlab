@@ -187,7 +187,8 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
                 unit: ingredient.unit,
                 total_amount: 0,
                 unit_price: ingredient.price / ingredient.package_amount,
-                total_price: 0
+                total_price: 0,
+                package_amount: ingredient.package_amount
               };
             }
             

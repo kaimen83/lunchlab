@@ -417,97 +417,149 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
         <TabsContent value="menu-portions" className="space-y-4">
           {Object.entries(processedMenusByMealTime).map(([mealTime, menus]) => (
             <Card key={mealTime}>
-              <CardHeader>
-                <CardTitle>{getMealTimeName(mealTime)} 식단</CardTitle>
-                <CardDescription>
-                  총 {mealTimeTotals[mealTime] || 0}명
-                </CardDescription>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center text-lg">
+                  <Badge variant="outline" className="mr-2 py-1 px-2 bg-blue-50">
+                    {getMealTimeName(mealTime)}
+                  </Badge>
+                  <span>식단</span> 
+                  <Badge variant="secondary" className="ml-auto text-sm">
+                    총 {mealTimeTotals[mealTime] || 0}명
+                  </Badge>
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>메뉴명</TableHead>
-                      <TableHead>용기</TableHead>
-                      <TableHead>사용 식단</TableHead>
-                      <TableHead>식수</TableHead>
-                      <TableHead>필요 식재료</TableHead>
-                      <TableHead className="text-right">식재료 수량</TableHead>
-                      <TableHead className="text-right">포장단위</TableHead>
-                      <TableHead className="text-right">투입량</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {menus.map((menuPortion, index) => {
-                      // 식재료가 있는 경우
-                      if (menuPortion.ingredients && menuPortion.ingredients.length > 0) {
-                        return menuPortion.ingredients.map((ingredient, idx) => {
-                          // 포장단위 기본값 설정 (실제로는 DB에서 가져와야 함)
-                          const packageAmount = 1000;
-                          
-                          // 투입량 계산 (필요 수량 / 포장단위)
-                          const unitsRequired = packageAmount > 0 
-                            ? (ingredient.amount / packageAmount).toFixed(1) 
-                            : "N/A";
+                <div className="overflow-x-auto">
+                  <Table className="w-full border-collapse">
+                    <TableHeader>
+                      <TableRow className="bg-slate-50">
+                        <TableHead className="font-semibold text-sm w-[16%]">메뉴명</TableHead>
+                        <TableHead className="font-semibold text-sm w-[12%]">용기</TableHead>
+                        <TableHead className="font-semibold text-sm w-[16%]">사용 식단</TableHead>
+                        <TableHead className="font-semibold text-sm w-[10%]">식수</TableHead>
+                        <TableHead className="font-semibold text-sm w-[14%]">필요 식재료</TableHead>
+                        <TableHead className="font-semibold text-sm text-right w-[12%]">식재료 수량</TableHead>
+                        <TableHead className="font-semibold text-sm text-right w-[10%]">포장단위</TableHead>
+                        <TableHead className="font-semibold text-sm text-right w-[10%]">투입량</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {menus.map((menuPortion, index) => {
+                        // 식재료가 있는 경우
+                        if (menuPortion.ingredients && menuPortion.ingredients.length > 0) {
+                          return menuPortion.ingredients.map((ingredient, idx) => {
+                            // 해당 식재료의 포장단위 정보 찾기
+                            const ingredientReq = cookingPlan.ingredient_requirements.find(
+                              item => item.ingredient_id === ingredient.id
+                            );
                             
+                            // 포장단위 정보 가져오기
+                            const packageAmount = ingredientReq?.package_amount;
+                            
+                            // 투입량 계산 (필요 수량 / 포장단위)
+                            // 포장단위 정보가 없거나 0이면 투입량 계산 불가능
+                            const unitsRequired = packageAmount ? 
+                              (ingredient.amount / packageAmount).toFixed(1) : 
+                              "포장단위 정보 없음";
+                              
+                            return (
+                              <TableRow 
+                                key={`${index}-${idx}`} 
+                                className={`
+                                  ${idx > 0 ? "border-t-0" : ""}
+                                  ${index % 2 === 0 ? "bg-white" : "bg-slate-50/30"}
+                                  hover:bg-blue-50/20 transition-colors
+                                `}
+                              >
+                                {idx === 0 && (
+                                  <>
+                                    <TableCell className="font-medium align-top" rowSpan={menuPortion.ingredients!.length}>
+                                      {menuPortion.menu_name}
+                                    </TableCell>
+                                    <TableCell className="align-top" rowSpan={menuPortion.ingredients!.length}>
+                                      {menuPortion.container_names.length > 0 
+                                        ? menuPortion.container_names.map((name, i) => (
+                                            <Badge key={i} variant="outline" className="mr-1 mb-1">
+                                              {name}
+                                            </Badge>
+                                          ))
+                                        : '-'}
+                                    </TableCell>
+                                    <TableCell className="align-top" rowSpan={menuPortion.ingredients!.length}>
+                                      {getMealPlanNames(menuPortion.mealPlans)}
+                                    </TableCell>
+                                    <TableCell className="align-top" rowSpan={menuPortion.ingredients!.length}>
+                                      <Badge variant="secondary" className="font-medium">
+                                        {formatHeadcounts(menuPortion.containers_info)}
+                                      </Badge>
+                                    </TableCell>
+                                  </>
+                                )}
+                                <TableCell className="border-l-0">
+                                  <span className="text-sm">{ingredient.name}</span>
+                                </TableCell>
+                                <TableCell className="text-right font-medium text-sm">
+                                  {formatAmount(ingredient.amount)} {ingredient.unit}
+                                </TableCell>
+                                <TableCell className="text-right text-sm text-gray-600">
+                                  {packageAmount ? `${packageAmount} ${ingredient.unit}` : "-"}
+                                </TableCell>
+                                <TableCell className="text-right font-medium text-sm">
+                                  {unitsRequired}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          });
+                        } else {
+                          // 식재료가 없는 경우
                           return (
-                            <TableRow key={`${index}-${idx}`} className={idx > 0 ? "border-t-0" : ""}>
-                              {idx === 0 && (
-                                <>
-                                  <TableCell className="font-medium" rowSpan={menuPortion.ingredients!.length}>
-                                    {menuPortion.menu_name}
-                                  </TableCell>
-                                  <TableCell rowSpan={menuPortion.ingredients!.length}>
-                                    {menuPortion.container_names.length > 0 
-                                      ? menuPortion.container_names.join(', ') 
-                                      : '-'}
-                                  </TableCell>
-                                  <TableCell rowSpan={menuPortion.ingredients!.length}>{getMealPlanNames(menuPortion.mealPlans)}</TableCell>
-                                  <TableCell rowSpan={menuPortion.ingredients!.length}>
-                                    {formatHeadcounts(menuPortion.containers_info)}
-                                  </TableCell>
-                                </>
-                              )}
-                              <TableCell>{ingredient.name}</TableCell>
-                              <TableCell className="text-right">
-                                {formatAmount(ingredient.amount)} {ingredient.unit}
+                            <TableRow 
+                              key={index}
+                              className={`
+                                ${index % 2 === 0 ? "bg-white" : "bg-slate-50/30"}
+                                hover:bg-blue-50/20 transition-colors
+                              `}
+                            >
+                              <TableCell className="font-medium">
+                                {menuPortion.menu_name}
                               </TableCell>
-                              <TableCell className="text-right">
-                                {`${packageAmount} ${ingredient.unit}`}
+                              <TableCell>
+                                {menuPortion.container_names.length > 0 
+                                  ? menuPortion.container_names.map((name, i) => (
+                                      <Badge key={i} variant="outline" className="mr-1 mb-1">
+                                        {name}
+                                      </Badge>
+                                    ))
+                                  : '-'}
                               </TableCell>
-                              <TableCell className="text-right">
-                                {unitsRequired}
+                              <TableCell>{getMealPlanNames(menuPortion.mealPlans)}</TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="font-medium">
+                                  {formatHeadcounts(menuPortion.containers_info)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell colSpan={4} className="text-center text-gray-500 text-sm italic">
+                                등록된 식재료 정보가 없습니다.
                               </TableCell>
                             </TableRow>
                           );
-                        });
-                      } else {
-                        // 식재료가 없는 경우
-                        return (
-                          <TableRow key={index}>
-                            <TableCell className="font-medium">
-                              {menuPortion.menu_name}
-                            </TableCell>
-                            <TableCell>
-                              {menuPortion.container_names.length > 0 
-                                ? menuPortion.container_names.join(', ') 
-                                : '-'}
-                            </TableCell>
-                            <TableCell>{getMealPlanNames(menuPortion.mealPlans)}</TableCell>
-                            <TableCell>{formatHeadcounts(menuPortion.containers_info)}</TableCell>
-                            <TableCell colSpan={4} className="text-center text-gray-500 text-sm">
-                              등록된 식재료 정보가 없습니다.
-                            </TableCell>
-                          </TableRow>
-                        );
-                      }
-                    })}
-                  </TableBody>
-                </Table>
-                <p className="text-xs text-gray-500 mt-2">
-                  * 식재료 수량은 각 메뉴의 식수에 맞게 계산된 값입니다.
-                  * 포장단위와 투입량은 예시로 표시된 값입니다. 실제 값은 식재료 정보에 따라 달라질 수 있습니다.
-                </p>
+                        }
+                      })}
+                      {menus.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                            등록된 메뉴가 없습니다.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="mt-3 text-xs text-gray-500 space-y-1">
+                  <p>* 식재료 수량은 각 메뉴의 식수에 맞게 계산된 값입니다.</p>
+                  <p>* 포장단위는 식재료 마스터에 등록된 정보입니다. 정보가 없는 경우 "-"로 표시됩니다.</p>
+                  <p>* 투입량은 필요 수량을 포장단위로 나눈 값입니다. 포장단위가 없으면 계산할 수 없습니다.</p>
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -537,18 +589,14 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                 </TableHeader>
                 <TableBody>
                   {cookingPlan.ingredient_requirements.map((item, index) => {
-                    // 단순화된 방식으로 각 식재료의 포장단위 정보 찾기
-                    // ingredient_requirements 배열에는 package_amount가 포함되어 있지 않으므로
-                    // 이 정보는 다른 방식으로 찾거나 API에서 제공받아야 함
-                    
-                    // 예시로 모든 식재료에 기본 포장단위를 설정
-                    // 실제로는 DB에서 식재료 정보를 가져와서 사용해야 함
-                    const packageAmount = 1000; // 기본값 - 실제로는 서버에서 받아와야 함
+                    // 식재료 포장단위 정보 가져오기
+                    const packageAmount = item.package_amount;
                     
                     // 투입량 계산 (필요 수량 / 포장단위)
-                    const unitsRequired = packageAmount > 0 
-                      ? (item.total_amount / packageAmount).toFixed(1) 
-                      : "N/A";
+                    // 포장단위 정보가 없거나 0이면 투입량 계산 불가능
+                    const unitsRequired = packageAmount ? 
+                      (item.total_amount / packageAmount).toFixed(1) : 
+                      "포장단위 정보 없음";
                     
                     return (
                       <TableRow key={index}>
@@ -557,7 +605,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                           {formatAmount(item.total_amount)} {item.unit}
                         </TableCell>
                         <TableCell className="text-right">
-                          {`${packageAmount} ${item.unit}`}
+                          {packageAmount ? `${packageAmount} ${item.unit}` : "-"}
                         </TableCell>
                         <TableCell className="text-right">
                           {unitsRequired}
@@ -570,7 +618,10 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload }: 
                 </TableBody>
               </Table>
               <p className="text-xs text-gray-500 mt-2">
-                * 포장단위와 투입량은 예시로 표시된 값입니다. 실제 값은 식재료 정보에 따라 달라질 수 있습니다.
+                * 포장단위는 식재료 마스터에 등록된 정보입니다. 정보가 없는 경우 "-"로 표시됩니다.
+              </p>
+              <p className="text-xs text-gray-500">
+                * 투입량은 필요 수량을 포장단위로 나눈 값입니다. 포장단위가 없으면 계산할 수 없습니다.
               </p>
             </CardContent>
           </Card>
