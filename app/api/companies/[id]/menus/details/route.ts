@@ -144,16 +144,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
     // 용기 가격 (참고용)
     const containerPrice = containerData.container?.price || 0;
 
-    // 총 가격 (식재료 원가만 반환)
-    const totalCost = ingredientsCost;
+    // 총 가격 (식재료 원가 + 용기 가격)
+    const totalCost = ingredientsCost + containerPrice;
 
     return NextResponse.json({
       id: containerData.id,
       menu_id: containerData.menu_id,
       container_id: containerData.container_id,
       container: containerData.container,
-      ingredients_cost: totalCost,
+      ingredients_cost: ingredientsCost,
       container_price: containerPrice,
+      total_cost: totalCost,
       calories,
       ingredients
     });

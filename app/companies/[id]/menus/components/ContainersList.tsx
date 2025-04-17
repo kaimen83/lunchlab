@@ -22,6 +22,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import ContainerModal, { Container } from './ContainerModal';
 
 interface ContainersListProps {
@@ -151,21 +152,26 @@ export default function ContainersList({ companyId }: ContainersListProps) {
       ) : filteredContainers.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {filteredContainers.map((container) => (
-            <Card key={container.id} className="overflow-hidden">
-              <CardHeader className="pb-2">
+            <Card key={container.id} className="overflow-hidden border border-slate-200 hover:border-slate-300 transition-colors">
+              <CardHeader className="pb-2 bg-gradient-to-r from-slate-50 to-white">
                 <div className="flex justify-between items-start">
-                  <div>
+                  <div className="space-y-1">
                     <CardTitle className="text-lg flex items-center">
                       <Package className="h-4 w-4 mr-2 text-primary" />
                       {container.name}
                     </CardTitle>
+                    {container.price !== null && container.price !== undefined && (
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-50">
+                        {container.price.toLocaleString()}원
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex space-x-1">
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => handleEditClick(container)}
-                      className="h-8 w-8"
+                      className="h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -173,7 +179,7 @@ export default function ContainersList({ companyId }: ContainersListProps) {
                       variant="ghost"
                       size="icon"
                       onClick={() => handleDeleteClick(container)}
-                      className="h-8 w-8 text-destructive"
+                      className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -181,31 +187,21 @@ export default function ContainersList({ companyId }: ContainersListProps) {
                 </div>
               </CardHeader>
               {container.description && (
-                <CardContent className="py-2">
-                  <p className="text-sm text-muted-foreground">{container.description}</p>
+                <CardContent className="py-3">
+                  <p className="text-sm text-slate-600">{container.description}</p>
                 </CardContent>
               )}
-              <CardFooter className="pt-2 pb-3 flex justify-between text-xs text-muted-foreground">
-                <span>
-                  생성: {new Date(container.created_at).toLocaleDateString('ko-KR')}
-                </span>
-                {container.updated_at && (
-                  <span>
-                    수정: {new Date(container.updated_at).toLocaleDateString('ko-KR')}
-                  </span>
-                )}
-              </CardFooter>
             </Card>
           ))}
         </div>
       ) : (
-        <div className="py-12 text-center border rounded-md">
+        <div className="py-12 text-center border rounded-md bg-slate-50">
           <Package className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
           <h3 className="text-lg font-medium mb-1">등록된 용기가 없습니다</h3>
           <p className="text-muted-foreground mb-4">
             '용기 추가' 버튼을 클릭하여 새 용기를 등록하세요.
           </p>
-          <Button onClick={handleAddClick}>
+          <Button onClick={handleAddClick} className="bg-primary hover:bg-primary/90">
             <Plus className="mr-2 h-4 w-4" />
             용기 추가
           </Button>

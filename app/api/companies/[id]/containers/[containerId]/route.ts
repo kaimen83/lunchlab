@@ -64,6 +64,7 @@ export async function PATCH(
         name: body.name,
         description: body.description || null,
         category: body.category || null,
+        price: body.price || null,
       })
       .eq('company_id', companyId)
       .eq('id', containerId)

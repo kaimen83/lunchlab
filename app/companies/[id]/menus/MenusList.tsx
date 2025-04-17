@@ -134,6 +134,7 @@ interface ContainerDetailsResponse {
   };
   ingredients_cost: number;
   container_price: number;
+  total_cost: number;
   calories: number;
   ingredients: any[];
 }
@@ -507,51 +508,74 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                     return (
                       <div
                         key={container.id}
-                        className="rounded-md overflow-hidden shadow-sm border"
+                        className="rounded-md overflow-hidden border border-slate-200 bg-white shadow-sm"
                       >
-                        <div className="flex items-center justify-between bg-blue-50 p-2 border-b">
+                        {/* 용기 헤더 */}
+                        <div className="flex items-center justify-between bg-slate-50 p-3 border-b border-slate-200">
                           <div className="flex items-center">
-                            <div className="mr-2 bg-white p-1 rounded-full w-6 h-6 flex items-center justify-center shadow-sm">
-                              <Package className="h-3 w-3 text-blue-500" />
+                            <div className="mr-2 bg-white p-1.5 rounded-full shadow-sm border border-slate-200">
+                              <Package className="h-4 w-4 text-blue-600" />
                             </div>
-                            <span className="font-medium text-sm">
+                            <span className="font-semibold text-sm text-slate-800">
                               {container.container.name}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2">
+                          {/* 원가 및 칼로리 정보 */}
+                          <div className="flex items-center gap-2 text-xs">
                             {isLoading ? (
-                              <div className="h-6 w-20 flex items-center justify-center">
-                                <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                              <div className="h-5 w-20 flex items-center justify-center">
+                                <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
                               </div>
                             ) : detail ? (
-                              <>
+                              <div className="flex items-center gap-3">
                                 {detail.calories > 0 && (
-                                  <Badge variant="outline" className="bg-white">
-                                    {Math.round(detail.calories)} kcal
-                                  </Badge>
+                                  <TooltipProvider delayDuration={100}>
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <Badge variant="outline" className="bg-white border-amber-300 text-amber-700">
+                                          {Math.round(detail.calories)} kcal
+                                        </Badge>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>칼로리 합계</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
                                 )}
-                                <Badge variant="secondary" className="bg-white">
-                                  {formatCurrency(detail.ingredients_cost)}
-                                </Badge>
-                              </>
-                            ) : (
-                              <div className="h-6 w-20 flex items-center justify-center text-xs text-gray-400">
-                                정보 없음
+                                <TooltipProvider delayDuration={100}>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <Badge variant="secondary" className="bg-white border-green-300 text-green-700 flex items-center">
+                                        <DollarSign className="h-3 w-3 mr-1"/> 
+                                        {formatCurrency(detail.total_cost || (detail.ingredients_cost + detail.container_price))}
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom" align="end">
+                                      <div className="text-xs space-y-1">
+                                        <p>식재료: {formatCurrency(detail.ingredients_cost)}</p>
+                                        <p>용기: {formatCurrency(detail.container_price)}</p>
+                                        <hr className="my-1"/>
+                                        <p className="font-medium">총 원가: {formatCurrency(detail.total_cost || (detail.ingredients_cost + detail.container_price))}</p>
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               </div>
+                            ) : (
+                              <span className="text-slate-400">정보 없음</span>
                             )}
                           </div>
                         </div>
 
+                        {/* 식재료 목록 */}
                         {container.ingredients.length > 0 && (
-                          <div className="p-2 text-xs bg-white">
-                            <div className="text-gray-500 mb-2 text-[10px] flex justify-between px-1">
-                              <span>식자재</span>
-                              <div className="flex space-x-3">
-                                <span>사용량</span>
-                                <span>원가</span>
-                              </div>
+                          <div className="p-3 text-xs">
+                            <div className="grid grid-cols-3 gap-2 mb-2 font-medium text-slate-500 text-[11px] px-1">
+                              <span className="col-span-1">식자재명</span>
+                              <span className="col-span-1 text-right">사용량</span>
+                              <span className="col-span-1 text-right">원가</span>
                             </div>
-                            <div className="space-y-2 ml-1">
+                            <div className="space-y-1.5">
                               {container.ingredients
                                 .sort((a, b) => {
                                   const aCost =
@@ -571,45 +595,38 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                                   return (
                                     <div
                                       key={item.id}
-                                      className="flex items-center justify-between border-b border-gray-100 pb-1"
+                                      className="grid grid-cols-3 gap-2 items-center border-b border-slate-100 pb-1.5 last:border-b-0"
                                     >
-                                      <div className="flex items-center">
-                                        <div className="h-1 w-1 rounded-full bg-slate-300 mr-2"></div>
-                                        <span>{item.ingredient.name}</span>
-                                      </div>
-                                      <div className="flex items-center gap-4">
-                                        <span className="text-gray-600 tabular-nums">
-                                          {item.amount} {item.ingredient.unit}
-                                        </span>
-                                        <span className="text-blue-600 tabular-nums w-14 text-right">
-                                          {formatCurrency(itemCost)}
-                                        </span>
-                                      </div>
+                                      <span className="col-span-1 truncate text-slate-700">
+                                        {item.ingredient.name}
+                                      </span>
+                                      <span className="col-span-1 text-slate-600 tabular-nums text-right">
+                                        {item.amount}{item.ingredient.unit}
+                                      </span>
+                                      <span className="col-span-1 text-blue-600 tabular-nums text-right">
+                                        {formatCurrency(itemCost)}
+                                      </span>
                                     </div>
                                   );
                                 })}
-                              {container.ingredients.length > 3 && !expandedContainers.includes(container.id) && (
-                                <div 
-                                  className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleContainerExpand(container.id);
-                                  }}
-                                >
-                                  <span>+{container.ingredients.length - 3}개 더보기</span>
-                                  <ChevronDown className="h-3 w-3" />
-                                </div>
-                              )}
-                              {expandedContainers.includes(container.id) && (
-                                <div 
-                                  className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleContainerExpand(container.id);
-                                  }}
-                                >
-                                  <span>접기</span>
-                                  <ChevronUp className="h-3 w-3" />
+                              {/* 더보기/접기 버튼 */} 
+                              {container.ingredients.length > 3 && (
+                                <div className="pt-1">
+                                  <Button 
+                                    variant="link"
+                                    size="sm"
+                                    className="text-xs h-6 p-0 text-blue-600 hover:text-blue-800 w-full justify-center"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleContainerExpand(container.id);
+                                    }}
+                                  >
+                                    {expandedContainers.includes(container.id) ? (
+                                      <><ChevronUp className="h-3 w-3 mr-1" />접기</>
+                                    ) : (
+                                      <><ChevronDown className="h-3 w-3 mr-1" />+{container.ingredients.length - 3}개 더보기</>
+                                    )}
+                                  </Button>
                                 </div>
                               )}
                             </div>
@@ -734,51 +751,74 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                               return (
                                 <div
                                   key={container.id}
-                                  className="rounded-md overflow-hidden shadow-sm border"
+                                  className="rounded-md overflow-hidden border border-slate-200 bg-white shadow-sm"
                                 >
-                                  <div className="flex items-center justify-between bg-blue-50 p-2 border-b">
+                                  {/* 용기 헤더 */}
+                                  <div className="flex items-center justify-between bg-slate-50 p-3 border-b border-slate-200">
                                     <div className="flex items-center">
-                                      <div className="mr-2 bg-white p-1 rounded-full w-6 h-6 flex items-center justify-center shadow-sm">
-                                        <Package className="h-3 w-3 text-blue-500" />
+                                      <div className="mr-2 bg-white p-1.5 rounded-full shadow-sm border border-slate-200">
+                                        <Package className="h-4 w-4 text-blue-600" />
                                       </div>
-                                      <span className="font-medium text-sm">
+                                      <span className="font-semibold text-sm text-slate-800">
                                         {container.container.name}
                                       </span>
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                    {/* 원가 및 칼로리 정보 */}
+                                    <div className="flex items-center gap-2 text-xs">
                                       {isLoading ? (
-                                        <div className="h-6 w-20 flex items-center justify-center">
-                                          <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                                        <div className="h-5 w-20 flex items-center justify-center">
+                                          <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
                                         </div>
                                       ) : detail ? (
-                                        <>
+                                        <div className="flex items-center gap-3">
                                           {detail.calories > 0 && (
-                                            <Badge variant="outline" className="bg-white">
-                                              {Math.round(detail.calories)} kcal
-                                            </Badge>
+                                            <TooltipProvider delayDuration={100}>
+                                              <Tooltip>
+                                                <TooltipTrigger>
+                                                  <Badge variant="outline" className="bg-white border-amber-300 text-amber-700">
+                                                    {Math.round(detail.calories)} kcal
+                                                  </Badge>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                  <p>칼로리 합계</p>
+                                                </TooltipContent>
+                                              </Tooltip>
+                                            </TooltipProvider>
                                           )}
-                                          <Badge variant="secondary" className="bg-white">
-                                            {formatCurrency(detail.ingredients_cost)}
-                                          </Badge>
-                                        </>
-                                      ) : (
-                                        <div className="h-6 w-20 flex items-center justify-center text-xs text-gray-400">
-                                          정보 없음
+                                          <TooltipProvider delayDuration={100}>
+                                            <Tooltip>
+                                              <TooltipTrigger>
+                                                <Badge variant="secondary" className="bg-white border-green-300 text-green-700 flex items-center">
+                                                  <DollarSign className="h-3 w-3 mr-1"/> 
+                                                  {formatCurrency(detail.total_cost || (detail.ingredients_cost + detail.container_price))}
+                                                </Badge>
+                                              </TooltipTrigger>
+                                              <TooltipContent side="bottom" align="end">
+                                                <div className="text-xs space-y-1">
+                                                  <p>식재료: {formatCurrency(detail.ingredients_cost)}</p>
+                                                  <p>용기: {formatCurrency(detail.container_price)}</p>
+                                                  <hr className="my-1"/>
+                                                  <p className="font-medium">총 원가: {formatCurrency(detail.total_cost || (detail.ingredients_cost + detail.container_price))}</p>
+                                                </div>
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
                                         </div>
+                                      ) : (
+                                        <span className="text-slate-400">정보 없음</span>
                                       )}
                                     </div>
                                   </div>
 
+                                  {/* 식재료 목록 */}
                                   {container.ingredients.length > 0 && (
-                                    <div className="p-2 text-xs bg-white">
-                                      <div className="text-gray-500 mb-2 text-[10px] flex justify-between px-1">
-                                        <span>식자재</span>
-                                        <div className="flex space-x-3">
-                                          <span>사용량</span>
-                                          <span>원가</span>
-                                        </div>
+                                    <div className="p-3 text-xs">
+                                      <div className="grid grid-cols-3 gap-2 mb-2 font-medium text-slate-500 text-[11px] px-1">
+                                        <span className="col-span-1">식자재명</span>
+                                        <span className="col-span-1 text-right">사용량</span>
+                                        <span className="col-span-1 text-right">원가</span>
                                       </div>
-                                      <div className="space-y-2 ml-1">
+                                      <div className="space-y-1.5">
                                         {container.ingredients
                                           .sort((a, b) => {
                                             const aCost =
@@ -798,45 +838,38 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
                                             return (
                                               <div
                                                 key={item.id}
-                                                className="flex items-center justify-between border-b border-gray-100 pb-1"
+                                                className="grid grid-cols-3 gap-2 items-center border-b border-slate-100 pb-1.5 last:border-b-0"
                                               >
-                                                <div className="flex items-center">
-                                                  <div className="h-1 w-1 rounded-full bg-slate-300 mr-2"></div>
-                                                  <span>{item.ingredient.name}</span>
-                                                </div>
-                                                <div className="flex items-center gap-4">
-                                                  <span className="text-gray-600 tabular-nums">
-                                                    {item.amount} {item.ingredient.unit}
-                                                  </span>
-                                                  <span className="text-blue-600 tabular-nums w-14 text-right">
-                                                    {formatCurrency(itemCost)}
-                                                  </span>
-                                                </div>
+                                                <span className="col-span-1 truncate text-slate-700">
+                                                  {item.ingredient.name}
+                                                </span>
+                                                <span className="col-span-1 text-slate-600 tabular-nums text-right">
+                                                  {item.amount}{item.ingredient.unit}
+                                                </span>
+                                                <span className="col-span-1 text-blue-600 tabular-nums text-right">
+                                                  {formatCurrency(itemCost)}
+                                                </span>
                                               </div>
                                             );
                                           })}
-                                        {container.ingredients.length > 3 && !expandedContainers.includes(container.id) && (
-                                          <div 
-                                            className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              toggleContainerExpand(container.id);
-                                            }}
-                                          >
-                                            <span>+{container.ingredients.length - 3}개 더보기</span>
-                                            <ChevronDown className="h-3 w-3" />
-                                          </div>
-                                        )}
-                                        {expandedContainers.includes(container.id) && (
-                                          <div 
-                                            className="text-xs text-blue-500 mt-2 text-center cursor-pointer flex justify-center items-center space-x-1"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              toggleContainerExpand(container.id);
-                                            }}
-                                          >
-                                            <span>접기</span>
-                                            <ChevronUp className="h-3 w-3" />
+                                        {/* 더보기/접기 버튼 */} 
+                                        {container.ingredients.length > 3 && (
+                                          <div className="pt-1">
+                                            <Button 
+                                              variant="link"
+                                              size="sm"
+                                              className="text-xs h-6 p-0 text-blue-600 hover:text-blue-800 w-full justify-center"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleContainerExpand(container.id);
+                                              }}
+                                            >
+                                              {expandedContainers.includes(container.id) ? (
+                                                <><ChevronUp className="h-3 w-3 mr-1" />접기</>
+                                              ) : (
+                                                <><ChevronDown className="h-3 w-3 mr-1" />+{container.ingredients.length - 3}개 더보기</>
+                                              )}
+                                            </Button>
                                           </div>
                                         )}
                                       </div>

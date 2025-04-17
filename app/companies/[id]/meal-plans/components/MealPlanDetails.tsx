@@ -15,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import { FilePen, Trash2, Package, ChevronDown, ChevronUp, Loader2, Info, Calendar, Clock, Maximize, Minimize, CircleDollarSign, Gauge } from 'lucide-react';
+import { FilePen, Trash2, Package, ChevronDown, ChevronUp, Loader2, Info, Calendar, Clock, CircleDollarSign, Gauge } from 'lucide-react';
 import { format } from 'date-fns';
 import { MealPlan } from '../types';
 import { getMealTimeName, calculateMealPlanCost, formatCurrency } from '../utils';
@@ -47,7 +47,6 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
   const [loadingMenus, setLoadingMenus] = useState<Record<string, boolean>>({});
   const [totalCalories, setTotalCalories] = useState<number>(0);
   const [isLoadingCalories, setIsLoadingCalories] = useState<boolean>(true);
-  const [isFullWidth, setIsFullWidth] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
   
   // 컴포넌트 마운트 시 화면 크기 감지
@@ -276,11 +275,6 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
     return totalCalories;
   };
 
-  // 풀스크린 모드 토글
-  const toggleFullWidth = () => {
-    setIsFullWidth(!isFullWidth);
-  };
-  
   // 모바일 버전 렌더링
   if (isMobile) {
     return (
@@ -417,20 +411,7 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
   
   // 데스크탑 버전 렌더링
   return (
-    <div className={`space-y-6 py-2 overflow-y-auto ${isFullWidth ? 'px-0' : 'px-1 md:px-4'}`}>
-      {/* 헤더 및 제어 버튼 */}
-      <div className="flex items-center justify-end gap-3">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-8 w-8 rounded-full" 
-          onClick={toggleFullWidth}
-          title={isFullWidth ? "기본 화면으로 보기" : "넓게 보기"}
-        >
-          {isFullWidth ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-        </Button>
-      </div>
-      
+    <div className="space-y-6 py-2 overflow-y-auto px-1 md:px-4">
       {/* 요약 정보 카드 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border border-gray-200 shadow-sm bg-white">
@@ -611,7 +592,7 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
         </Button>
       </div>
       
-      {/* 삭제 확인 대화상자 */}
+      {/* 삭제 확인 모달 */}
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>

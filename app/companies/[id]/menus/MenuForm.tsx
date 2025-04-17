@@ -41,6 +41,7 @@ interface Container {
   name: string;
   description?: string;
   category?: string;
+  price?: number;
 }
 
 // 선택된 식재료 타입 정의
@@ -197,8 +198,15 @@ export default function MenuForm({
               }
             });
             
-            newContainerCosts[containerId] = containerCost;
-            totalCost += containerCost;
+            // 용기 가격 추가
+            const container = containers.find((c: Container) => c.id === containerId);
+            const containerPrice = container?.price || 0;
+            
+            // 총 원가 = 식재료 원가 + 용기 가격
+            const totalContainerCost = containerCost + containerPrice;
+            
+            newContainerCosts[containerId] = totalContainerCost;
+            totalCost += totalContainerCost;
           });
           
           // 용기별 원가와 총 원가 업데이트
@@ -320,9 +328,16 @@ export default function MenuForm({
         }
       });
       
+      // 용기 가격 추가
+      const container = containers.find((c: Container) => c.id === containerId);
+      const containerPrice = container?.price || 0;
+      
+      // 총 원가 = 식재료 원가 + 용기 가격
+      const totalContainerCost = containerCost + containerPrice;
+      
       // 소수점 첫째자리까지 계산 (반올림)
-      newContainerCosts[containerId] = parseFloat(containerCost.toFixed(1));
-      totalCost += containerCost;
+      newContainerCosts[containerId] = parseFloat(totalContainerCost.toFixed(1));
+      totalCost += totalContainerCost;
     });
     
     // 총 원가도 소수점 첫째자리까지 계산 (반올림)
@@ -352,6 +367,9 @@ export default function MenuForm({
       }));
       
       setContainerIngredients(newContainerIngredients);
+      
+      // 용기를 추가한 후 원가 재계산
+      updateCostFromContainers(newContainerIngredients);
     }
   };
 

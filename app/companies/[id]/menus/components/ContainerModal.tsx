@@ -30,6 +30,7 @@ export interface Container {
   id: string;
   name: string;
   description?: string;
+  price?: number;
   created_at: string;
   updated_at?: string;
 }
@@ -38,8 +39,13 @@ export interface Container {
 const containerSchema = z.object({
   name: z.string().min(1, { message: '용기 이름은 필수입니다.' }),
   description: z.string().max(200, { message: '설명은 200자 이하여야 합니다.' }).optional(),
+  price: z.preprocess(
+    (val) => (val === '' ? undefined : Number(val)),
+    z.number().nonnegative({ message: '가격은 0 이상이어야 합니다.' }).optional()
+  ),
 });
 
+// ContainerFormValues 타입 정의
 type ContainerFormValues = z.infer<typeof containerSchema>;
 
 interface ContainerModalProps {
@@ -67,6 +73,7 @@ export default function ContainerModal({
     defaultValues: {
       name: container?.name || '',
       description: container?.description || '',
+      price: container?.price || undefined,
     }
   });
 
@@ -76,6 +83,7 @@ export default function ContainerModal({
       form.reset({
         name: container?.name || '',
         description: container?.description || '',
+        price: container?.price || undefined,
       });
     }
   }, [container, open, form]);
@@ -167,6 +175,34 @@ export default function ContainerModal({
                       rows={2}
                       value={field.value || ''}
                     />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="price"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>가격 (원)</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Input
+                        {...field}
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="용기 가격"
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}
+                        className="pl-10"
+                      />
+                      <div className="absolute left-3 top-0 h-full flex items-center text-muted-foreground">
+                        ₩
+                      </div>
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
