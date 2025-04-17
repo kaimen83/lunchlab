@@ -12,8 +12,10 @@ export function SidebarContent({ companies, isMobile = false, isSheetOpen, setIs
     joinRequestCounts,
     currentCompanyId,
     userCanCreateCompany,
+    navigationInProgress,
     toggleCompany,
-    isFeatureEnabled
+    isFeatureEnabled,
+    navigateToTab
   } = useSidebarState(companies);
 
   // 모바일 사이드바 닫기 (링크 클릭 시)
@@ -53,7 +55,9 @@ export function SidebarContent({ companies, isMobile = false, isSheetOpen, setIs
                 hasIngredientsFeature: isFeatureEnabled(company.id, 'ingredients'),
                 hasMenusFeature: isFeatureEnabled(company.id, 'menus'),
                 hasMealPlanningFeature: isFeatureEnabled(company.id, 'mealPlanning'),
-                hasCookingPlanFeature: isFeatureEnabled(company.id, 'cookingPlan')
+                hasCookingPlanFeature: isFeatureEnabled(company.id, 'cookingPlan'),
+                navigationInProgress,
+                navigateToTab
               };
               
               return (

@@ -34,4 +34,7 @@ export interface CompanyWithFeatures {
   hasMenusFeature: boolean;
   hasMealPlanningFeature: boolean;
   hasCookingPlanFeature: boolean;
+  // 낙관적 UI 업데이트를 위한 추가 속성
+  navigationInProgress?: string | null;
+  navigateToTab?: (url: string) => void;
 } 

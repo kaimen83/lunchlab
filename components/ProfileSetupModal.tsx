@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -47,7 +47,7 @@ export function ProfileSetupModal({ onClose, initialOpen = true }: ProfileSetupM
   }, [user]);
 
   // 모달 닫기 시 DOM 이벤트 정리 함수
-  const cleanupDOMAfterClose = () => {
+  const cleanupDOMAfterClose = useCallback(() => {
     // 터치 및 포인터 이벤트 관련 스타일 정리
     document.body.style.pointerEvents = '';
     document.body.style.touchAction = '';
@@ -72,10 +72,10 @@ export function ProfileSetupModal({ onClose, initialOpen = true }: ProfileSetupM
     } catch (e) {
       console.warn("모달 닫기 정리 중 오류:", e);
     }
-  };
+  }, []);
 
   // 모달이 닫힐 때 처리
-  const handleOpenChange = (open: boolean) => {
+  const handleOpenChange = useCallback((open: boolean) => {
     if (isOpen && !open) {
       // 모달이 닫힐 때 setTimeout을 사용하여 비동기적으로 상태 업데이트
       setTimeout(() => {
@@ -89,13 +89,13 @@ export function ProfileSetupModal({ onClose, initialOpen = true }: ProfileSetupM
     } else {
       setIsOpen(open);
     }
-  };
+  }, [isOpen, cleanupDOMAfterClose, onClose]);
 
   // 입력 값 변경 처리
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  }, []);
 
   // 폼 제출 처리
   const handleSubmit = async (e: React.FormEvent) => {

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useUser, useClerk } from '@clerk/nextjs';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { UserRole, UserProfile } from '@/lib/types';
 import { usePathname, useRouter } from 'next/navigation';
 import { Mail, Shield, LogOut, User } from 'lucide-react';
@@ -29,49 +29,31 @@ export function Navbar() {
   // companies 경로에서는 렌더링하지 않음
   const isCompaniesRoute = pathname?.startsWith('/companies');
   
-  // 메타데이터 변경 실시간 감지를 위한 폴링 효과
-  useEffect(() => {
+  // 메타데이터 로드 함수
+  const loadUserMetadata = useCallback(() => {
     if (isLoaded && user) {
-      // 초기 역할 설정
-      setRole(user.publicMetadata.role as UserRole || null);
+      // 역할 설정
+      const currentRole = user.publicMetadata.role as UserRole;
+      setRole(currentRole || null);
       
       // 프로필 정보 설정
       if (user.publicMetadata.profileCompleted && user.publicMetadata.profile) {
         setUserProfile(user.publicMetadata.profile as UserProfile);
       }
-      
-      // 메타데이터 변경 주기적 확인 (5초마다)
-      const intervalId = setInterval(() => {
-        const currentRole = user.publicMetadata.role as UserRole;
-        if (currentRole !== role) {
-          setRole(currentRole || null);
-          // 역할이 변경되면 현재 페이지 새로고침
-          if (pathname === '/') {
-            router.refresh();
-          }
-        }
-        
-        // 프로필 정보 업데이트
-        if (user.publicMetadata.profileCompleted && user.publicMetadata.profile) {
-          setUserProfile(user.publicMetadata.profile as UserProfile);
-        }
-      }, 5000);
-      
-      return () => clearInterval(intervalId);
     }
-  }, [isLoaded, user, pathname, router, role]);
+  }, [isLoaded, user]);
 
-  // 로그인 상태나 사용자 변경 감지
+  // 초기 데이터 로드 및 사용자 변경 시 업데이트
   useEffect(() => {
-    if (isLoaded && user) {
-      setRole(user.publicMetadata.role as UserRole || null);
-      
-      // 프로필 정보 설정
-      if (user.publicMetadata.profileCompleted && user.publicMetadata.profile) {
-        setUserProfile(user.publicMetadata.profile as UserProfile);
-      }
+    loadUserMetadata();
+  }, [loadUserMetadata, isSignedIn]);
+  
+  // 라우팅 변경 시 메타데이터 다시 로드
+  useEffect(() => {
+    if (pathname === '/') {
+      loadUserMetadata();
     }
-  }, [isLoaded, user, isSignedIn]);
+  }, [pathname, loadUserMetadata]);
 
   // 모든 훅을 호출한 후에 조건부 반환
   if (isCompaniesRoute) {
@@ -131,6 +113,33 @@ export function Navbar() {
   // 로그아웃 처리
   const handleSignOut = async () => {
     await signOut(() => router.push('/sign-in'));
+  };
+
+  // 모달 닫기 시 DOM 클린업
+  const cleanupDOM = () => {
+    setTimeout(() => {
+      document.body.style.pointerEvents = '';
+      document.body.style.touchAction = '';
+      document.documentElement.style.touchAction = '';
+      
+      try {
+        document.querySelectorAll('[aria-hidden="true"]').forEach(el => {
+          try {
+            if (el instanceof HTMLElement && !el.dataset.permanent && document.body.contains(el)) {
+              el.removeAttribute('aria-hidden');
+            }
+          } catch (e) {
+            // 오류 시 무시
+          }
+        });
+        
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+      } catch (e) {
+        console.warn("모달 닫기 정리 중 오류:", e);
+      }
+    }, 100);
   };
 
   return (
@@ -206,33 +215,7 @@ export function Navbar() {
         <ProfileSetupModal 
           onClose={() => {
             setShowProfileModal(false);
-            
-            // 터치 및 포인터 이벤트 관련 스타일 정리
-            setTimeout(() => {
-              document.body.style.pointerEvents = '';
-              document.body.style.touchAction = '';
-              document.documentElement.style.touchAction = '';
-              
-              // 모든 aria-hidden 속성 제거
-              try {
-                document.querySelectorAll('[aria-hidden="true"]').forEach(el => {
-                  try {
-                    if (el instanceof HTMLElement && !el.dataset.permanent && document.body.contains(el)) {
-                      el.removeAttribute('aria-hidden');
-                    }
-                  } catch (e) {
-                    // 오류 시 무시
-                  }
-                });
-                
-                // 포커스 해제
-                if (document.activeElement instanceof HTMLElement) {
-                  document.activeElement.blur();
-                }
-              } catch (e) {
-                console.warn("모달 닫기 정리 중 오류:", e);
-              }
-            }, 100);
+            cleanupDOM();
           }} 
         />
       )}

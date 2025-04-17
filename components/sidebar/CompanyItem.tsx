@@ -4,6 +4,8 @@ import { Building, ChevronDown, ChevronRight, Users, ClipboardList, Settings, Ca
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { CompanyWithFeatures } from './types';
+import { useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface CompanyItemProps {
   company: CompanyWithFeatures;
@@ -13,6 +15,10 @@ interface CompanyItemProps {
 
 export function CompanyItem({ company, toggleCompany, handleLinkClick }: CompanyItemProps) {
   const pathname = usePathname();
+  const [activeTab, setActiveTab] = useState<string | null>(
+    pathname.startsWith(`/companies/${company.id}`) ? pathname : null
+  );
+  
   const {
     id,
     name,
@@ -23,8 +29,40 @@ export function CompanyItem({ company, toggleCompany, handleLinkClick }: Company
     hasIngredientsFeature,
     hasMenusFeature,
     hasMealPlanningFeature,
-    hasCookingPlanFeature
+    hasCookingPlanFeature,
+    navigationInProgress
   } = company;
+  
+  // 낙관적 UI 업데이트를 위한 함수
+  const handleTabClick = (url: string, event: React.MouseEvent) => {
+    event.preventDefault(); // 기본 링크 동작 방지
+    
+    // 이미 활성화된 탭이면 무시
+    if (url === activeTab) {
+      handleLinkClick();
+      return;
+    }
+    
+    // 낙관적 UI 업데이트: 클릭한 탭을 즉시 활성화
+    setActiveTab(url);
+    
+    // 내비게이션 기능 호출
+    if (company.navigateToTab) {
+      company.navigateToTab(url);
+    }
+    
+    handleLinkClick();
+  };
+  
+  // 각 탭이 활성화 되었는지 확인하는 함수
+  const isTabActive = (url: string) => {
+    // 낙관적 UI 적용: 현재 활성화 탭이 있으면 그것을 우선 사용
+    if (activeTab) {
+      return activeTab === url || activeTab.startsWith(url);
+    }
+    // 아니면 실제 경로 확인
+    return pathname === url || pathname.startsWith(url);
+  };
   
   // 디버깅용 로그 추가
   console.log(`회사 ${name}(${id}) 기능 상태:`, {
@@ -62,32 +100,38 @@ export function CompanyItem({ company, toggleCompany, handleLinkClick }: Company
       {/* 확장된 회사일 경우 하위 메뉴 표시 */}
       {isExpanded && (
         <div className="pl-7 space-y-0.5 mb-2">
-          <Link 
+          <a 
             href={`/companies/${id}`} 
             className={cn(
-              "flex items-center px-2 py-1.5 text-sm rounded",
-              pathname === `/companies/${id}` 
+              "flex items-center px-2 py-1.5 text-sm rounded relative",
+              isTabActive(`/companies/${id}`) && !pathname.includes('/members') && !pathname.includes('/inventory') 
+                && !pathname.includes('/meal-plans') && !pathname.includes('/cooking-plans') && !pathname.includes('/settings')
                 ? "bg-[#1164A3] text-white" 
                 : "hover:bg-gray-700"
             )}
-            onClick={handleLinkClick}
+            onClick={(e) => handleTabClick(`/companies/${id}`, e)}
           >
             <span className="text-gray-400 mr-2">#</span>
             일반
-          </Link>
+            {/* 로딩 인디케이터 */}
+            {navigationInProgress === `/companies/${id}` && (
+              <div className="absolute right-2 w-3 h-3 rounded-full border-2 border-t-transparent border-white animate-spin"></div>
+            )}
+          </a>
           
-          <Link 
+          <a 
             href={isAdmin && requestCount > 0 
               ? `/companies/${id}/members?tab=requests` 
               : `/companies/${id}/members`} 
             className={cn(
-              "flex items-center px-2 py-1.5 text-sm rounded",
-              pathname.startsWith(`/companies/${id}/members`) || 
-              pathname.startsWith(`/companies/${id}/join-requests`)
+              "flex items-center px-2 py-1.5 text-sm rounded relative",
+              isTabActive(`/companies/${id}/members`) || isTabActive(`/companies/${id}/join-requests`)
                 ? "bg-[#1164A3] text-white" 
                 : "hover:bg-gray-700"
             )}
-            onClick={handleLinkClick}
+            onClick={(e) => handleTabClick(isAdmin && requestCount > 0 
+              ? `/companies/${id}/members?tab=requests` 
+              : `/companies/${id}/members`, e)}
           >
             <Users className="h-3.5 w-3.5 mr-2 text-gray-400" />
             <span>멤버</span>
@@ -96,78 +140,94 @@ export function CompanyItem({ company, toggleCompany, handleLinkClick }: Company
                 {requestCount}
               </Badge>
             )}
-          </Link>
+            {/* 로딩 인디케이터 */}
+            {(navigationInProgress === `/companies/${id}/members` || navigationInProgress === `/companies/${id}/members?tab=requests`) && (
+              <div className="absolute right-2 w-3 h-3 rounded-full border-2 border-t-transparent border-white animate-spin"></div>
+            )}
+          </a>
           
           {/* 식자재/메뉴 관리 메뉴 - 모든 회원에게 표시 */}
           {(hasIngredientsFeature || hasMenusFeature) && (
-            <Link 
+            <a 
               href={`/companies/${id}/inventory`} 
               className={cn(
-                "flex items-center px-2 py-1.5 text-sm rounded",
-                pathname === `/companies/${id}/inventory` ||
-                pathname.startsWith(`/companies/${id}/ingredients`) ||
-                pathname.startsWith(`/companies/${id}/menus`)
+                "flex items-center px-2 py-1.5 text-sm rounded relative",
+                isTabActive(`/companies/${id}/inventory`) || isTabActive(`/companies/${id}/ingredients`) || isTabActive(`/companies/${id}/menus`)
                   ? "bg-[#1164A3] text-white" 
                   : "hover:bg-gray-700"
               )}
-              onClick={handleLinkClick}
+              onClick={(e) => handleTabClick(`/companies/${id}/inventory`, e)}
             >
               <ClipboardList className="h-3.5 w-3.5 mr-2 text-gray-400" />
               <span>식자재/메뉴</span>
-            </Link>
+              {/* 로딩 인디케이터 */}
+              {navigationInProgress === `/companies/${id}/inventory` && (
+                <div className="absolute right-2 w-3 h-3 rounded-full border-2 border-t-transparent border-white animate-spin"></div>
+              )}
+            </a>
           )}
           
           {/* 식단 관리 메뉴 - 모든 회원에게 표시 */}
           {hasMealPlanningFeature && (
-            <Link 
+            <a 
               href={`/companies/${id}/meal-plans`} 
               className={cn(
-                "flex items-center px-2 py-1.5 text-sm rounded",
-                pathname === `/companies/${id}/meal-plans` ||
-                pathname.startsWith(`/companies/${id}/meal-plans`)
+                "flex items-center px-2 py-1.5 text-sm rounded relative",
+                isTabActive(`/companies/${id}/meal-plans`)
                   ? "bg-[#1164A3] text-white" 
                   : "hover:bg-gray-700"
               )}
-              onClick={handleLinkClick}
+              onClick={(e) => handleTabClick(`/companies/${id}/meal-plans`, e)}
             >
               <CalendarDays className="h-3.5 w-3.5 mr-2 text-gray-400" />
               <span>식단 관리</span>
-            </Link>
+              {/* 로딩 인디케이터 */}
+              {navigationInProgress === `/companies/${id}/meal-plans` && (
+                <div className="absolute right-2 w-3 h-3 rounded-full border-2 border-t-transparent border-white animate-spin"></div>
+              )}
+            </a>
           )}
           
           {/* 조리계획서 메뉴 - 모든 회원에게 표시 */}
           {hasCookingPlanFeature && (
-            <Link 
+            <a 
               href={`/companies/${id}/cooking-plans`} 
               className={cn(
-                "flex items-center px-2 py-1.5 text-sm rounded",
-                pathname === `/companies/${id}/cooking-plans` ||
-                pathname.startsWith(`/companies/${id}/cooking-plans`)
+                "flex items-center px-2 py-1.5 text-sm rounded relative",
+                isTabActive(`/companies/${id}/cooking-plans`)
                   ? "bg-[#1164A3] text-white" 
                   : "hover:bg-gray-700"
               )}
-              onClick={handleLinkClick}
+              onClick={(e) => handleTabClick(`/companies/${id}/cooking-plans`, e)}
             >
               <FileText className="h-3.5 w-3.5 mr-2 text-gray-400" />
               <span>조리계획서</span>
-            </Link>
+              {/* 로딩 인디케이터 */}
+              {navigationInProgress === `/companies/${id}/cooking-plans` && (
+                <div className="absolute right-2 w-3 h-3 rounded-full border-2 border-t-transparent border-white animate-spin"></div>
+              )}
+            </a>
           )}
           
           {/* 회사 설정 메뉴 - 관리자만 접근 가능 */}
           {isAdmin && (
-            <Link 
+            <a 
               href={`/companies/${id}/settings`} 
               className={cn(
-                "flex items-center px-2 py-1.5 text-sm rounded",
-                pathname.startsWith(`/companies/${id}/settings`) 
+                "flex items-center px-2 py-1.5 text-sm rounded relative",
+                isTabActive(`/companies/${id}/settings`)
                   ? "bg-[#1164A3] text-white" 
                   : "hover:bg-gray-700"
               )}
-              onClick={handleLinkClick}
+              onClick={(e) => handleTabClick(`/companies/${id}/settings`, e)}
             >
               <Settings className="h-3.5 w-3.5 mr-2 text-gray-400" />
               <span>설정</span>
-            </Link>
+              {/* 로딩 인디케이터 */}
+              {navigationInProgress === `/companies/${id}/settings` && (
+                <div className="absolute right-2 w-3 h-3 rounded-full border-2 border-t-transparent border-white animate-spin"></div>
+              )}
+            </a>
           )}
         </div>
       )}
