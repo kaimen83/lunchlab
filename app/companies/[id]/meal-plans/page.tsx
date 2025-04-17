@@ -476,25 +476,29 @@ export default function MealPlansPage() {
 
       {/* 식단 상세 보기 모달 */}
       <Dialog open={showMealPlanDetails} onOpenChange={setShowMealPlanDetails}>
-        <DialogContent className="max-w-md md:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>식단 상세 정보</DialogTitle>
-            <DialogDescription>
-              {selectedMealPlan
-                ? `${format(new Date(selectedMealPlan.date), 'yyyy년 MM월 dd일')} ${getMealTimeName(selectedMealPlan.meal_time)}`
-                : ''}
-            </DialogDescription>
+        <DialogContent className="max-w-md md:max-w-4xl lg:max-w-6xl sm:w-[95vw] md:w-[80vw] lg:w-auto max-h-[80vh] md:max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex flex-row items-center justify-between shrink-0">
+            <div>
+              <DialogTitle className="text-xl font-bold">{selectedMealPlan?.name || '식단 상세 정보'}</DialogTitle>
+              <DialogDescription className="mt-1">
+                {selectedMealPlan
+                  ? `${format(new Date(selectedMealPlan.date), 'yyyy년 MM월 dd일')} ${getMealTimeName(selectedMealPlan.meal_time)}`
+                  : ''}
+              </DialogDescription>
+            </div>
           </DialogHeader>
-          {selectedMealPlan && (
-            <MealPlanDetails
-              mealPlan={selectedMealPlan}
-              onEdit={() => {
-                setShowMealPlanDetails(false);
-                handleEditMealPlan(selectedMealPlan);
-              }}
-              onDelete={() => handleDeleteMealPlan(selectedMealPlan.id)}
-            />
-          )}
+          <div className="overflow-y-auto flex-1 pr-6 -mr-6 pb-2">
+            {selectedMealPlan && (
+              <MealPlanDetails
+                mealPlan={selectedMealPlan}
+                onEdit={() => {
+                  setShowMealPlanDetails(false);
+                  handleEditMealPlan(selectedMealPlan);
+                }}
+                onDelete={() => handleDeleteMealPlan(selectedMealPlan.id)}
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

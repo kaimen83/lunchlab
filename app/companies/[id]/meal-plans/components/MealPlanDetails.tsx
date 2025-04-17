@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -14,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import { FilePen, Trash2, Package, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { FilePen, Trash2, Package, ChevronDown, ChevronUp, Loader2, Info, Calendar, Clock, Maximize, Minimize, CircleDollarSign, Gauge } from 'lucide-react';
 import { format } from 'date-fns';
 import { MealPlan } from '../types';
 import { getMealTimeName, calculateMealPlanCost, formatCurrency } from '../utils';
@@ -46,6 +47,26 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
   const [loadingMenus, setLoadingMenus] = useState<Record<string, boolean>>({});
   const [totalCalories, setTotalCalories] = useState<number>(0);
   const [isLoadingCalories, setIsLoadingCalories] = useState<boolean>(true);
+  const [isFullWidth, setIsFullWidth] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  
+  // 컴포넌트 마운트 시 화면 크기 감지
+  useEffect(() => {
+    const checkIfMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    // 초기 상태 설정
+    checkIfMobile();
+    
+    // 리사이즈 이벤트 핸들러 등록
+    window.addEventListener('resize', checkIfMobile);
+    
+    // 클린업
+    return () => {
+      window.removeEventListener('resize', checkIfMobile);
+    };
+  }, []);
   
   // 컴포넌트 마운트 시 모든 메뉴의 칼로리 정보를 한 번에 로드
   useEffect(() => {
@@ -241,108 +262,339 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
   const calculateTotalCalories = () => {
     return totalCalories;
   };
+
+  // 풀스크린 모드 토글
+  const toggleFullWidth = () => {
+    setIsFullWidth(!isFullWidth);
+  };
   
+  // 모바일 버전 렌더링
+  if (isMobile) {
+    return (
+      <div className="space-y-4 overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">{mealPlan.name}</h3>
+          <Badge variant="outline">{getMealTimeName(mealPlan.meal_time)}</Badge>
+        </div>
+        
+        <Separator />
+        
+        <div>
+          <h4 className="font-medium mb-2">포함 메뉴 ({mealPlan.meal_plan_menus.length}개)</h4>
+          {mealPlan.meal_plan_menus.length === 0 ? (
+            <p className="text-sm text-muted-foreground">등록된 메뉴가 없습니다.</p>
+          ) : (
+            <ul className="space-y-3">
+              {mealPlan.meal_plan_menus.map((item) => {
+                const cacheKey = `${item.menu_id}-${item.container_id}`;
+                const isExpanded = expandedMenus[cacheKey] || false;
+                const isLoading = loadingMenus[cacheKey] || false;
+                const details = menuDetails[cacheKey];
+                
+                return (
+                  <li key={item.id} className="border rounded-md p-3">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1">
+                        <div className="font-medium">{item.menu.name}</div>
+                        {item.menu.description && (
+                          <p className="text-xs text-muted-foreground">{item.menu.description}</p>
+                        )}
+                        
+                        {item.container && (
+                          <div className="flex items-center text-xs text-muted-foreground mt-1">
+                            <Package className="h-3 w-3 mr-1" />
+                            <span>{item.container.name}</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 hover:bg-gray-100 rounded-full"
+                        onClick={() => toggleMenuExpand(item.menu_id, item.container_id)}
+                        aria-expanded={isExpanded}
+                        disabled={isLoading}
+                      >
+                        {isLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : isExpanded ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    
+                    {isExpanded && details && (
+                      <div className="pt-2 mt-2 border-t">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm">원가:</span>
+                          <div className="font-medium">{formatCurrency(details.cost)}</div>
+                        </div>
+                        
+                        {details.calories > 0 && (
+                          <div className="flex justify-between items-center mt-1">
+                            <span className="text-sm">칼로리:</span>
+                            <Badge variant="outline" className="bg-white">
+                              {Math.round(details.calories)} kcal
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+        
+        <div className="flex justify-between items-center pt-2 border-t">
+          <div className="font-medium text-lg">
+            총 비용: {formatCurrency(calculateTotalCost())}
+          </div>
+          <div className="font-medium text-lg">
+            총 칼로리: {isLoadingCalories ? (
+              <span className="text-sm text-muted-foreground">로딩 중...</span>
+            ) : (
+              `${Math.round(calculateTotalCalories())} kcal`
+            )}
+          </div>
+        </div>
+        
+        <div className="flex justify-end gap-2 pt-4">
+          <Button variant="secondary" size="sm" className="gap-1 shadow-sm hover:bg-gray-100" onClick={onEdit}>
+            <FilePen className="h-4 w-4" />
+            수정
+          </Button>
+          <Button variant="destructive" size="sm" className="gap-1 shadow-sm hover:bg-red-700" onClick={() => setShowDeleteAlert(true)}>
+            <Trash2 className="h-4 w-4" />
+            삭제
+          </Button>
+        </div>
+        
+        {/* 삭제 확인 대화상자 */}
+        <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>식단 삭제</AlertDialogTitle>
+              <AlertDialogDescription>
+                정말 이 식단을 삭제하시겠습니까?<br />
+                이 작업은 되돌릴 수 없습니다.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border border-gray-200 shadow-sm hover:bg-gray-100">취소</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  setShowDeleteAlert(false);
+                  onDelete();
+                }}
+                className="bg-red-600 text-white shadow-sm hover:bg-red-700"
+              >
+                삭제
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    );
+  }
+  
+  // 데스크탑 버전 렌더링
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">{mealPlan.name}</h3>
-        <Badge variant="outline">{getMealTimeName(mealPlan.meal_time)}</Badge>
+    <div className={`space-y-6 py-2 overflow-y-auto ${isFullWidth ? 'px-0' : 'px-1 md:px-4'}`}>
+      {/* 헤더 및 제어 버튼 */}
+      <div className="flex items-center justify-end gap-3">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-8 w-8 rounded-full" 
+          onClick={toggleFullWidth}
+          title={isFullWidth ? "기본 화면으로 보기" : "넓게 보기"}
+        >
+          {isFullWidth ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+        </Button>
       </div>
       
-      <Separator />
+      {/* 요약 정보 카드 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border border-gray-200 shadow-sm bg-white">
+          <CardHeader className="pb-2 pt-4">
+            <CardTitle className="text-sm font-medium text-muted-foreground">식단 타입</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="text-2xl font-bold">{mealPlan.name}</div>
+          </CardContent>
+        </Card>
       
-      <div>
-        <h4 className="font-medium mb-2">포함 메뉴 ({mealPlan.meal_plan_menus.length}개)</h4>
+        <Card className="border border-gray-200 shadow-sm bg-white">
+          <CardHeader className="pb-2 pt-4">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
+              <CircleDollarSign className="h-4 w-4 mr-1 text-muted-foreground" />
+              총 비용
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="text-2xl font-bold">{formatCurrency(calculateTotalCost())}</div>
+          </CardContent>
+        </Card>
+        
+        <Card className="border border-gray-200 shadow-sm bg-white">
+          <CardHeader className="pb-2 pt-4">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
+              <Gauge className="h-4 w-4 mr-1 text-muted-foreground" />
+              총 칼로리
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {isLoadingCalories ? (
+              <div className="flex items-center space-x-2">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">로딩 중...</span>
+              </div>
+            ) : (
+              <div className="text-2xl font-bold">{Math.round(calculateTotalCalories())} kcal</div>
+            )}
+          </CardContent>
+        </Card>
+        
+        <Card className="border border-gray-200 shadow-sm bg-white">
+          <CardHeader className="pb-2 pt-4">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
+              <Calendar className="h-4 w-4 mr-1 text-muted-foreground" />
+              날짜 및 시간
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="font-medium">{format(new Date(mealPlan.date), 'yyyy년 MM월 dd일')}</div>
+            <div className="text-sm text-muted-foreground mt-1">
+              <Badge variant="secondary" className="font-normal bg-gray-100 hover:bg-gray-200 text-gray-700">
+                {getMealTimeName(mealPlan.meal_time)}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* 포함 메뉴 목록 */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+          <h4 className="font-medium">식단 메뉴 목록</h4>
+        </div>
+        
         {mealPlan.meal_plan_menus.length === 0 ? (
-          <p className="text-sm text-muted-foreground">등록된 메뉴가 없습니다.</p>
+          <div className="p-8 flex flex-col items-center justify-center text-center text-muted-foreground">
+            <Package className="h-12 w-12 text-gray-300 mb-2" />
+            <p>등록된 메뉴가 없습니다.</p>
+          </div>
         ) : (
-          <ul className="space-y-3">
-            {mealPlan.meal_plan_menus.map((item) => {
-              const cacheKey = `${item.menu_id}-${item.container_id}`;
-              const isExpanded = expandedMenus[cacheKey] || false;
-              const isLoading = loadingMenus[cacheKey] || false;
-              const details = menuDetails[cacheKey];
-              
-              return (
-                <li key={item.id} className="border rounded-md p-3">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-1">
-                      <div className="font-medium">{item.menu.name}</div>
+          <div className="divide-y divide-gray-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+              {mealPlan.meal_plan_menus.map((item) => {
+                const cacheKey = `${item.menu_id}-${item.container_id}`;
+                const isExpanded = expandedMenus[cacheKey] || false;
+                const isLoading = loadingMenus[cacheKey] || false;
+                const details = menuDetails[cacheKey];
+                
+                return (
+                  <Card key={item.id} className="border border-gray-200 shadow-sm overflow-hidden">
+                    <CardHeader className="pb-0 pt-3 px-4">
+                      <div className="flex justify-between items-start">
+                        <h3 className="font-medium text-base">{item.menu.name}</h3>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 hover:bg-gray-100 rounded-md text-xs flex items-center gap-1 -mt-1 -mr-2"
+                          onClick={() => toggleMenuExpand(item.menu_id, item.container_id)}
+                          aria-expanded={isExpanded}
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              <span>로딩 중</span>
+                            </>
+                          ) : isExpanded ? (
+                            <>
+                              <ChevronUp className="h-3.5 w-3.5" />
+                              <span>접기</span>
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-3.5 w-3.5" />
+                              <span>상세 정보</span>
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="px-4 pt-2 pb-3">
                       {item.menu.description && (
-                        <p className="text-xs text-muted-foreground">{item.menu.description}</p>
+                        <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{item.menu.description}</p>
                       )}
                       
-                      {item.container && (
+                      {item.container && !isExpanded && (
                         <div className="flex items-center text-xs text-muted-foreground mt-1">
                           <Package className="h-3 w-3 mr-1" />
                           <span>{item.container.name}</span>
                         </div>
                       )}
-                    </div>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 hover:bg-gray-100 rounded-full"
-                      onClick={() => toggleMenuExpand(item.menu_id, item.container_id)}
-                      aria-expanded={isExpanded}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : isExpanded ? (
-                        <ChevronUp className="h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  
-                  {isExpanded && details && (
-                    <div className="pt-2 mt-2 border-t">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm">원가:</span>
-                        <div className="font-medium">{formatCurrency(details.cost)}</div>
-                      </div>
                       
-                      {details.calories > 0 && (
-                        <div className="flex justify-between items-center mt-1">
-                          <span className="text-sm">칼로리:</span>
-                          <Badge variant="outline" className="bg-white">
-                            {Math.round(details.calories)} kcal
-                          </Badge>
+                      {isExpanded && details && (
+                        <div className="mt-3 pt-3 border-t space-y-2">
+                          <div className="flex items-center gap-1.5">
+                            <CircleDollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="text-sm font-medium">원가:</span>
+                            <div className="text-sm">{formatCurrency(details.cost)}</div>
+                          </div>
+                          
+                          {details.calories > 0 && (
+                            <div className="flex items-center gap-1.5">
+                              <Gauge className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="text-sm font-medium">칼로리:</span>
+                              <div className="text-sm">{Math.round(details.calories)} kcal</div>
+                            </div>
+                          )}
+                          
+                          {details.container && (
+                            <div className="flex items-center gap-1.5">
+                              <Package className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="text-sm font-medium">용기:</span>
+                              <div className="text-sm">{details.container.name} ({formatCurrency(details.container.price)})</div>
+                            </div>
+                          )}
                         </div>
                       )}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
         )}
       </div>
       
-      <div className="flex justify-between items-center pt-2 border-t">
-        <div className="font-medium text-lg">
-          총 비용: {formatCurrency(calculateTotalCost())}
-        </div>
-        <div className="font-medium text-lg">
-          총 칼로리: {isLoadingCalories ? (
-            <span className="text-sm text-muted-foreground">로딩 중...</span>
-          ) : (
-            `${Math.round(calculateTotalCalories())} kcal`
-          )}
-        </div>
-      </div>
-      
-      <div className="flex justify-end gap-2 pt-4">
-        <Button variant="secondary" size="sm" className="gap-1 shadow-sm hover:bg-gray-100" onClick={onEdit}>
+      {/* 작업 버튼 영역 */}
+      <div className="flex justify-end gap-3 pt-2">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="h-10 px-4 gap-2 shadow-sm hover:bg-gray-100 font-medium" 
+          onClick={onEdit}
+        >
           <FilePen className="h-4 w-4" />
-          수정
+          수정하기
         </Button>
-        <Button variant="destructive" size="sm" className="gap-1 shadow-sm hover:bg-red-700" onClick={() => setShowDeleteAlert(true)}>
+        <Button 
+          variant="destructive" 
+          size="sm" 
+          className="h-10 px-4 gap-2 shadow-sm hover:bg-red-700 font-medium" 
+          onClick={() => setShowDeleteAlert(true)}
+        >
           <Trash2 className="h-4 w-4" />
-          삭제
+          삭제하기
         </Button>
       </div>
       

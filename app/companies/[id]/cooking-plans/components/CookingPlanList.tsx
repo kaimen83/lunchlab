@@ -476,8 +476,10 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
                         )}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={toggleCalendar}>
-                        <CalendarIcon className="h-4 w-4 mr-2" />
-                        날짜 범위 선택
+                        <div className="flex items-center">
+                          <CalendarIcon className="h-4 w-4 mr-2" />
+                          날짜 범위 선택
+                        </div>
                       </DropdownMenuItem>
                     </DropdownMenuGroup>
                   </DropdownMenuContent>
