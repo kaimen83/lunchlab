@@ -1,8 +1,8 @@
 'use client';
 
-import { Dispatch, SetStateAction, useState, MouseEvent } from 'react';
+import { Dispatch, SetStateAction, useState, MouseEvent, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Search, Check } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -52,19 +52,47 @@ export default function MenuSelection({
 }: MenuSelectionProps) {
   if (!containerId) return null;
   
-  // 메뉴 선택 중인지 추적하는 상태 추가
-  const [isSelecting, setIsSelecting] = useState(false);
+  // 임시 선택 상태를 관리할 로컬 상태 추가
+  const [tempSelectedMenuIds, setTempSelectedMenuIds] = useState<string[]>([]);
+  
+  // 모달이 열릴 때 현재 선택된 메뉴 IDs로 임시 상태 초기화
+  useEffect(() => {
+    if (isOpen) {
+      setTempSelectedMenuIds([...selectedMenuIds]);
+    }
+  }, [isOpen, selectedMenuIds]);
 
-  // 메뉴 선택 핸들러 (단순화된 버전)
-  const handleMenuSelect = (e: MouseEvent, menuId: string) => {
-    e.preventDefault();
-    e.stopPropagation(); // 이벤트 버블링 방지
+  // 메뉴 선택/해제 핸들러 - 로컬 상태만 업데이트
+  const handleMenuToggle = (menuId: string) => {
+    setTempSelectedMenuIds(prev => {
+      if (prev.includes(menuId)) {
+        // 이미 선택된 메뉴면 제거
+        return prev.filter(id => id !== menuId);
+      } else {
+        // 선택되지 않은 메뉴면 추가
+        return [...prev, menuId];
+      }
+    });
+  };
+  
+  // 확인 버튼 클릭 시 모든 변경사항 적용
+  const handleConfirm = () => {
+    // 1. 제거할 메뉴 처리 (현재 선택된 메뉴 중 temp에 없는 것)
+    selectedMenuIds.forEach(menuId => {
+      if (!tempSelectedMenuIds.includes(menuId)) {
+        onMenuSelect(containerId, menuId); // 토글 함수 호출하여 삭제
+      }
+    });
     
-    setIsSelecting(true);
-    setTimeout(() => {
-      onMenuSelect(containerId, menuId);
-      setIsSelecting(false);
-    }, 10);
+    // 2. 추가할 메뉴 처리 (temp에 있지만 현재 선택되지 않은 것)
+    tempSelectedMenuIds.forEach(menuId => {
+      if (!selectedMenuIds.includes(menuId)) {
+        onMenuSelect(containerId, menuId); // 토글 함수 호출하여 추가
+      }
+    });
+    
+    // 모달 닫기
+    setIsOpen(false);
   };
 
   // 호환되는 메뉴만 필터링
@@ -75,24 +103,15 @@ export default function MenuSelection({
   return (
     <Dialog 
       open={isOpen} 
-      onOpenChange={(open) => {
-        // 메뉴 선택 중이면 모달 닫기 이벤트 무시
-        if (isSelecting) return;
-        setIsOpen(open);
-      }}
+      onOpenChange={setIsOpen}
     >
-      <DialogContent className="sm:max-w-md py-3 sm:py-4" onPointerDownOutside={(e) => {
-        // 메뉴 선택 중이면 외부 클릭 이벤트 방지
-        if (isSelecting) {
-          e.preventDefault();
-        }
-      }}>
+      <DialogContent className="sm:max-w-md py-3 sm:py-4">
         <DialogHeader className="pb-2">
           <DialogTitle className="text-base">
             {containerName}에 담을 메뉴 선택
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
-            메뉴를 여러 개 선택할 수 있습니다. 선택된 메뉴를 다시 클릭하면 선택이 해제됩니다.
+            메뉴를 여러 개 선택한 후 하단의 확인 버튼을 눌러 적용하세요.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2 pt-2">
@@ -111,7 +130,7 @@ export default function MenuSelection({
               {compatibleMenus.length > 0 ? (
                 <div>
                   {compatibleMenus.map(menu => {
-                    const isSelected = selectedMenuIds.includes(menu.id);
+                    const isSelected = tempSelectedMenuIds.includes(menu.id);
                     const costInfo = getCostInfoForMenuAndContainer(menu.id, containerId, menuContainers);
                     
                     return (
@@ -121,22 +140,14 @@ export default function MenuSelection({
                           "flex flex-col p-3 border-b cursor-pointer hover:bg-accent/20",
                           isSelected && "bg-accent/30"
                         )}
-                        onClick={(e) => handleMenuSelect(e, menu.id)}
+                        onClick={() => handleMenuToggle(menu.id)}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
                             <Checkbox 
                               checked={isSelected} 
                               className="mr-2" 
-                              onClick={(e) => {
-                                // 버블링 방지를 위한 중복 클릭 처리 방지
-                                e.stopPropagation();
-                                // 부모의 클릭 이벤트가 처리하도록 함
-                              }}
-                              onCheckedChange={() => {
-                                // 체크박스 변경 시 부모 요소 클릭 이벤트 사용
-                                // 별도 처리 안함 - 상위 div의 onClick 핸들러가 처리
-                              }}
+                              onCheckedChange={() => handleMenuToggle(menu.id)}
                             />
                             <span className="font-medium">{menu.name}</span>
                             <Badge variant="secondary" className="ml-2 text-xs">
@@ -164,6 +175,22 @@ export default function MenuSelection({
             </div>
           </ScrollArea>
         </div>
+        <DialogFooter className="mt-4 flex justify-between">
+          <Button 
+            variant="outline" 
+            onClick={() => setIsOpen(false)}
+          >
+            취소
+          </Button>
+          <Button 
+            variant="default" 
+            onClick={handleConfirm}
+            className="gap-1"
+          >
+            <Check className="h-4 w-4" />
+            선택 완료 ({tempSelectedMenuIds.length}개)
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
