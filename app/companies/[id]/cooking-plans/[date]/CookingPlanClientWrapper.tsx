@@ -155,16 +155,16 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
   const generateIngredientsExcel = () => {
     const excelData: any[] = [];
     
-    // 총 비용 계산
+    // 총 원가 계산
     const totalIngredientsCost = cookingPlan.ingredient_requirements.reduce(
       (sum, item) => sum + item.total_price, 0
     );
     
     // 헤더 행 추가
     excelData.push(['필요 식재료 목록']);
-    excelData.push([`총 ${cookingPlan.ingredient_requirements.length}개 품목 / 예상 비용: ${formatCurrency(totalIngredientsCost)}`]);
+    excelData.push([`총 ${cookingPlan.ingredient_requirements.length}개 품목 / 예상 원가: ${formatCurrency(totalIngredientsCost)}`]);
     excelData.push(['']);
-    excelData.push(['식재료명', '품목코드', '필요 수량', '포장단위', '투입량', '단가', '총 비용']);
+    excelData.push(['식재료명', '품목코드', '필요 수량', '포장단위', '투입량', '단가', '총 원가']);
     
     // 식재료 데이터 추가
     cookingPlan.ingredient_requirements.forEach(item => {

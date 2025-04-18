@@ -110,7 +110,7 @@ export default function MenuIngredientsView({ companyId, menuId }: MenuIngredien
         </CardHeader>
         <CardContent>
           <div className="bg-blue-50 p-2 rounded text-sm mb-4">
-            <span className="font-semibold">식재료 총 비용:</span> {formatCurrency(container.ingredients_cost)}
+            <span className="font-semibold">식재료 총 원가:</span> {formatCurrency(container.ingredients_cost)}
           </div>
           
           {container.ingredients.length > 0 ? (
@@ -120,7 +120,7 @@ export default function MenuIngredientsView({ companyId, menuId }: MenuIngredien
                   <TableHead>식재료</TableHead>
                   <TableHead>양</TableHead>
                   <TableHead>단가</TableHead>
-                  <TableHead>비용</TableHead>
+                  <TableHead>원가</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

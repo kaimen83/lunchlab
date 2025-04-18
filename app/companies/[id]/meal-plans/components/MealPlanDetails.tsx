@@ -422,7 +422,7 @@ export default function MealPlanDetails({ mealPlan, onEdit, onDelete }: MealPlan
         
         <div className="flex justify-between items-center pt-2 border-t">
           <div className="font-medium text-lg">
-            총 비용: {formatCurrency(calculateTotalCost())}
+            총 원가: {formatCurrency(calculateTotalCost())}
           </div>
           <div className="font-medium text-lg">
             총 칼로리: {isLoadingCalories ? (

@@ -402,7 +402,7 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
       (container) => container.ingredients,
     );
 
-    // 식자재별 총 비용 계산
+    // 식자재별 총 원가 계산
     const ingredientCosts: { name: string; cost: number }[] = [];
     allIngredients.forEach((item) => {
       const unitPrice = item.ingredient.price / item.ingredient.package_amount;
@@ -421,7 +421,7 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
       }
     });
 
-    // 비용이 높은 순으로 정렬하고 상위 3개 반환
+    // 원가이 높은 순으로 정렬하고 상위 3개 반환
     return ingredientCosts.sort((a, b) => b.cost - a.cost).slice(0, 3);
   };
 

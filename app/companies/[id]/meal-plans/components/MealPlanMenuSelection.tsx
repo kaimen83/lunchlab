@@ -92,7 +92,7 @@ export default function MealPlanMenuSelection({
               const containerDetails = getContainerDetailsById(containerId);
               const selectedMenuIds = containerMenuSelections[containerId] || [];
               
-              // 총 비용 계산
+              // 총 원가 계산
               const totalCost = selectedMenuIds.reduce((sum, menuId) => {
                 const costInfo = getCostInfoForMenuAndContainer(menuId, containerId, menuContainers);
                 return sum + costInfo.total_cost;

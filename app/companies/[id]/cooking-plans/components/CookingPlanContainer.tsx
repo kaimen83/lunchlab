@@ -186,7 +186,7 @@ export default function CookingPlanContainer({ companyId, initialDate, onComplet
       });
       
       // 식재료 CSV 데이터 생성
-      let ingredientsCsv = '식재료ID,식재료명,단위,필요량,단가,총 비용\n';
+      let ingredientsCsv = '식재료ID,식재료명,단위,필요량,단가,총 원가\n';
       
       cookingPlan.ingredient_requirements.forEach(item => {
         // 단가를 "금액/단위" 형식으로 표시

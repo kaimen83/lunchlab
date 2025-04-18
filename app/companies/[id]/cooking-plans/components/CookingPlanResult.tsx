@@ -368,7 +368,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
     return mealPlanNames.join(', ');
   };
 
-  // 총 식재료 비용 계산
+  // 총 식재료 원가 계산
   const totalIngredientsCost = cookingPlan.ingredient_requirements.reduce(
     (sum, item) => sum + item.total_price, 0
   );
@@ -578,7 +578,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
               <CardTitle>필요 식재료 목록</CardTitle>
               <CardDescription>
                 총 {cookingPlan.ingredient_requirements.length}개 품목 / 
-                예상 비용: {formatCurrency(totalIngredientsCost)}
+                예상 원가: {formatCurrency(totalIngredientsCost)}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -591,7 +591,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                     <TableHead className="text-right">포장단위</TableHead>
                     <TableHead className="text-right">투입량</TableHead>
                     <TableHead className="text-right">단가</TableHead>
-                    <TableHead className="text-right">총 비용</TableHead>
+                    <TableHead className="text-right">총 원가</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
