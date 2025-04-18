@@ -189,9 +189,18 @@ export function IngredientFormFields({
       setCodeExists(data.exists);
       
       if (data.exists) {
+        // 어떤 테이블에서 중복되었는지에 따라 다른 오류 메시지 표시
+        let errorMessage = '이미 사용 중인 코드명입니다. 다른 코드명을 사용해주세요.';
+        
+        if (data.containersExists) {
+          errorMessage = '이미 용기 코드명으로 사용 중입니다. 다른 코드명을 사용해주세요.';
+        } else if (data.ingredientsExists) {
+          errorMessage = '이미 식재료 코드명으로 사용 중입니다. 다른 코드명을 사용해주세요.';
+        }
+        
         form.setError('code_name', { 
           type: 'manual', 
-          message: '이미 사용 중인 코드명입니다. 다른 코드명을 사용해주세요.' 
+          message: errorMessage
         });
       } else {
         form.clearErrors('code_name');

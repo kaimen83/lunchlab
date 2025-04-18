@@ -24,6 +24,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 
 // 컨테이너 데이터 타입
 export interface Container {
@@ -65,6 +66,10 @@ export default function ContainerModal({
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditMode = !!container;
+  
+  // 코드명 중복 체크 관련 상태
+  const [isCheckingCode, setIsCheckingCode] = useState(false);
+  const [codeExists, setCodeExists] = useState(false);
 
   // 폼 초기화
   const form = useForm<z.infer<typeof containerSchema>>({
@@ -77,6 +82,10 @@ export default function ContainerModal({
     }
   });
 
+  // 코드명 상태 감시
+  const currentCodeName = form.watch('code_name');
+  const initialCodeName = container?.code_name || ''; // 초기 코드명 (편집 모드일 때 사용)
+
   // container 값이 변경될 때마다 폼 값 재설정
   useEffect(() => {
     if (open) {
@@ -86,11 +95,99 @@ export default function ContainerModal({
         description: container?.description || '',
         price: container?.price,
       });
+      // 모달이 열릴 때 코드명 중복 상태 초기화
+      setCodeExists(false);
     }
   }, [container, open, form]);
 
+  // 실시간 코드명 중복 체크 함수
+  const checkCodeName = async (code: string) => {
+    if (!code || code.trim() === '') {
+      setCodeExists(false);
+      form.clearErrors('code_name');
+      return;
+    }
+    
+    // 수정 모드에서 코드명이 변경되지 않았다면 중복 체크 필요 없음
+    if (isEditMode && code === initialCodeName) {
+      setCodeExists(false);
+      form.clearErrors('code_name');
+      return;
+    }
+    
+    setIsCheckingCode(true);
+    try {
+      // excludeId 파라미터 추가 (편집 모드에서 현재 아이템 제외)
+      const excludeIdParam = isEditMode && container?.id ? `&excludeId=${container.id}` : '';
+      
+      // fetch 요청으로 코드명 중복 확인
+      const response = await fetch(
+        `/api/companies/${companyId}/containers/check-code?code=${encodeURIComponent(code)}${excludeIdParam}`
+      );
+      
+      if (!response.ok) {
+        console.error('[ContainerModal] 코드명 중복 확인 요청 실패:', response.status);
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('[ContainerModal] 코드명 중복 체크 결과:', data);
+      
+      // 중복 여부 설정 및 에러 표시
+      setCodeExists(data.exists);
+      
+      if (data.exists) {
+        // 어떤 테이블에서 중복되었는지에 따라 다른 오류 메시지 표시
+        let errorMessage = '이미 사용 중인 코드명입니다. 다른 코드명을 사용해주세요.';
+        
+        if (data.ingredientsExists) {
+          errorMessage = '이미 식재료 코드명으로 사용 중입니다. 다른 코드명을 사용해주세요.';
+        } else if (data.containersExists) {
+          errorMessage = '이미 용기 코드명으로 사용 중입니다. 다른 코드명을 사용해주세요.';
+        }
+        
+        form.setError('code_name', { 
+          type: 'manual', 
+          message: errorMessage
+        });
+      } else {
+        form.clearErrors('code_name');
+      }
+    } catch (error) {
+      console.error('[ContainerModal] 코드명 체크 오류:', error);
+    } finally {
+      setIsCheckingCode(false);
+    }
+  };
+  
+  // 코드명 변경 시 중복 체크 실행 (디바운스 적용)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (currentCodeName) {
+        checkCodeName(currentCodeName);
+      } else {
+        setCodeExists(false);
+        form.clearErrors('code_name');
+      }
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [currentCodeName, companyId, initialCodeName, isEditMode, container?.id, form]);
+
   // 폼 제출 처리
   const onSubmit = async (data: z.infer<typeof containerSchema>) => {
+    // 코드명 중복 체크 중이거나 중복이 있으면 제출 방지
+    if (isCheckingCode || codeExists) {
+      if (codeExists) {
+        toast({
+          title: '코드명 중복',
+          description: '중복된 코드명이 있습니다. 다른 코드명을 사용해주세요.',
+          variant: 'destructive',
+        });
+      }
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -170,16 +267,31 @@ export default function ContainerModal({
             <FormField
               control={form.control}
               name="code_name"
-              render={({ field }) => (
+              render={({ field: { value, onChange, ...fieldProps } }) => (
                 <FormItem>
                   <FormLabel>코드명</FormLabel>
                   <FormControl>
-                    <Input 
-                      {...field} 
-                      placeholder="예: CT001, 소플라용기" 
-                      value={field.value ?? ''} 
-                    />
+                    <div className="relative">
+                      <Input 
+                        {...fieldProps} 
+                        value={value || ""} 
+                        onChange={(e) => {
+                          onChange(e.target.value);
+                          console.log('[ContainerModal] 코드명 변경:', e.target.value);
+                        }}
+                        placeholder="예: CT001, 소플라용기" 
+                        className={codeExists ? "border-red-500 pr-10" : ""}
+                      />
+                      {codeExists && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500">
+                          <AlertTriangle className="h-5 w-5" />
+                        </div>
+                      )}
+                    </div>
                   </FormControl>
+                  <div className="mt-1 text-sm">
+                    {isCheckingCode && <p className="text-muted-foreground">코드명 중복 확인 중...</p>}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
@@ -245,9 +357,14 @@ export default function ContainerModal({
               </Button>
               <Button 
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isCheckingCode || codeExists}
               >
-                {isSubmitting ? '저장 중...' : isEditMode ? '수정' : '추가'}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    저장 중...
+                  </>
+                ) : isEditMode ? '수정' : '추가'}
               </Button>
             </DialogFooter>
           </form>
