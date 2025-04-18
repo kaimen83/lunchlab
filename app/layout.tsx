@@ -2,10 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { koKR } from "@clerk/localizations";
-import { NavbarWrapper } from "@/components/NavbarWrapper";
+import { Navbar } from "@/components/Navbar";
 import { Toaster } from "@/components/ui/toaster";
 import TouchEventFixer from "./components/global/TouchEventFixer";
-import { SWRProvider } from "@/lib/swr-provider";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/react"
 
@@ -26,12 +25,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-  admin,
-  invitations,
 }: Readonly<{
   children: React.ReactNode;
-  admin?: React.ReactNode;
-  invitations?: React.ReactNode;
 }>) {
   return (
     <ClerkProvider 
@@ -50,17 +45,10 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
-          <SWRProvider>
-            <NavbarWrapper />
-            <main>
-              {children}
-              {/* 병렬 라우트 슬롯 - 현재 활성화된 탭만 보이도록 설정 (hidden) */}
-              <div id="admin-tab" className="hidden">{admin}</div>
-              <div id="invitations-tab" className="hidden">{invitations}</div>
-            </main>
-            <Toaster />
-            <TouchEventFixer />
-          </SWRProvider>
+          <Navbar />
+          <main>{children}</main>
+          <Toaster />
+          <TouchEventFixer />
         </body>
       </html>
     </ClerkProvider>

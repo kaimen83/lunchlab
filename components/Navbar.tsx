@@ -17,12 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ProfileSetupModal } from "./ProfileSetupModal";
 
-interface NavbarProps {
-  onTabChange?: (tabName: string, href: string) => void;
-  activeTab?: string | null;
-}
-
-export function Navbar({ onTabChange, activeTab }: NavbarProps) {
+export function Navbar() {
   const { user, isLoaded, isSignedIn } = useUser();
   const [role, setRole] = useState<UserRole | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -147,29 +142,6 @@ export function Navbar({ onTabChange, activeTab }: NavbarProps) {
     }, 100);
   };
 
-  /**
-   * 탭 클릭 핸들러
-   * @param tabName 탭 이름
-   * @param href 라우트 경로
-   */
-  const handleTabClick = (e: React.MouseEvent, tabName: string, href: string) => {
-    if (onTabChange) {
-      e.preventDefault();
-      onTabChange(tabName, href);
-    }
-  };
-
-  // CSS 클래스 생성 - 활성 탭에 따라 스타일 변경
-  const getTabClass = (tabName: string) => {
-    const baseClass = "px-3 py-2 rounded-md text-sm font-medium flex items-center";
-    
-    if (activeTab === tabName) {
-      return `${baseClass} bg-blue-100 text-blue-800 hover:bg-blue-200`;
-    }
-    
-    return `${baseClass} text-gray-700 hover:text-gray-900 hover:bg-gray-50`;
-  };
-
   return (
     <>
       <header className="bg-white shadow">
@@ -183,24 +155,22 @@ export function Navbar({ onTabChange, activeTab }: NavbarProps) {
               </div>
               <nav className="ml-6 flex items-center space-x-4">
                 {role === 'headAdmin' && (
-                  <a 
+                  <Link 
                     href="/admin" 
-                    className={getTabClass('admin')}
-                    onClick={(e) => handleTabClick(e, 'admin', '/admin')}
+                    className="px-3 py-2 rounded-md text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 flex items-center"
                   >
                     <Shield className="w-4 h-4 sm:mr-1" />
                     <span className="hidden sm:inline">관리자</span>
-                  </a>
+                  </Link>
                 )}
                 
-                <a 
+                <Link 
                   href="/invitations" 
-                  className={getTabClass('invitations')}
-                  onClick={(e) => handleTabClick(e, 'invitations', '/invitations')}
+                  className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 flex items-center"
                 >
                   <Mail className="w-4 h-4 sm:mr-1" />
                   <span className="hidden sm:inline">초대 관리</span>
-                </a>
+                </Link>
               </nav>
             </div>
             <div className="flex items-center">
