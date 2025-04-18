@@ -257,16 +257,16 @@ export default async function CompanyPage({ params }: CompanyPageProps) {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th scope="col" className="px-4 py-2 text-xs font-medium text-gray-500 text-left">
+                      <th scope="col" className="px-4 py-2 text-xs font-medium text-gray-500 text-left w-[20%]">
                         날짜
                       </th>
-                      <th scope="col" className="px-2 py-2 text-xs font-medium text-gray-500 text-left">
+                      <th scope="col" className="px-2 py-2 text-xs font-medium text-gray-500 text-left w-[26.67%]">
                         아침
                       </th>
-                      <th scope="col" className="px-2 py-2 text-xs font-medium text-gray-500 text-left">
+                      <th scope="col" className="px-2 py-2 text-xs font-medium text-gray-500 text-left w-[26.67%]">
                         점심
                       </th>
-                      <th scope="col" className="px-2 py-2 text-xs font-medium text-gray-500 text-left">
+                      <th scope="col" className="px-2 py-2 text-xs font-medium text-gray-500 text-left w-[26.67%]">
                         저녁
                       </th>
                     </tr>
@@ -278,13 +278,13 @@ export default async function CompanyPage({ params }: CompanyPageProps) {
                       
                       return (
                         <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="px-4 py-2 text-xs text-gray-900 align-top">
+                          <td className="px-4 py-2 text-xs text-gray-900 align-top w-[20%]">
                             <div className="font-semibold">{format(day, 'E', { locale: ko })}</div>
                             <div>{format(day, 'MM.dd')}</div>
                           </td>
                           
                           {['breakfast', 'lunch', 'dinner'].map((mealTime) => (
-                            <td key={mealTime} className="px-2 py-2 text-xs text-gray-900 align-top">
+                            <td key={mealTime} className="px-2 py-2 text-xs text-gray-900 align-top w-[26.67%]">
                               {mealPlans[mealTime].length > 0 ? (
                                 <div className="space-y-1">
                                   {mealPlans[mealTime].map((plan: any) => (
