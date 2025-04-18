@@ -31,6 +31,7 @@ export interface IngredientRequirement {
   total_price: number;
   package_amount?: number;
   code_name?: string;
+  supplier?: string;
 }
 
 // 조리계획서 전체 타입

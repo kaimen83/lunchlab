@@ -8,12 +8,30 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CookingPlan, MenuPortion, IngredientRequirement } from '../types';
+import { CookingPlan, MenuPortion } from '../types';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 
+// 확장된 식재료 요구사항 타입 정의
+interface ExtendedIngredientRequirement {
+  ingredient_id: string;
+  ingredient_name: string;
+  unit: string;
+  total_amount: number;
+  unit_price: number;
+  total_price: number;
+  package_amount?: number;
+  code_name?: string;
+  supplier?: string; // 식재료 업체 필드 추가
+}
+
+// 확장된 조리계획서 타입 정의
+interface ExtendedCookingPlan extends Omit<CookingPlan, 'ingredient_requirements'> {
+  ingredient_requirements: ExtendedIngredientRequirement[];
+}
+
 interface CookingPlanResultProps {
-  cookingPlan: CookingPlan;
+  cookingPlan: ExtendedCookingPlan;
   onPrint: () => void;
   onDownload: () => void;
   onTabChange?: (value: string) => void;
@@ -103,6 +121,19 @@ interface ContainerInfo {
     amount: number;
     unit: string;
   }[] | undefined
+}
+
+// 식재료별 필요량 계산 결과
+export interface IngredientRequirement {
+  ingredient_id: string;
+  ingredient_name: string;
+  unit: string;
+  total_amount: number;
+  unit_price: number;
+  total_price: number;
+  package_amount?: number;
+  code_name?: string;
+  supplier?: string; // 식재료 업체 필드 추가
 }
 
 export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, onTabChange, activeTab = 'menu-portions' }: CookingPlanResultProps) {
@@ -611,6 +642,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                   <TableRow>
                     <TableHead>식재료명</TableHead>
                     <TableHead>품목코드</TableHead>
+                    <TableHead>식재료 업체</TableHead>
                     <TableHead className="text-right">필요 수량</TableHead>
                     <TableHead className="text-right">포장단위</TableHead>
                     <TableHead className="text-right">투입량</TableHead>
@@ -633,6 +665,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                       <TableRow key={index}>
                         <TableCell className="font-medium">{item.ingredient_name}</TableCell>
                         <TableCell>{item.code_name || "-"}</TableCell>
+                        <TableCell>{item.supplier || "-"}</TableCell>
                         <TableCell className="text-right">
                           {formatIngredientAmount(item.total_amount, item.unit)}
                         </TableCell>
@@ -654,6 +687,9 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
               </p>
               <p className="text-xs text-gray-500">
                 * 투입량은 필요 수량을 포장단위로 나눈 값입니다. 포장단위가 없으면 계산할 수 없습니다.
+              </p>
+              <p className="text-xs text-gray-500">
+                * 식재료 업체는 식재료 마스터에 등록된 공급업체 정보입니다.
               </p>
             </CardContent>
           </Card>

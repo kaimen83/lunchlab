@@ -19,6 +19,8 @@ interface IngredientRequirement {
   unit_price: number;
   total_price: number;
   package_amount: number;
+  code_name?: string;
+  supplier?: string;
 }
 
 // 조리계획서 생성 요청 스키마
@@ -171,7 +173,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const { data: mealPlans, error: mealPlansError } = await supabase
       .from('meal_plans')
       .select(`
-        *,
+        id,
+        name,
+        meal_time,
         meal_plan_menus(
           *,
           menu:menus(
@@ -274,6 +278,56 @@ export async function GET(request: NextRequest, context: RouteContext) {
             }
             
             ingredientRequirements[ingredient.id].total_amount += amount;
+          }
+        }
+      }
+    }
+    
+    // 식재료 코드명과 공급업체 정보 가져오기
+    const ingredientIds = Object.keys(ingredientRequirements);
+    if (ingredientIds.length > 0) {
+      // 식재료 상세 정보 조회
+      const { data: ingredientsDetails, error: ingredientsError } = await supabase
+        .from('ingredients')
+        .select('id, code_name, supplier, supplier_id')
+        .in('id', ingredientIds);
+      
+      if (!ingredientsError && ingredientsDetails) {
+        // 공급업체 ID 목록 추출
+        const supplierIds = ingredientsDetails
+          .filter(i => i.supplier_id)
+          .map(i => i.supplier_id);
+        
+        // 공급업체 정보 조회
+        let suppliersMap: Record<string, string> = {};
+        
+        if (supplierIds.length > 0) {
+          const { data: suppliers, error: suppliersError } = await supabase
+            .from('suppliers')
+            .select('id, name')
+            .in('id', supplierIds);
+          
+          if (!suppliersError && suppliers) {
+            // 공급업체 ID를 키로 하는 맵 생성
+            suppliersMap = suppliers.reduce((map, supplier) => {
+              map[supplier.id] = supplier.name;
+              return map;
+            }, {} as Record<string, string>);
+          }
+        }
+        
+        // 식재료 요구사항에 코드명과 공급업체 정보 추가
+        for (const item of ingredientsDetails) {
+          if (ingredientRequirements[item.id]) {
+            // 코드명 추가
+            ingredientRequirements[item.id].code_name = item.code_name;
+            
+            // 공급업체 정보 추가 (우선순위: 매핑된 공급업체명 > 직접 입력된 공급업체명)
+            if (item.supplier_id && suppliersMap[item.supplier_id]) {
+              ingredientRequirements[item.id].supplier = suppliersMap[item.supplier_id];
+            } else if (item.supplier) {
+              ingredientRequirements[item.id].supplier = item.supplier;
+            }
           }
         }
       }
