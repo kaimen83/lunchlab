@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameDay } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameDay, compareAsc, compareDesc } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -79,12 +79,19 @@ interface CookingPlanSummary {
   total_headcount: number;
 }
 
+// 정렬 방향 타입 정의
+type SortDirection = 'asc' | 'desc';
+
 export default function CookingPlanList({ companyId }: CookingPlanListProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [cookingPlans, setCookingPlans] = useState<CookingPlanSummary[]>([]);
   const [activeTab, setActiveTab] = useState<string>('list');
+  
+  // 정렬 관련 상태 추가
+  const [sortField, setSortField] = useState<'date' | null>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   
   // 필터 관련 상태 및 설정
   // ---------------------------------------------
@@ -353,20 +360,49 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
     }, 10);
   }, [isMountedRef, toast]);
   
-  // 검색어 기반 필터링된.
-  const filteredCookingPlans = cookingPlans.filter(plan => {
-    if (!searchTerm.trim()) return true;
+  // 정렬 처리 함수
+  const handleSort = (field: 'date') => {
+    if (sortField === field) {
+      // 같은 필드를 다시 클릭한 경우 정렬 방향 전환
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // 다른 필드를 클릭한 경우 해당 필드로 정렬 필드 변경하고 기본 방향은 오름차순
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  // 정렬된 조리계획서 목록 계산
+  const sortedCookingPlans = useMemo(() => {
+    // 검색어로 필터링된 목록 가져오기
+    const filtered = cookingPlans.filter(plan => {
+      if (!searchTerm.trim()) return true;
+      
+      const searchTermLower = searchTerm.toLowerCase();
+      const dateStr = format(new Date(plan.date), 'yyyy년 MM월 dd일', { locale: ko });
+      const mealTimesStr = plan.meal_times.map(meal => getMealTimeName(meal)).join(' ');
+      
+      return (
+        dateStr.includes(searchTermLower) ||
+        mealTimesStr.toLowerCase().includes(searchTermLower) ||
+        plan.total_headcount.toString().includes(searchTermLower)
+      );
+    });
     
-    const searchTermLower = searchTerm.toLowerCase();
-    const dateStr = format(new Date(plan.date), 'yyyy년 MM월 dd일', { locale: ko });
-    const mealTimesStr = plan.meal_times.map(meal => getMealTimeName(meal)).join(' ');
+    // 정렬 적용
+    if (sortField === 'date') {
+      return [...filtered].sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        
+        return sortDirection === 'asc' 
+          ? compareAsc(dateA, dateB)
+          : compareDesc(dateA, dateB);
+      });
+    }
     
-    return (
-      dateStr.includes(searchTermLower) ||
-      mealTimesStr.toLowerCase().includes(searchTermLower) ||
-      plan.total_headcount.toString().includes(searchTermLower)
-    );
-  });
+    return filtered;
+  }, [cookingPlans, searchTerm, sortField, sortDirection]);
   
   // 현재 적용된 필터가 이번 주인지 확인하는 함수
   const isThisWeekFilter = () => {
@@ -542,7 +578,7 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
                 <p className="mt-4 text-sm text-gray-500">조리계획서 목록을 불러오는 중...</p>
               </div>
             </div>
-          ) : filteredCookingPlans.length === 0 ? (
+          ) : sortedCookingPlans.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-4 py-8 h-64 text-center">
               <div className="bg-blue-50 rounded-full p-3 mb-4">
                 <FileText className="h-8 w-8 text-blue-600" />
@@ -564,14 +600,26 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
                 <Table className="min-w-full">
                   <TableHeader>
                     <TableRow className="bg-slate-50">
-                      <TableHead className="px-4 py-3 font-medium text-sm">날짜</TableHead>
+                      <TableHead 
+                        className="px-4 py-3 font-medium text-sm cursor-pointer"
+                        onClick={() => handleSort('date')}
+                      >
+                        <div className="flex items-center">
+                          날짜
+                          {sortField === 'date' && (
+                            <span className="ml-1">
+                              {sortDirection === 'asc' ? '↑' : '↓'}
+                            </span>
+                          )}
+                        </div>
+                      </TableHead>
                       <TableHead className="px-4 py-3 font-medium text-sm">식사 시간</TableHead>
                       <TableHead className="px-4 py-3 font-medium text-sm text-right">총 식수</TableHead>
                       <TableHead className="px-4 py-3 text-right font-medium text-sm">관리</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredCookingPlans.map((plan) => (
+                    {sortedCookingPlans.map((plan) => (
                       <TableRow key={plan.date} className="hover:bg-slate-50 text-sm">
                         <TableCell className="px-4 py-3 font-medium whitespace-nowrap">
                           <span className="hidden md:inline">{format(new Date(plan.date), 'yyyy년 MM월 dd일 (EEE)', { locale: ko })}</span>
@@ -629,7 +677,7 @@ export default function CookingPlanList({ companyId }: CookingPlanListProps) {
               
               <div className="mt-4 flex flex-col sm:flex-row items-center justify-between p-2 text-xs sm:text-sm text-gray-500 gap-2">
                 <div>
-                  총 {filteredCookingPlans.length}개의 조리계획서
+                  총 {sortedCookingPlans.length}개의 조리계획서
                 </div>
                 <div className="flex items-center space-x-1">
                   <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
