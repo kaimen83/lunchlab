@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { CompanyMembership, CompanyMemberRole, UserProfile } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
-import { UserRoundIcon, ShieldCheck, Crown, UserPlus, X, LogOut, MoreVertical } from 'lucide-react';
+import { UserRoundIcon, ShieldCheck, Crown, UserPlus, X, LogOut, MoreVertical, CheckIcon, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -19,7 +19,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
 
 interface CompanyMemberListProps {
@@ -235,6 +238,76 @@ export function CompanyMemberList({
     }
   };
   
+  // 역할 변경 함수 추가
+  const changeRole = async (userId: string, newRole: CompanyMemberRole) => {
+    try {
+      setIsProcessing(true);
+      
+      const response = await fetch(`/api/companies/${companyId}/members/${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ role: newRole }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '역할 변경에 실패했습니다.');
+      }
+      
+      // 역할 변경 성공 시 UI 업데이트
+      setMembersWithUsers((prevMembers) => 
+        prevMembers.map((m) => {
+          if (m.membership.user_id === userId) {
+            // 새로운 멤버십 객체 생성 (불변성 유지)
+            const updatedMembership = {
+              ...m.membership,
+              role: newRole,
+              updated_at: new Date().toISOString()
+            };
+            
+            return {
+              ...m,
+              membership: updatedMembership
+            };
+          }
+          
+          // 소유자 역할이 변경된 경우, 이전 소유자는 관리자로 변경
+          if (newRole === 'owner' && m.membership.role === 'owner') {
+            const updatedMembership = {
+              ...m.membership,
+              role: 'admin' as CompanyMemberRole,
+              updated_at: new Date().toISOString()
+            };
+            
+            return {
+              ...m,
+              membership: updatedMembership
+            };
+          }
+          
+          return m;
+        })
+      );
+      
+      toast({
+        title: '역할 변경 완료',
+        description: '멤버 역할이 성공적으로 변경되었습니다.',
+        variant: 'default',
+      });
+    } catch (err) {
+      console.error('역할 변경 중 오류:', err);
+      toast({
+        title: '역할 변경 실패',
+        description: err instanceof Error ? err.message : '역할 변경 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+  
   return (
     <div className="bg-white shadow-sm rounded-lg">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 sm:mb-4 p-2 sm:p-3 md:p-4">
@@ -344,35 +417,86 @@ export function CompanyMemberList({
                   </td>
                   {isAdmin && (
                     <td className="px-2 sm:px-3 md:px-6 py-2 whitespace-nowrap text-right text-[10px] sm:text-xs font-medium">
-                      {/* 데스크톱 버전 - 삭제 버튼 표시 */}
-                      <div className="hidden sm:block">
-                        {(isOwner || (isAdmin && member.membership.role !== 'owner')) && 
-                          member.membership.user_id !== currentUser?.id && (
-                          <button
-                            onClick={() => openDeleteConfirm(member)}
-                            className="text-red-500 hover:text-red-700"
-                            disabled={isProcessing}
-                          >
-                            삭제
-                          </button>
-                        )}
-                      </div>
-                      
-                      {/* 모바일 버전 - 작은 버튼으로 변경 */}
-                      <div className="sm:hidden">
-                        {(isOwner || (isAdmin && member.membership.role !== 'owner')) && 
-                          member.membership.user_id !== currentUser?.id && (
+                      {/* 관리자 액션 드롭다운 */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => openDeleteConfirm(member)}
-                            className="h-6 w-6 p-0 text-red-500"
-                            disabled={isProcessing}
+                            className="h-7 w-7 p-0 rounded-full"
                           >
-                            <X className="h-3 w-3" />
+                            <MoreVertical className="h-3.5 w-3.5" />
+                            <span className="sr-only">메뉴 열기</span>
                           </Button>
-                        )}
-                      </div>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          {/* 역할 변경 메뉴 (소유자만 가능) */}
+                          {isOwner && (
+                            <>
+                              <DropdownMenuRadioGroup 
+                                value={member.membership.role}
+                                onValueChange={(value) => changeRole(member.membership.user_id, value as CompanyMemberRole)}
+                              >
+                                <div className="px-2 py-1.5 text-xs text-gray-500">역할 변경</div>
+                                
+                                <DropdownMenuRadioItem 
+                                  value="owner" 
+                                  className="text-xs cursor-pointer"
+                                  disabled={
+                                    isProcessing || 
+                                    (member.membership.role === 'owner') ||
+                                    member.membership.user_id === currentUser?.id
+                                  }
+                                >
+                                  <Crown className="mr-2 h-3.5 w-3.5 text-yellow-500" />
+                                  <span>소유자</span>
+                                </DropdownMenuRadioItem>
+                                
+                                <DropdownMenuRadioItem 
+                                  value="admin" 
+                                  className="text-xs cursor-pointer"
+                                  disabled={
+                                    isProcessing || 
+                                    (member.membership.role === 'admin') ||
+                                    (member.membership.role === 'owner' && member.membership.user_id === currentUser?.id)
+                                  }
+                                >
+                                  <ShieldCheck className="mr-2 h-3.5 w-3.5 text-blue-500" />
+                                  <span>관리자</span>
+                                </DropdownMenuRadioItem>
+                                
+                                <DropdownMenuRadioItem 
+                                  value="member" 
+                                  className="text-xs cursor-pointer"
+                                  disabled={
+                                    isProcessing || 
+                                    (member.membership.role === 'member') ||
+                                    (member.membership.role === 'owner' && member.membership.user_id === currentUser?.id)
+                                  }
+                                >
+                                  <UserRoundIcon className="mr-2 h-3.5 w-3.5 text-gray-500" />
+                                  <span>멤버</span>
+                                </DropdownMenuRadioItem>
+                              </DropdownMenuRadioGroup>
+                              
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
+                          
+                          {/* 멤버 삭제 옵션 (자기 자신은 삭제 불가) */}
+                          {(isOwner || (isAdmin && member.membership.role !== 'owner')) && 
+                            member.membership.user_id !== currentUser?.id && (
+                            <DropdownMenuItem 
+                              onClick={() => openDeleteConfirm(member)}
+                              className="text-xs text-red-500 focus:text-red-500 cursor-pointer"
+                              disabled={isProcessing}
+                            >
+                              <X className="mr-2 h-3.5 w-3.5" />
+                              <span>멤버 삭제</span>
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </td>
                   )}
                 </tr>
@@ -382,7 +506,7 @@ export function CompanyMemberList({
         </div>
       )}
       
-      {/* 회원 삭제 확인 다이얼로그 - 모바일 최적화 */}
+      {/* 회원 삭제 확인 다이얼로그 - 그대로 유지 */}
       <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
         <DialogContent className="sm:max-w-md max-w-[90vw] rounded-lg p-4 sm:p-6">
           <DialogHeader className="space-y-2">
