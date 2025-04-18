@@ -687,12 +687,10 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
           />
         </div>
 
-        {isOwnerOrAdmin && (
-          <Button onClick={handleAddMenu} className="w-full sm:w-auto">
-            <Plus className="mr-2 h-4 w-4" />
-            메뉴 추가
-          </Button>
-        )}
+        <Button onClick={handleAddMenu} className="w-full sm:w-auto">
+          <Plus className="mr-2 h-4 w-4" />
+          메뉴 추가
+        </Button>
       </div>
 
       {/* 메뉴 목록 */}
@@ -948,12 +946,10 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
           <p className="text-muted-foreground mb-4">
             '메뉴 추가' 버튼을 클릭하여 새 메뉴를 등록하세요.
           </p>
-          {isOwnerOrAdmin && (
-            <Button onClick={handleAddMenu}>
-              <Plus className="mr-2 h-4 w-4" />
-              메뉴 추가
-            </Button>
-          )}
+          <Button onClick={handleAddMenu}>
+            <Plus className="mr-2 h-4 w-4" />
+            메뉴 추가
+          </Button>
         </div>
       )}
 
