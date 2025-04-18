@@ -218,7 +218,7 @@ export default async function InventoryPage({ params, searchParams }: InventoryP
                   <p className="text-muted-foreground mb-6">
                     메뉴에 사용할 용기를 등록하고 관리하세요. 용기 정보는 원가 계산과 메뉴 구성에 활용됩니다.
                   </p>
-                  <ContainersList companyId={companyId} />
+                  <ContainersList companyId={companyId} userRole={membership.role} />
                 </div>
               </TabsContent>
             )}

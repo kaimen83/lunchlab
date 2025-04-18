@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { auth } from '@clerk/nextjs/server';
+import { CompanyMemberRole } from '@/lib/types';
 
 // 라우트 핸들러 컨텍스트에 대한 타입 정의
 interface RouteContext {
@@ -94,6 +96,41 @@ export async function DELETE(
   try {
     const { id: companyId, containerId } = await context.params;
     const supabase = createServerSupabaseClient();
+    
+    // 인증된 사용자 확인
+    const { userId } = await auth();
+    
+    if (!userId) {
+      return NextResponse.json(
+        { error: '인증되지 않은 요청입니다.' },
+        { status: 401 }
+      );
+    }
+    
+    // 사용자의 회사 내 역할 확인
+    const { data: membership, error: membershipError } = await supabase
+      .from('company_memberships')
+      .select('role')
+      .eq('company_id', companyId)
+      .eq('user_id', userId)
+      .single();
+    
+    if (membershipError) {
+      return NextResponse.json(
+        { error: '회사 멤버십을 확인할 수 없습니다.' },
+        { status: 403 }
+      );
+    }
+    
+    // 소유자 또는 관리자인지 확인
+    const isOwnerOrAdmin = membership.role === 'owner' || membership.role === 'admin';
+    
+    if (!isOwnerOrAdmin) {
+      return NextResponse.json(
+        { error: '컨테이너 삭제는 관리자 이상의 권한이 필요합니다.' },
+        { status: 403 }
+      );
+    }
 
     // 메뉴에서 이 컨테이너를 사용 중인지 확인
     const { count, error: countError } = await supabase

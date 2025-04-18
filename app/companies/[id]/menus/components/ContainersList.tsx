@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, Trash2, Package, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Package, Search, AlertTriangle } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,13 +23,15 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { CompanyMemberRole } from '@/lib/types';
 import ContainerModal, { Container } from './ContainerModal';
 
 interface ContainersListProps {
   companyId: string;
+  userRole: CompanyMemberRole;
 }
 
-export default function ContainersList({ companyId }: ContainersListProps) {
+export default function ContainersList({ companyId, userRole }: ContainersListProps) {
   const { toast } = useToast();
   const [containers, setContainers] = useState<Container[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +40,10 @@ export default function ContainersList({ companyId }: ContainersListProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [containerToDelete, setContainerToDelete] = useState<Container | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-
+  
+  // 권한 체크: 소유자 또는 관리자인지 확인
+  const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin';
+  
   // 용기 목록 불러오기
   const fetchContainers = async () => {
     setLoading(true);
@@ -76,6 +81,16 @@ export default function ContainersList({ companyId }: ContainersListProps) {
 
   // 용기 삭제 버튼 클릭 
   const handleDeleteClick = (container: Container) => {
+    // 권한 체크: 소유자 또는 관리자만 삭제 가능
+    if (!isOwnerOrAdmin) {
+      toast({
+        title: '권한 없음',
+        description: '용기 삭제는 관리자 이상의 권한이 필요합니다.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     setContainerToDelete(container);
     setDeleteDialogOpen(true);
   };
@@ -83,6 +98,18 @@ export default function ContainersList({ companyId }: ContainersListProps) {
   // 용기 삭제 처리
   const confirmDelete = async () => {
     if (!containerToDelete) return;
+    
+    // 권한 재확인
+    if (!isOwnerOrAdmin) {
+      toast({
+        title: '권한 없음',
+        description: '용기 삭제는 관리자 이상의 권한이 필요합니다.',
+        variant: 'destructive',
+      });
+      setDeleteDialogOpen(false);
+      setContainerToDelete(null);
+      return;
+    }
     
     try {
       const response = await fetch(`/api/companies/${companyId}/containers/${containerToDelete.id}`, {
@@ -187,7 +214,11 @@ export default function ContainersList({ companyId }: ContainersListProps) {
                       variant="ghost"
                       size="icon"
                       onClick={() => handleDeleteClick(container)}
-                      className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      className={`h-8 w-8 ${isOwnerOrAdmin 
+                        ? "text-red-500 hover:text-red-700 hover:bg-red-50" 
+                        : "text-gray-300 cursor-not-allowed"}`}
+                      disabled={!isOwnerOrAdmin}
+                      title={isOwnerOrAdmin ? '용기 삭제' : '용기 삭제는 관리자 이상 권한이 필요합니다'}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -213,6 +244,20 @@ export default function ContainersList({ companyId }: ContainersListProps) {
             <Plus className="mr-2 h-4 w-4" />
             용기 추가
           </Button>
+        </div>
+      )}
+
+      {/* 권한 없음 알림 - 관리자 이상만 사용 가능 설명 */}
+      {!isOwnerOrAdmin && (
+        <div className="p-4 mt-4 bg-yellow-50 border border-yellow-200 rounded-md flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <h4 className="font-medium text-yellow-700">알림: 제한된 권한</h4>
+            <p className="text-sm text-yellow-600 mt-1">
+              용기 삭제 기능은 관리자 또는 소유자 권한이 필요합니다. 현재 일반 멤버로 접속 중이므로 
+              삭제 기능을 사용할 수 없습니다.
+            </p>
+          </div>
         </div>
       )}
 
