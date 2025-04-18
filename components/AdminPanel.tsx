@@ -49,6 +49,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import React from 'react';
 
 interface User {
   id: string;
@@ -633,8 +634,8 @@ export default function AdminPanel() {
                         </TableRow>
                       ) : (
                         filteredCompanies.map((company) => (
-                          <>
-                            <TableRow key={company.id} className={expandedCompany === company.id ? "bg-muted/30" : ""}>
+                          <React.Fragment key={company.id}>
+                            <TableRow className={expandedCompany === company.id ? "bg-muted/30" : ""}>
                               <TableCell className="font-medium">
                                 <div className="flex items-center">
                                   <Button
@@ -710,7 +711,7 @@ export default function AdminPanel() {
                                 </TableCell>
                               </TableRow>
                             )}
-                          </>
+                          </React.Fragment>
                         ))
                       )}
                     </TableBody>

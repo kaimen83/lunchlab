@@ -6,7 +6,8 @@ import { Navbar } from "@/components/Navbar";
 import { Toaster } from "@/components/ui/toaster";
 import TouchEventFixer from "./components/global/TouchEventFixer";
 import "./globals.css";
-import { Analytics } from "@vercel/analytics/react"
+import { Analytics } from "@vercel/analytics/react";
+import FloatingFeedbackButton from '@/components/feedback/FloatingFeedbackButton';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -49,6 +50,8 @@ export default function RootLayout({
           <main>{children}</main>
           <Toaster />
           <TouchEventFixer />
+          <FloatingFeedbackButton />
+          <Analytics />
         </body>
       </html>
     </ClerkProvider>
