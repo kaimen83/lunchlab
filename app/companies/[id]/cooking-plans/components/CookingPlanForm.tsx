@@ -350,9 +350,9 @@ export default function CookingPlanForm({ companyId, initialDate, onSubmit, isEd
               </div>
             </div>
             
-            {/* 식단별 식수 입력 */}
+            {/* 조리지시서 입력 */}
             <div>
-              <h3 className="text-lg font-medium mb-4">식단별 식수 입력</h3>
+              <h3 className="text-lg font-medium mb-4">조리지시서</h3>
               
               {isLoading ? (
                 <p className="text-center text-gray-500 py-4">식단 정보를 불러오는 중...</p>

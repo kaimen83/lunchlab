@@ -133,7 +133,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
 
   // 식사 시간별 총 식수 계산 (식단별로 중복없이 합산)
   const mealTimeTotals = Object.keys(menusByMealTime).reduce((acc, mealTime) => {
-    // 식단별 식수를 Map으로 저장 (중복 방지)
+    // 조리지시서를 Map으로 저장 (중복 방지)
     const mealPlanHeadcounts = new Map<string, number>();
     
     menusByMealTime[mealTime].forEach(menu => {
@@ -146,7 +146,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
       }
     });
     
-    // 식단별 식수의 합계
+    // 조리지시서의 합계
     const total = Array.from(mealPlanHeadcounts.values()).reduce((sum, count) => sum + count, 0);
     acc[mealTime] = total;
     
@@ -355,6 +355,17 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
     return amount % 1 === 0 ? amount.toString() : amount.toFixed(1);
   };
 
+  // 식재료 양 포맷 (g -> kg 변환)
+  const formatIngredientAmount = (amount: number, unit: string) => {
+    // g 단위일 경우 kg으로 변환
+    if (unit === 'g' && amount >= 1000) {
+      const kgAmount = amount / 1000;
+      return `${kgAmount % 1 === 0 ? kgAmount.toString() : kgAmount.toFixed(1)}kg`;
+    }
+    // 그 외 단위는 그대로 표시
+    return `${formatAmount(amount)} ${unit}`;
+  };
+
   // 식단 ID를 식단명으로 변환하는 함수
   const getMealPlanNames = (mealPlanIds: string[]) => {
     if (!mealPlanIds.length) return '-';
@@ -411,11 +422,11 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
 
       <Tabs defaultValue="menu-portions" value={activeTab} onValueChange={onTabChange}>
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="menu-portions">식단별 식수</TabsTrigger>
+          <TabsTrigger value="menu-portions">조리지시서</TabsTrigger>
           <TabsTrigger value="ingredients">필요 식재료</TabsTrigger>
         </TabsList>
         
-        {/* 식단별 식수 탭 */}
+        {/* 조리지시서 탭 */}
         <TabsContent value="menu-portions" className="space-y-4">
           {Object.entries(processedMenusByMealTime).map(([mealTime, menus]) => (
             <Card key={mealTime}>
@@ -436,14 +447,14 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                     <TableHeader>
                       <TableRow className="bg-slate-50">
                         <TableHead className="font-semibold text-sm w-[14%]">메뉴명</TableHead>
-                        <TableHead className="font-semibold text-sm w-[10%]">용기</TableHead>
                         <TableHead className="font-semibold text-sm w-[14%]">사용 식단</TableHead>
+                        <TableHead className="font-semibold text-sm w-[10%]">용기</TableHead>
                         <TableHead className="font-semibold text-sm w-[8%]">식수</TableHead>
-                        <TableHead className="font-semibold text-sm w-[10%]">필요 식재료</TableHead>
                         <TableHead className="font-semibold text-sm w-[10%]">품목코드</TableHead>
-                        <TableHead className="font-semibold text-sm text-right w-[10%]">식재료 양</TableHead>
+                        <TableHead className="font-semibold text-sm w-[10%]">필요 식재료</TableHead>
                         <TableHead className="font-semibold text-sm text-right w-[10%]">포장단위</TableHead>
-                        <TableHead className="font-semibold text-sm text-right w-[14%]">투입량</TableHead>
+                        <TableHead className="font-semibold text-sm text-right w-[14%]">투입량(pac)</TableHead>
+                        <TableHead className="font-semibold text-sm text-right w-[10%]">식재료 양</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -480,6 +491,9 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                                       {menuPortion.menu_name}
                                     </TableCell>
                                     <TableCell className="align-top" rowSpan={menuPortion.ingredients!.length}>
+                                      {getMealPlanNames(menuPortion.mealPlans)}
+                                    </TableCell>
+                                    <TableCell className="align-top" rowSpan={menuPortion.ingredients!.length}>
                                       {menuPortion.container_names.length > 0 
                                         ? menuPortion.container_names.map((name, i) => (
                                             <Badge key={i} variant="outline" className="mr-1 mb-1">
@@ -489,29 +503,26 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                                         : '-'}
                                     </TableCell>
                                     <TableCell className="align-top" rowSpan={menuPortion.ingredients!.length}>
-                                      {getMealPlanNames(menuPortion.mealPlans)}
-                                    </TableCell>
-                                    <TableCell className="align-top" rowSpan={menuPortion.ingredients!.length}>
                                       <Badge variant="secondary" className="font-medium">
                                         {formatHeadcounts(menuPortion.containers_info)}
                                       </Badge>
                                     </TableCell>
                                   </>
                                 )}
-                                <TableCell className="border-l-0">
-                                  <span className="text-sm">{ingredient.name}</span>
-                                </TableCell>
                                 <TableCell className="text-sm text-gray-600">
                                   {ingredientReq?.code_name || "-"}
                                 </TableCell>
-                                <TableCell className="text-right font-medium text-sm">
-                                  {formatAmount(ingredient.amount)} {ingredient.unit}
+                                <TableCell className="border-l-0">
+                                  <span className="text-sm">{ingredient.name}</span>
                                 </TableCell>
                                 <TableCell className="text-right text-sm text-gray-600">
                                   {packageAmount ? `${packageAmount} ${ingredient.unit}` : "-"}
                                 </TableCell>
                                 <TableCell className="text-right font-medium text-sm">
                                   {unitsRequired}
+                                </TableCell>
+                                <TableCell className="text-right font-medium text-sm">
+                                  {formatIngredientAmount(ingredient.amount, ingredient.unit)}
                                 </TableCell>
                               </TableRow>
                             );
@@ -529,6 +540,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                               <TableCell className="font-medium">
                                 {menuPortion.menu_name}
                               </TableCell>
+                              <TableCell>{getMealPlanNames(menuPortion.mealPlans)}</TableCell>
                               <TableCell>
                                 {menuPortion.container_names.length > 0 
                                   ? menuPortion.container_names.map((name, i) => (
@@ -538,7 +550,6 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                                     ))
                                   : '-'}
                               </TableCell>
-                              <TableCell>{getMealPlanNames(menuPortion.mealPlans)}</TableCell>
                               <TableCell>
                                 <Badge variant="secondary" className="font-medium">
                                   {formatHeadcounts(menuPortion.containers_info)}
@@ -610,7 +621,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                         <TableCell className="font-medium">{item.ingredient_name}</TableCell>
                         <TableCell>{item.code_name || "-"}</TableCell>
                         <TableCell className="text-right">
-                          {formatAmount(item.total_amount)} {item.unit}
+                          {formatIngredientAmount(item.total_amount, item.unit)}
                         </TableCell>
                         <TableCell className="text-right">
                           {packageAmount ? `${packageAmount} ${item.unit}` : "-"}

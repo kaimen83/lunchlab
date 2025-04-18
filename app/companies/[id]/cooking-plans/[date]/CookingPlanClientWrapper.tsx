@@ -55,7 +55,7 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
     window.print();
   };
 
-  // 메뉴 식단별 식수 탭 데이터로 엑셀 생성
+  // 메뉴 조리지시서 탭 데이터로 엑셀 생성
   const generateMenuPortionsExcel = () => {
     // 결과 데이터를 저장할 배열
     const excelData: any[] = [];
