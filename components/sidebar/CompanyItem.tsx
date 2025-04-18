@@ -15,8 +15,12 @@ interface CompanyItemProps {
 
 export function CompanyItem({ company, toggleCompany, handleLinkClick }: CompanyItemProps) {
   const pathname = usePathname();
+  // 현재 URL에서 회사 ID 추출
+  const currentCompanyIdInUrl = pathname.startsWith('/companies/') ? pathname.split('/')[2] : null;
+  
+  // activeTab 초기화 - 현재 보고 있는 회사가 이 회사인 경우에만 설정
   const [activeTab, setActiveTab] = useState<string | null>(
-    pathname.startsWith(`/companies/${company.id}`) ? pathname : null
+    currentCompanyIdInUrl === company.id ? pathname : null
   );
   
   const {
@@ -56,6 +60,11 @@ export function CompanyItem({ company, toggleCompany, handleLinkClick }: Company
   
   // 각 탭이 활성화 되었는지 확인하는 함수
   const isTabActive = (url: string) => {
+    // 현재 URL의 회사 ID가 이 회사가 아니면 항상 false 반환
+    if (currentCompanyIdInUrl !== company.id) {
+      return false;
+    }
+    
     // 낙관적 UI 적용: 현재 활성화 탭이 있으면 그것을 우선 사용
     if (activeTab) {
       return activeTab === url || activeTab.startsWith(url);
