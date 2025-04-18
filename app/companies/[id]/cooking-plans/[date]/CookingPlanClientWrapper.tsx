@@ -79,7 +79,7 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
       excelData.push([`${mealTimeName} 식단`]);
       
       // 헤더 행 추가
-      excelData.push(['메뉴명', '용기', '사용 식단', '식수', '필요 식재료', '품목코드', '식재료 양', '포장단위', '투입량']);
+      excelData.push(['메뉴명', '용기', '사용 식단', '식수', '식재료', '품목코드', '식재료 양', '포장단위', '투입량']);
       
       // 식단 데이터 처리
       const processedMenus = processMenuData(menus, mealTime);
@@ -151,7 +151,7 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
     return excelData;
   };
 
-  // 필요 식재료 탭 데이터로 엑셀 생성
+  // 발주서 탭 데이터로 엑셀 생성
   const generateIngredientsExcel = () => {
     const excelData: any[] = [];
     
@@ -161,7 +161,7 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
     );
     
     // 헤더 행 추가
-    excelData.push(['필요 식재료 목록']);
+    excelData.push(['식재료 목록']);
     excelData.push([`총 ${cookingPlan.ingredient_requirements.length}개 품목 / 예상 원가: ${formatCurrency(totalIngredientsCost)}`]);
     excelData.push(['']);
     excelData.push(['식재료명', '품목코드', '필요 수량', '포장단위', '투입량', '단가', '총 원가']);

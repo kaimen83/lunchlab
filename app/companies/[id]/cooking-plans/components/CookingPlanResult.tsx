@@ -352,18 +352,31 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
 
   // 수량 포맷
   const formatAmount = (amount: number) => {
-    return amount % 1 === 0 ? amount.toString() : amount.toFixed(1);
+    return amount.toFixed(1);
   };
 
   // 식재료 양 포맷 (g -> kg 변환)
   const formatIngredientAmount = (amount: number, unit: string) => {
     // g 단위일 경우 kg으로 변환
-    if (unit === 'g' && amount >= 1000) {
+    if (unit === 'g') {
       const kgAmount = amount / 1000;
-      return `${kgAmount % 1 === 0 ? kgAmount.toString() : kgAmount.toFixed(1)}kg`;
+      return `${kgAmount.toFixed(1)}kg`;
     }
-    // 그 외 단위는 그대로 표시
+    // 그 외 단위는 그대로 표시하되 소수점 첫째자리까지
     return `${formatAmount(amount)} ${unit}`;
+  };
+
+  // 포장 단위 포맷 (g -> kg 변환)
+  const formatPackageAmount = (amount: number | undefined, unit: string) => {
+    if (!amount) return "-";
+    
+    // g 단위일 경우 kg으로 변환
+    if (unit === 'g') {
+      const kgAmount = amount / 1000;
+      return `${kgAmount.toFixed(1)}kg`;
+    }
+    // 그 외 단위는 그대로 표시하되 소수점 첫째자리까지
+    return `${amount.toFixed(1)} ${unit}`;
   };
 
   // 식단 ID를 식단명으로 변환하는 함수
@@ -423,7 +436,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
       <Tabs defaultValue="menu-portions" value={activeTab} onValueChange={onTabChange}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="menu-portions">조리지시서</TabsTrigger>
-          <TabsTrigger value="ingredients">필요 식재료</TabsTrigger>
+          <TabsTrigger value="ingredients">발주서</TabsTrigger>
         </TabsList>
         
         {/* 조리지시서 탭 */}
@@ -451,7 +464,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                         <TableHead className="font-semibold text-sm w-[10%]">용기</TableHead>
                         <TableHead className="font-semibold text-sm w-[8%]">식수</TableHead>
                         <TableHead className="font-semibold text-sm w-[10%]">품목코드</TableHead>
-                        <TableHead className="font-semibold text-sm w-[10%]">필요 식재료</TableHead>
+                        <TableHead className="font-semibold text-sm w-[10%]">식재료</TableHead>
                         <TableHead className="font-semibold text-sm text-right w-[10%]">포장단위</TableHead>
                         <TableHead className="font-semibold text-sm text-right w-[14%]">투입량(pac)</TableHead>
                         <TableHead className="font-semibold text-sm text-right w-[10%]">식재료 양</TableHead>
@@ -516,7 +529,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                                   <span className="text-sm">{ingredient.name}</span>
                                 </TableCell>
                                 <TableCell className="text-right text-sm text-gray-600">
-                                  {packageAmount ? `${packageAmount} ${ingredient.unit}` : "-"}
+                                  {formatPackageAmount(packageAmount, ingredient.unit)}
                                 </TableCell>
                                 <TableCell className="text-right font-medium text-sm">
                                   {unitsRequired}
@@ -582,11 +595,11 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
           ))}
         </TabsContent>
         
-        {/* 필요 식재료 탭 */}
+        {/* 발주서 탭 */}
         <TabsContent value="ingredients">
           <Card>
             <CardHeader>
-              <CardTitle>필요 식재료 목록</CardTitle>
+              <CardTitle>발주서 목록</CardTitle>
               <CardDescription>
                 총 {cookingPlan.ingredient_requirements.length}개 품목 / 
                 예상 원가: {formatCurrency(totalIngredientsCost)}
@@ -624,7 +637,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                           {formatIngredientAmount(item.total_amount, item.unit)}
                         </TableCell>
                         <TableCell className="text-right">
-                          {packageAmount ? `${packageAmount} ${item.unit}` : "-"}
+                          {formatPackageAmount(packageAmount, item.unit)}
                         </TableCell>
                         <TableCell className="text-right">
                           {unitsRequired}
