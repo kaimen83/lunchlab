@@ -89,6 +89,7 @@ export default function AdminPanel() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingCompanies, setIsLoadingCompanies] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [loadingMembers, setLoadingMembers] = useState<Record<string, boolean>>({});
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedRole, setSelectedRole] = useState<UserRole>('user');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -142,17 +143,6 @@ export default function AdminPanel() {
         // 회사 생성자 이름 매핑
         const creatorIds = data.companies.map((company: any) => company.created_by).filter(Boolean);
         await loadCreatorNames(creatorIds);
-        
-        // 회사별 멤버 정보 로드
-        const membersData: Record<string, CompanyMember[]> = {};
-        for (const company of data.companies) {
-          const membersResponse = await fetch(`/api/admin/companies/${company.id}/members`);
-          if (membersResponse.ok) {
-            const membersResult = await membersResponse.json();
-            membersData[company.id] = membersResult.members || [];
-          }
-        }
-        setCompanyMembers(membersData);
       } catch (err) {
         setCompanyError(err instanceof Error ? err.message : '오류가 발생했습니다.');
         console.error('Failed to load companies:', err);
@@ -195,11 +185,38 @@ export default function AdminPanel() {
   };
   
   // 멤버 토글 함수
-  const toggleCompanyMembers = (companyId: string) => {
+  const toggleCompanyMembers = async (companyId: string) => {
     if (expandedCompany === companyId) {
       setExpandedCompany(null);
     } else {
       setExpandedCompany(companyId);
+      
+      if (!companyMembers[companyId] || companyMembers[companyId].length === 0) {
+        try {
+          setLoadingMembers(prev => ({
+            ...prev,
+            [companyId]: true
+          }));
+          
+          const membersResponse = await fetch(`/api/admin/companies/${companyId}/members`);
+          if (membersResponse.ok) {
+            const membersResult = await membersResponse.json();
+            setCompanyMembers(prev => ({
+              ...prev,
+              [companyId]: membersResult.members || []
+            }));
+          } else {
+            console.error(`회사 ${companyId}의 멤버 데이터를 가져오는데 실패했습니다.`);
+          }
+        } catch (error) {
+          console.error(`회사 ${companyId}의 멤버 로딩 중 오류 발생:`, error);
+        } finally {
+          setLoadingMembers(prev => ({
+            ...prev,
+            [companyId]: false
+          }));
+        }
+      }
     }
   };
 
@@ -686,7 +703,12 @@ export default function AdminPanel() {
                                 <TableCell colSpan={5} className="py-2">
                                   <div className="pl-8 pr-2 py-2">
                                     <h4 className="text-sm font-medium mb-2">회사 멤버 목록</h4>
-                                    {companyMembers[company.id]?.length > 0 ? (
+                                    {loadingMembers[company.id] ? (
+                                      <div className="flex items-center justify-center p-2">
+                                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                                        <span className="ml-2 text-sm text-muted-foreground">멤버 정보를 불러오는 중...</span>
+                                      </div>
+                                    ) : companyMembers[company.id]?.length > 0 ? (
                                       <div className="space-y-2">
                                         {companyMembers[company.id].map((member) => (
                                           <div key={member.id} className="flex items-center justify-between">
