@@ -230,6 +230,20 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       );
     }
     
+    // 먼저 해당 식단을 참조하는 식수(meal_portions) 데이터를 삭제
+    const { error: deleteMealPortionsError } = await supabase
+      .from('meal_portions')
+      .delete()
+      .eq('meal_plan_id', mealPlanId);
+      
+    if (deleteMealPortionsError) {
+      console.error('식수 데이터 삭제 오류:', deleteMealPortionsError);
+      return NextResponse.json(
+        { error: '식단과 연결된 식수 데이터를 삭제하는 중 오류가 발생했습니다.' },
+        { status: 500 }
+      );
+    }
+    
     // 식단 삭제 (관련 meal_plan_menus 항목은 CASCADE 제약 조건으로 자동 삭제됨)
     const { error: deleteError } = await supabase
       .from('meal_plans')
@@ -251,7 +265,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   } catch (error) {
     console.error('식단 삭제 오류:', error);
     return NextResponse.json(
-      { error: '식단을 삭제하는 중 오류가 발생했습니다.' },
+      { error: '식단을 삭제하는데 실패했습니다.' },
       { status: 500 }
     );
   }
