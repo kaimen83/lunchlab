@@ -120,7 +120,7 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
               container:containers(id, name),
               menu_container_ingredients(
                 amount,
-                ingredient:ingredients(id, name, package_amount, unit, price, code_name)
+                ingredient:ingredients(id, name, package_amount, unit, price, code_name, supplier, supplier_id)
               )
             )
           ),
@@ -192,7 +192,8 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
                 unit_price: ingredient.price / ingredient.package_amount,
                 total_price: 0,
                 package_amount: ingredient.package_amount,
-                code_name: ingredient.code_name
+                code_name: ingredient.code_name,
+                supplier: ingredient.supplier
               };
             }
             

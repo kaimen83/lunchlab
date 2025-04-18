@@ -8,22 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CookingPlan, MenuPortion } from '../types';
+import { CookingPlan, MenuPortion, IngredientRequirement } from '../types';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 
-// 확장된 식재료 요구사항 타입 정의
-interface ExtendedIngredientRequirement {
-  ingredient_id: string;
-  ingredient_name: string;
-  unit: string;
-  total_amount: number;
-  unit_price: number;
-  total_price: number;
-  package_amount?: number;
-  code_name?: string;
-  supplier?: string; // 식재료 업체 필드 추가
-}
+// 확장된 식재료 요구사항 타입 정의 - 외부에서 import하는 IngredientRequirement 사용
+interface ExtendedIngredientRequirement extends IngredientRequirement {}
 
 // 확장된 조리계획서 타입 정의
 interface ExtendedCookingPlan extends Omit<CookingPlan, 'ingredient_requirements'> {
@@ -121,19 +111,6 @@ interface ContainerInfo {
     amount: number;
     unit: string;
   }[] | undefined
-}
-
-// 식재료별 필요량 계산 결과
-export interface IngredientRequirement {
-  ingredient_id: string;
-  ingredient_name: string;
-  unit: string;
-  total_amount: number;
-  unit_price: number;
-  total_price: number;
-  package_amount?: number;
-  code_name?: string;
-  supplier?: string; // 식재료 업체 필드 추가
 }
 
 export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, onTabChange, activeTab = 'menu-portions' }: CookingPlanResultProps) {
