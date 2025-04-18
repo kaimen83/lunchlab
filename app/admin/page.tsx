@@ -20,9 +20,8 @@ export default async function AdminPage() {
   }
   
   return (
-    <div className="container mx-auto py-8 px-4 mt-4">
-      <h1 className="text-3xl font-bold mb-8">관리자 페이지</h1>
-      <p className="mb-6 text-gray-600">사용자 권한을 관리할 수 있습니다. 권한 변경은 즉시 반영됩니다.</p>
+    <div className="container mx-auto py-8 px-4">
+      <h1 className="text-3xl font-bold mb-4">관리자 페이지</h1>
       <AdminPanel />
     </div>
   );

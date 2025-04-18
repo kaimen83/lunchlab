@@ -102,7 +102,8 @@ export async function getAllUsers() {
       role: (user.publicMetadata?.role as UserRole) || 'user',
       profileCompleted: !!user.publicMetadata?.profileCompleted,
       profile: user.publicMetadata?.profile as UserProfile,
-      createdAt: user.createdAt
+      createdAt: user.createdAt,
+      lastSignInAt: user.lastSignInAt
     }));
   } catch (error) {
     console.error('Error fetching users:', error);
