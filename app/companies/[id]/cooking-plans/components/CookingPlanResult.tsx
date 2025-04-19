@@ -341,7 +341,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
       currency: 'KRW',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(amount);
+    }).format(amount).replace('₩', '');
   };
 
   // 단가 포맷 (원/단위 형태로 표시)
@@ -352,7 +352,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
       currency: 'KRW',
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
-    }).format(unitPrice);
+    }).format(unitPrice).replace('₩', '');
     
     // 단위 추가 (예: "1,000원/g")
     return `${formattedPrice}/${unit}`;
@@ -544,12 +544,12 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                                   {ingredientReq?.code_name || "-"}
                                 </TableCell>
                                 <TableCell className="border-l-0">
-                                  <span className="text-sm">{ingredient.name}</span>
+                                  <span className="text-sm font-bold">{ingredient.name}</span>
                                 </TableCell>
                                 <TableCell className="text-right text-sm text-gray-600">
                                   {formatPackageAmount(packageAmount, ingredient.unit)}
                                 </TableCell>
-                                <TableCell className="text-right font-medium text-sm">
+                                <TableCell className="text-right font-bold text-sm">
                                   {unitsRequired}
                                 </TableCell>
                                 <TableCell className="text-right font-medium text-sm">
@@ -620,7 +620,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
               <CardTitle>발주서 목록</CardTitle>
               <CardDescription>
                 총 {cookingPlan.ingredient_requirements.length}개 품목 / 
-                예상 원가: {formatCurrency(totalIngredientsCost)}
+                예상 원가: {formatCurrency(totalIngredientsCost)}원
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -633,8 +633,8 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                     <TableHead className="text-right">필요 수량</TableHead>
                     <TableHead className="text-right">포장단위</TableHead>
                     <TableHead className="text-right">투입량</TableHead>
-                    <TableHead className="text-right">단가</TableHead>
-                    <TableHead className="text-right">총 원가</TableHead>
+                    <TableHead className="text-right">단가 (원)</TableHead>
+                    <TableHead className="text-right">총 원가 (원)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -650,7 +650,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                     
                     return (
                       <TableRow key={index}>
-                        <TableCell className="font-medium">{item.ingredient_name}</TableCell>
+                        <TableCell className="font-bold">{item.ingredient_name}</TableCell>
                         <TableCell>{item.code_name || "-"}</TableCell>
                         <TableCell>{item.supplier || "-"}</TableCell>
                         <TableCell className="text-right">
@@ -659,7 +659,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                         <TableCell className="text-right">
                           {formatPackageAmount(packageAmount, item.unit)}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right font-bold">
                           {unitsRequired}
                         </TableCell>
                         <TableCell className="text-right">{formatUnitPrice(item.unit_price, item.unit)}</TableCell>
