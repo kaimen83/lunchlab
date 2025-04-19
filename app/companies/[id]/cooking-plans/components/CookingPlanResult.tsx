@@ -363,18 +363,23 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
     return amount.toFixed(1);
   };
 
-  // 식재료 양 포맷 (g -> kg 변환)
+  // 식재료 양 포맷 (g -> kg 변환, ml -> l 변환)
   const formatIngredientAmount = (amount: number, unit: string) => {
     // g 단위일 경우 kg으로 변환
     if (unit === 'g') {
       const kgAmount = amount / 1000;
       return `${kgAmount.toFixed(1)}kg`;
     }
+    // ml 단위일 경우 l로 변환
+    else if (unit === 'ml') {
+      const lAmount = amount / 1000;
+      return `${lAmount.toFixed(1)}l`;
+    }
     // 그 외 단위는 그대로 표시하되 소수점 첫째자리까지
     return `${formatAmount(amount)} ${unit}`;
   };
 
-  // 포장 단위 포맷 (g -> kg 변환)
+  // 포장 단위 포맷 (g -> kg 변환, ml -> l 변환)
   const formatPackageAmount = (amount: number | undefined, unit: string) => {
     if (!amount) return "-";
     
@@ -382,6 +387,11 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
     if (unit === 'g') {
       const kgAmount = amount / 1000;
       return `${kgAmount.toFixed(1)}kg`;
+    }
+    // ml 단위일 경우 l로 변환
+    else if (unit === 'ml') {
+      const lAmount = amount / 1000;
+      return `${lAmount.toFixed(1)}l`;
     }
     // 그 외 단위는 그대로 표시하되 소수점 첫째자리까지
     return `${amount.toFixed(1)} ${unit}`;

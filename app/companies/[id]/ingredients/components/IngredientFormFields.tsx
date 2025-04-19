@@ -409,7 +409,7 @@ export function IngredientFormFields({
                   <SelectContent>
                     <SelectItem value="g">g</SelectItem>
                     <SelectItem value="ea">EA</SelectItem>
-                    <SelectItem value="l">l</SelectItem>
+                    <SelectItem value="ml">ml</SelectItem>
                   </SelectContent>
                 </Select>
               </FormControl>

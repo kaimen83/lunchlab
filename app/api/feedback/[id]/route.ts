@@ -5,7 +5,7 @@ import { auth } from '@clerk/nextjs/server'
 // 특정 피드백 조회
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth()
@@ -14,20 +14,22 @@ export async function GET(
     }
 
     const supabase = createServerSupabaseClient()
-    const feedbackId = params.id
+    const { id: feedbackId } = await params
 
     // 관리자 여부 확인
     const { data: membership, error: membershipError } = await supabase
       .from('company_memberships')
       .select('role')
       .eq('user_id', userId)
-      .eq('role', 'admin')
       .maybeSingle()
 
     if (membershipError) {
       console.error('회원 권한 확인 오류:', membershipError)
       return NextResponse.json({ error: '권한 확인 중 오류가 발생했습니다.' }, { status: 500 })
     }
+
+    // 디버깅을 위한 로깅
+    console.log('GET - 사용자 권한 정보:', membership, 'userId:', userId)
 
     // 피드백 조회
     const { data, error } = await supabase
@@ -42,7 +44,8 @@ export async function GET(
     }
 
     // 관리자가 아니고, 본인의 피드백이 아니면 접근 거부
-    if (!membership && data.user_id !== userId) {
+    const isAdmin = membership && membership.role === 'admin'
+    if (!isAdmin && data.user_id !== userId) {
       return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 })
     }
 
@@ -56,7 +59,7 @@ export async function GET(
 // 피드백 업데이트 (상태 변경 또는 답변)
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth()
@@ -65,7 +68,7 @@ export async function PATCH(
     }
 
     const supabase = createServerSupabaseClient()
-    const feedbackId = params.id
+    const { id: feedbackId } = await params
     const body = await req.json()
     
     // 관리자 여부 확인
@@ -73,7 +76,6 @@ export async function PATCH(
       .from('company_memberships')
       .select('role')
       .eq('user_id', userId)
-      .eq('role', 'admin')
       .maybeSingle()
 
     if (membershipError) {
@@ -81,8 +83,12 @@ export async function PATCH(
       return NextResponse.json({ error: '권한 확인 중 오류가 발생했습니다.' }, { status: 500 })
     }
 
+    // 디버깅을 위한 로깅
+    console.log('PATCH - 사용자 권한 정보:', membership, 'userId:', userId)
+
     // 관리자만 피드백을 업데이트할 수 있음
-    if (!membership) {
+    const isAdmin = membership && membership.role === 'admin'
+    if (!isAdmin) {
       return NextResponse.json({ error: '관리자만 피드백을 수정할 수 있습니다.' }, { status: 403 })
     }
 

@@ -47,7 +47,7 @@ export const useIngredientForm = ({
         code_name: '',
         supplier_id: '',
         package_amount: 0,
-        unit: 'g',
+        unit: 'ml',
         price: 0,
         items_per_box: 0,
         stock_grade: '',

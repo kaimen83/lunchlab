@@ -403,7 +403,7 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
                 <TableCell>{ingredient.supplier || '-'}</TableCell>
               )}
               {visibleColumns.package_amount && (
-                <TableCell>{formatNumber(ingredient.package_amount)}{ingredient.unit}</TableCell>
+                <TableCell>{formatNumber(ingredient.package_amount)}{ingredient.unit === 'l' ? 'ml' : ingredient.unit}</TableCell>
               )}
               {visibleColumns.price && (
                 <TableCell className="text-right">{formatCurrency(ingredient.price)}</TableCell>
@@ -573,7 +573,7 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
       </div>
       <div className="grid grid-cols-2 gap-1 text-sm">
         <div className="text-muted-foreground">단가:</div>
-        <div>{formatCurrency(ingredient.price)}원/{ingredient.package_amount}{ingredient.unit}</div>
+        <div>{formatCurrency(ingredient.price)}원/{ingredient.package_amount}{ingredient.unit === 'l' ? 'ml' : ingredient.unit}</div>
         
         <div className="text-muted-foreground">공급업체:</div>
         <div>{ingredient.supplier || '-'}</div>
