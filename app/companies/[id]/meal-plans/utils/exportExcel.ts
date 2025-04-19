@@ -96,75 +96,55 @@ const getMealPlanForDateAndTime = (
   return plans.length > 0 ? plans[0] : undefined;
 };
 
-// 주간 식단표 데이터 생성 - 웹 화면과 유사한 테이블 형식으로 개선
+// 주간 식단표 데이터 생성 - 템플릿별 표시 방식으로 변경
 export const exportWeeklyMealPlans = (
   daysOfWeek: Date[],
   mealPlans: MealPlan[],
   companyName: string
 ): void => {
+  // 템플릿 이름 목록 추출 (중복 제거 및 정렬)
+  const templateNames = [...new Set(mealPlans.map(plan => plan.name))].sort();
+  
   // 워크시트 데이터 준비
   const wsData = [
-    // 첫 번째 행: 헤더
-    ['요일', '식사 시간', '메뉴', '원가 (원)'],
+    // 첫 번째 행: 헤더 (템플릿 이름, 요일별 날짜)
+    ['템플릿 / 요일', ...daysOfWeek.map(day => `${format(day, 'MM/dd')} (${format(day, 'E', { locale: ko })})`)]
   ];
   
-  // 셀 병합을 위한 정보
-  interface MergeCell {
-    s: { r: number; c: number };
-    e: { r: number; c: number };
-  }
-  
-  const merges: MergeCell[] = [];
-  let rowIndex = 1; // 데이터 시작 행 (헤더 다음)
-  
-  // 각 날짜별 식단 데이터 추가
-  daysOfWeek.forEach((day, dayIndex) => {
-    const dateLabel = `${format(day, 'MM/dd')} (${format(day, 'E', { locale: ko })})`;
+  // 각 템플릿별 행 추가
+  templateNames.forEach(templateName => {
+    const rowData = [templateName];
     
-    // 아침
-    const breakfastPlan = getMealPlanForDateAndTime(mealPlans, day, 'breakfast');
-    wsData.push([
-      dateLabel, 
-      '아침', 
-      getMealPlanMenusText(breakfastPlan),
-      breakfastPlan ? Math.round(calculateMealPlanCost(breakfastPlan)).toLocaleString() : ''
-    ]);
-    
-    // 점심
-    const lunchPlan = getMealPlanForDateAndTime(mealPlans, day, 'lunch');
-    wsData.push([
-      '', 
-      '점심', 
-      getMealPlanMenusText(lunchPlan),
-      lunchPlan ? Math.round(calculateMealPlanCost(lunchPlan)).toLocaleString() : ''
-    ]);
-    
-    // 저녁
-    const dinnerPlan = getMealPlanForDateAndTime(mealPlans, day, 'dinner');
-    wsData.push([
-      '', 
-      '저녁', 
-      getMealPlanMenusText(dinnerPlan),
-      dinnerPlan ? Math.round(calculateMealPlanCost(dinnerPlan)).toLocaleString() : ''
-    ]);
-    
-    // 첫 번째 열 셀 병합 (3개 행을 하나로)
-    merges.push({
-      s: { r: rowIndex, c: 0 },
-      e: { r: rowIndex + 2, c: 0 }
+    // 각 요일별 메뉴 데이터 추가
+    daysOfWeek.forEach(day => {
+      // 해당 날짜와 템플릿 이름에 맞는 식단 필터링
+      const plansByTemplate = mealPlans.filter(plan => 
+        plan.date === format(day, 'yyyy-MM-dd') && 
+        plan.name === templateName
+      );
+      
+      if (plansByTemplate.length === 0) {
+        rowData.push(''); // 식단이 없는 경우 빈 셀
+      } else {
+        // 해당 날짜의 템플릿에 포함된 모든 식단의 메뉴 이름과 식사 시간
+        const menuContents = plansByTemplate.map(plan => {
+          const mealTimeKorean = getMealTimeKorean(plan.meal_time);
+          const menuText = getMealPlanMenusText(plan);
+          return `[${mealTimeKorean}] ${menuText}`;
+        }).join('\n');
+        
+        rowData.push(menuContents);
+      }
     });
     
-    rowIndex += 3;
+    wsData.push(rowData);
   });
   
   // 워크시트 생성
   const ws = utils.aoa_to_sheet(wsData);
   
-  // 셀 병합 적용
-  ws['!merges'] = merges;
-  
-  // 셀 너비 자동 조정
-  const colWidths = [13, 10, 50, 12];
+  // 셀 너비 설정
+  const colWidths = [20, ...Array(daysOfWeek.length).fill(28)];
   ws['!cols'] = colWidths.map(width => ({ width }));
   
   // 워크북 생성
@@ -178,6 +158,20 @@ export const exportWeeklyMealPlans = (
   
   // 파일 저장
   writeFile(wb, fileName);
+};
+
+// 식사 시간을 한글로 변환하는 함수
+const getMealTimeKorean = (mealTime: 'breakfast' | 'lunch' | 'dinner'): string => {
+  switch (mealTime) {
+    case 'breakfast':
+      return '아침';
+    case 'lunch':
+      return '점심';
+    case 'dinner':
+      return '저녁';
+    default:
+      return mealTime;
+  }
 };
 
 // 월간 식단표 데이터 생성 (일자별로 정확하게 표시)

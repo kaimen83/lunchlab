@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { format } from 'date-fns';
@@ -28,6 +28,13 @@ const WeekView: React.FC<WeekViewProps> = ({
   onViewMealPlan,
   onAddMealPlan
 }) => {
+  // 식단 이름(템플릿)별로 그룹화
+  const templateGroups = useMemo(() => {
+    // 식단 이름(템플릿) 목록 생성 (중복 제거)
+    const templateNames = [...new Set(mealPlans.map(plan => plan.name))].sort();
+    return templateNames;
+  }, [mealPlans]);
+
   // 식단 카드 렌더링
   const renderMealPlanCard = (mealPlan: MealPlan) => (
     <div 
@@ -36,30 +43,50 @@ const WeekView: React.FC<WeekViewProps> = ({
       onClick={() => onViewMealPlan(mealPlan)}
     >
       <div className="flex justify-between items-center mb-0.5">
-        <div className="font-medium text-xs truncate mr-2">{mealPlan.name}</div>
+        <div className="text-xs font-semibold text-blue-600 whitespace-nowrap">
+          {getMealTimeName(mealPlan.meal_time)}
+        </div>
         <div className="text-xs font-semibold text-blue-600 whitespace-nowrap">
           {formatCurrency(calculateMealPlanCost(mealPlan))}
         </div>
       </div>
-      <div className="text-xs text-gray-500 truncate">{getMenuNames(mealPlan)}</div>
+      <div className="text-xs text-gray-500">{getMenuNames(mealPlan)}</div>
     </div>
   );
+
+  // 특정 템플릿과 날짜에 맞는 식단 필터링
+  const getMealPlansByTemplateAndDate = (templateName: string, date: Date) => {
+    const dateString = format(date, 'yyyy-MM-dd');
+    return mealPlans.filter(
+      (plan) => plan.date === dateString && plan.name === templateName
+    );
+  };
+
+  // getMealTimeName 함수 추가
+  const getMealTimeName = (mealTime: 'breakfast' | 'lunch' | 'dinner'): string => {
+    switch (mealTime) {
+      case 'breakfast':
+        return '아침';
+      case 'lunch':
+        return '점심';
+      case 'dinner':
+        return '저녁';
+      default:
+        return mealTime;
+    }
+  };
 
   // PC 버전 렌더링
   const renderDesktopView = () => (
     <div className="hidden md:grid grid-cols-8 border-t border-l border-gray-200">
-      {/* 첫 번째 열: 시간대 */}
+      {/* 첫 번째 열: 템플릿 이름 */}
       <div className="col-span-1 border-r border-gray-200">
         <div className="h-16 border-b border-gray-200"></div> {/* 날짜 헤더 높이 맞춤 */} 
-        <div className="h-48 flex items-center justify-center font-semibold text-sm text-gray-500 border-b border-gray-200">
-          아침
-        </div>
-        <div className="h-48 flex items-center justify-center font-semibold text-sm text-gray-500 border-b border-gray-200">
-          점심
-        </div>
-        <div className="h-48 flex items-center justify-center font-semibold text-sm text-gray-500 border-b border-gray-200">
-          저녁
-        </div>
+        {templateGroups.map((templateName, index) => (
+          <div key={`template-${index}`} className="h-48 flex items-center justify-center font-semibold text-sm text-gray-500 border-b border-gray-200">
+            {templateName}
+          </div>
+        ))}
       </div>
       
       {/* 나머지 열: 요일별 식단 */} 
@@ -70,50 +97,40 @@ const WeekView: React.FC<WeekViewProps> = ({
             <div className="text-lg font-bold mt-1">{format(day, 'd')}</div>
           </div>
           
-          {/* 아침 식단 */}
-          <div className="h-48 border-b border-gray-200 p-2 relative group">
-            <div className="h-[90%] overflow-y-auto pr-1 space-y-2 mb-2">
-              {getMealPlansByDate(mealPlans, day, 'breakfast').map(renderMealPlanCard)}
-            </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="absolute bottom-2 right-2 w-auto opacity-40 hover:opacity-100 transition-opacity text-xs bg-white/80 rounded-full h-7 px-2"
-              onClick={() => onAddMealPlan(day, 'breakfast')}
-            >
-              <Plus className="h-3 w-3 mr-1" /> 추가
-            </Button>
-          </div>
-          
-          {/* 점심 식단 */} 
-          <div className="h-48 border-b border-gray-200 p-2 relative group">
-            <div className="h-[90%] overflow-y-auto pr-1 space-y-2 mb-2">
-              {getMealPlansByDate(mealPlans, day, 'lunch').map(renderMealPlanCard)}
-            </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="absolute bottom-2 right-2 w-auto opacity-40 hover:opacity-100 transition-opacity text-xs bg-white/80 rounded-full h-7 px-2"
-              onClick={() => onAddMealPlan(day, 'lunch')}
-            >
-              <Plus className="h-3 w-3 mr-1" /> 추가
-            </Button>
-          </div>
-          
-          {/* 저녁 식단 */} 
-          <div className="h-48 border-b border-gray-200 p-2 relative group">
-            <div className="h-[90%] overflow-y-auto pr-1 space-y-2 mb-2">
-              {getMealPlansByDate(mealPlans, day, 'dinner').map(renderMealPlanCard)}
-            </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="absolute bottom-2 right-2 w-auto opacity-40 hover:opacity-100 transition-opacity text-xs bg-white/80 rounded-full h-7 px-2"
-              onClick={() => onAddMealPlan(day, 'dinner')}
-            >
-              <Plus className="h-3 w-3 mr-1" /> 추가
-            </Button>
-          </div>
+          {/* 템플릿별 식단 표시 */}
+          {templateGroups.map((templateName, templateIndex) => {
+            const templateMealPlans = getMealPlansByTemplateAndDate(templateName, day);
+            return (
+              <div key={`day-${index}-template-${templateIndex}`} className="h-48 border-b border-gray-200 p-2 relative group">
+                <div className="h-[90%] overflow-y-auto pr-1 space-y-2 mb-2">
+                  {templateMealPlans.map(renderMealPlanCard)}
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="absolute bottom-2 right-2 w-auto opacity-40 hover:opacity-100 transition-opacity text-xs bg-white/80 rounded-full h-7 px-2"
+                  onClick={() => {
+                    // 현재 시간에 따라 기본 식사 시간 설정
+                    const now = new Date();
+                    const hour = now.getHours();
+                    let mealTime: 'breakfast' | 'lunch' | 'dinner';
+                    
+                    if (hour < 10) {
+                      mealTime = 'breakfast';
+                    } else if (hour < 15) {
+                      mealTime = 'lunch';
+                    } else {
+                      mealTime = 'dinner';
+                    }
+                    
+                    onAddMealPlan(day, mealTime);
+                  }}
+                >
+                  <Plus className="h-3 w-3 mr-1" /> 추가
+                </Button>
+              </div>
+            );
+          })}
         </div>
       ))}
     </div>
@@ -123,16 +140,18 @@ const WeekView: React.FC<WeekViewProps> = ({
   const renderMobileView = () => (
     <div className="md:hidden space-y-3">
       {daysOfWeek.map((day, index) => {
-        // 각 시간대별 식단 가져오기
-        const breakfastPlans = getMealPlansByDate(mealPlans, day, 'breakfast');
-        const lunchPlans = getMealPlansByDate(mealPlans, day, 'lunch');
-        const dinnerPlans = getMealPlansByDate(mealPlans, day, 'dinner');
+        // 이 날짜에 있는 모든 식단 가져오기 (템플릿별로 그룹화)
+        const dayMealPlans = getMealPlansByDate(mealPlans, day);
+        const hasMealPlans = dayMealPlans.length > 0;
         
-        // 식단이 있는지 확인
-        const hasBreakfast = breakfastPlans.length > 0;
-        const hasLunch = lunchPlans.length > 0;
-        const hasDinner = dinnerPlans.length > 0;
-        const hasAnyMeal = hasBreakfast || hasLunch || hasDinner;
+        // 템플릿별로 식단 그룹화
+        const templateMealPlans: Record<string, MealPlan[]> = {};
+        dayMealPlans.forEach(plan => {
+          if (!templateMealPlans[plan.name]) {
+            templateMealPlans[plan.name] = [];
+          }
+          templateMealPlans[plan.name].push(plan);
+        });
         
         // 오늘 날짜인지 확인
         const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
@@ -167,22 +186,22 @@ const WeekView: React.FC<WeekViewProps> = ({
               </div>
             </div>
             
-            {hasAnyMeal ? (
+            {hasMealPlans ? (
               <div className="px-4 py-2 space-y-2 border-t bg-gray-50">
-                {/* 아침 */}
-                {hasBreakfast && (
-                  <div className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors">
-                    <div className="w-2 h-2 rounded-full bg-yellow-400 mr-2"></div>
-                    <div className="text-sm font-medium mr-2">아침</div>
+                {/* 템플릿별 식단 표시 */}
+                {Object.entries(templateMealPlans).map(([templateName, plans]) => (
+                  <div key={`template-${templateName}`} className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors">
+                    <div className="w-2 h-2 rounded-full bg-blue-400 mr-2"></div>
+                    <div className="text-sm font-medium mr-2">{templateName}</div>
                     <div className="text-xs mr-auto overflow-hidden">
                       <Badge variant="secondary" className="text-xs">
-                        {breakfastPlans.length}개
+                        {plans.length}개
                       </Badge>
                     </div>
                     
                     <div className="flex-1 overflow-x-auto pb-1 hide-scrollbar">
                       <div className="flex gap-1 min-w-fit">
-                        {breakfastPlans.map(plan => (
+                        {plans.map(plan => (
                           <Button
                             key={plan.id}
                             variant="ghost"
@@ -190,71 +209,13 @@ const WeekView: React.FC<WeekViewProps> = ({
                             className="h-7 text-xs px-2 whitespace-nowrap"
                             onClick={() => onViewMealPlan(plan)}
                           >
-                            {plan.name}
+                            {getMealTimeName(plan.meal_time)}
                           </Button>
                         ))}
                       </div>
                     </div>
                   </div>
-                )}
-                
-                {/* 점심 */}
-                {hasLunch && (
-                  <div className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors">
-                    <div className="w-2 h-2 rounded-full bg-green-400 mr-2"></div>
-                    <div className="text-sm font-medium mr-2">점심</div>
-                    <div className="text-xs mr-auto overflow-hidden">
-                      <Badge variant="secondary" className="text-xs">
-                        {lunchPlans.length}개
-                      </Badge>
-                    </div>
-                    
-                    <div className="flex-1 overflow-x-auto pb-1 hide-scrollbar">
-                      <div className="flex gap-1 min-w-fit">
-                        {lunchPlans.map(plan => (
-                          <Button
-                            key={plan.id}
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs px-2 whitespace-nowrap"
-                            onClick={() => onViewMealPlan(plan)}
-                          >
-                            {plan.name}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {/* 저녁 */}
-                {hasDinner && (
-                  <div className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors">
-                    <div className="w-2 h-2 rounded-full bg-red-400 mr-2"></div>
-                    <div className="text-sm font-medium mr-2">저녁</div>
-                    <div className="text-xs mr-auto overflow-hidden">
-                      <Badge variant="secondary" className="text-xs">
-                        {dinnerPlans.length}개
-                      </Badge>
-                    </div>
-                    
-                    <div className="flex-1 overflow-x-auto pb-1 hide-scrollbar">
-                      <div className="flex gap-1 min-w-fit">
-                        {dinnerPlans.map(plan => (
-                          <Button
-                            key={plan.id}
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs px-2 whitespace-nowrap"
-                            onClick={() => onViewMealPlan(plan)}
-                          >
-                            {plan.name}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                ))}
               </div>
             ) : (
               <div className="px-4 py-3 border-t text-xs text-gray-400 italic">
@@ -266,6 +227,16 @@ const WeekView: React.FC<WeekViewProps> = ({
       })}
     </div>
   );
+
+  // 아무 템플릿도 없을 경우 안내 메시지
+  if (templateGroups.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center">
+        <div className="text-gray-400 mb-4">등록된 식단 템플릿이 없습니다.</div>
+        <div className="text-sm text-gray-500">식단 추가 시 생성된 템플릿(식단 이름)이 여기에 표시됩니다.</div>
+      </div>
+    );
+  }
 
   return (
     <>
