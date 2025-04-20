@@ -134,6 +134,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const ingredientsToInsert = [];
     const ingredientsToUpdate = [];
     
+    // 천단위 구분자(콤마)를 제거하고 숫자를 파싱하는 유틸리티 함수
+    const parseNumericValue = (value: string | null | undefined): number | null => {
+      if (!value) return null;
+      // 천단위 구분자(콤마) 제거 후 변환
+      const cleanedValue = value.replace(/,/g, '');
+      const result = parseFloat(cleanedValue);
+      return isNaN(result) ? null : result;
+    };
+    
     // 각 행 처리
     for (const [index, record] of records.entries()) {
       try {
@@ -159,8 +168,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
         const supplierName = record[4] || null;
         
         // F열(5번 인덱스): 포장당 식재료 양 (필수)
-        const packageAmount = parseFloat(record[5]);
-        if (isNaN(packageAmount) || packageAmount <= 0) {
+        const packageAmount = parseNumericValue(record[5]);
+        if (!packageAmount || packageAmount <= 0) {
           results.failed++;
           results.errors.push(`행 #${index + 4}: 유효하지 않은 포장 단위 - ${record[5]}`);
           continue;
@@ -182,16 +191,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
         }
         
         // J열(9번 인덱스): 가격 (필수)
-        const price = parseFloat(record[9]);
-        if (isNaN(price) || price < 0) {
+        const price = parseNumericValue(record[9]);
+        if (price === null || price < 0) {
           results.failed++;
           results.errors.push(`행 #${index + 4}: 유효하지 않은 가격 - ${record[9]}`);
           continue;
         }
         
         // L열(11번 인덱스): 박스당 포장갯수
-        const itemsPerBox = record[11] ? parseFloat(record[11]) : null;
-        if (record[11] && (isNaN(itemsPerBox!) || itemsPerBox! < 0)) {
+        const itemsPerBox = parseNumericValue(record[11]);
+        if (record[11] && (itemsPerBox === null || itemsPerBox < 0)) {
           results.failed++;
           results.errors.push(`행 #${index + 4}: 유효하지 않은 박스당 포장갯수 - ${record[11]}`);
           continue;
@@ -204,32 +213,32 @@ export async function POST(request: NextRequest, context: RouteContext) {
         const origin = record[13] || null;
         
         // O열(14번 인덱스): 칼로리
-        const calories = record[14] ? parseFloat(record[14]) : null;
-        if (record[14] && (isNaN(calories!) || calories! < 0)) {
+        const calories = parseNumericValue(record[14]);
+        if (record[14] && (calories === null || calories < 0)) {
           results.failed++;
           results.errors.push(`행 #${index + 4}: 유효하지 않은 칼로리 값 - ${record[14]}`);
           continue;
         }
         
         // P열(15번 인덱스): 탄수화물
-        const carbs = record[15] ? parseFloat(record[15]) : null;
-        if (record[15] && (isNaN(carbs!) || carbs! < 0)) {
+        const carbs = parseNumericValue(record[15]);
+        if (record[15] && (carbs === null || carbs < 0)) {
           results.failed++;
           results.errors.push(`행 #${index + 4}: 유효하지 않은 탄수화물 값 - ${record[15]}`);
           continue;
         }
         
         // Q열(16번 인덱스): 단백질
-        const protein = record[16] ? parseFloat(record[16]) : null;
-        if (record[16] && (isNaN(protein!) || protein! < 0)) {
+        const protein = parseNumericValue(record[16]);
+        if (record[16] && (protein === null || protein < 0)) {
           results.failed++;
           results.errors.push(`행 #${index + 4}: 유효하지 않은 단백질 값 - ${record[16]}`);
           continue;
         }
         
         // R열(17번 인덱스): 지방
-        const fat = record[17] ? parseFloat(record[17]) : null;
-        if (record[17] && (isNaN(fat!) || fat! < 0)) {
+        const fat = parseNumericValue(record[17]);
+        if (record[17] && (fat === null || fat < 0)) {
           results.failed++;
           results.errors.push(`행 #${index + 4}: 유효하지 않은 지방 값 - ${record[17]}`);
           continue;
@@ -285,13 +294,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
           }
         }
         
-        // 중복 식재료 확인 (이름 기준)
-        const { data: existingIngredient } = await supabase
+        // 중복 식재료 확인 (이름과 공급업체 기준)
+        let existingIngredientQuery = supabase
           .from('ingredients')
           .select('id')
           .eq('company_id', companyId)
           .eq('name', name)
-          .maybeSingle();
+          .eq('package_amount', packageAmount);
+        
+        // supplier_id가 있는 경우 supplier_id도 일치하는지 확인
+        if (supplierId) {
+          existingIngredientQuery = existingIngredientQuery.eq('supplier_id', supplierId);
+        } else {
+          // supplier_id가 없는 경우 supplier_id가 null인 항목 찾기
+          existingIngredientQuery = existingIngredientQuery.is('supplier_id', null);
+        }
+        
+        const { data: existingIngredient } = await existingIngredientQuery.maybeSingle();
         
         // 식재료 데이터 객체 생성
         const ingredient = {
