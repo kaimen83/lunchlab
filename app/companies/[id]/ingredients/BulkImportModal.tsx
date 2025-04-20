@@ -205,9 +205,15 @@ export default function BulkImportModal({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             취소
           </Button>
-          <Button onClick={handleImport} disabled={isLoading || !url}>
-            {isLoading ? '가져오는 중...' : '가져오기'}
-          </Button>
+          {importResult ? (
+            <Button onClick={() => onOpenChange(false)}>
+              닫기
+            </Button>
+          ) : (
+            <Button onClick={handleImport} disabled={isLoading || !url}>
+              {isLoading ? '가져오는 중...' : '가져오기'}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
