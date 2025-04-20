@@ -291,8 +291,39 @@ export function useSidebarState(companies: Array<Company & { role: string }>) {
 
   // 낙관적 업데이트를 위한 탭 이동 함수
   const navigateToTab = useCallback((url: string) => {
-    // 이미 이동 중인 경우 리턴
-    if (navigationInProgress === url) return;
+    // URL에서 회사 ID와 탭 경로 추출
+    const urlCompanyId = url.startsWith('/companies/') ? url.split('/')[2] : null;
+    const urlPattern = url.replace(/\/companies\/[^\/]+/, ''); // 회사 ID를 제외한 URL 패턴
+    
+    // 현재 진행 중인 내비게이션이 있는지 확인
+    if (navigationInProgress) {
+      // 정확히 같은 URL이거나, 같은 회사의 같은 패턴 URL인 경우 리턴
+      if (navigationInProgress === url) return;
+      
+      // 진행 중인 내비게이션에서도 회사 ID와 패턴 추출
+      const inProgressCompanyId = navigationInProgress.startsWith('/companies/') 
+        ? navigationInProgress.split('/')[2] 
+        : null;
+      const inProgressPattern = navigationInProgress.replace(/\/companies\/[^\/]+/, '');
+      
+      // 다른 회사로 같은 패턴의 탭으로 이동하는 경우 (A 회사 식단관리 → B 회사 식단관리)
+      // 이 경우는 블록하지 않고 진행
+      if (urlCompanyId !== inProgressCompanyId && urlPattern === inProgressPattern) {
+        // 내비게이션 진행 상태 초기화 (즉시)
+        setNavigationInProgress(null);
+        // 약간의 지연 후 새 내비게이션 설정 (포인터 이벤트가 정상화되도록)
+        setTimeout(() => {
+          setNavigationInProgress(url);
+          router.push(url);
+        }, 10);
+        return;
+      }
+    }
+    
+    // 포인터 이벤트 정상화 (추가 안전장치)
+    if (typeof document !== 'undefined' && document.body.style.pointerEvents === 'none') {
+      document.body.style.pointerEvents = '';
+    }
     
     // 낙관적 UI 업데이트를 위해 현재 이동 중인 URL 설정
     setNavigationInProgress(url);
@@ -300,10 +331,15 @@ export function useSidebarState(companies: Array<Company & { role: string }>) {
     // 실제 라우팅 수행
     router.push(url);
     
-    // 라우팅이 완료된 후 상태 초기화 (약간의 지연 추가)
+    // 라우팅이 완료된 후 상태 초기화 (타이머 시간 단축)
     setTimeout(() => {
       setNavigationInProgress(null);
-    }, 500);
+      
+      // 포인터 이벤트 다시 한번 정상화 (추가 안전장치)
+      if (typeof document !== 'undefined' && document.body.style.pointerEvents === 'none') {
+        document.body.style.pointerEvents = '';
+      }
+    }, 300); // 500ms → 300ms로 단축
   }, [router, navigationInProgress]);
 
   const toggleCompany = (companyId: string) => {

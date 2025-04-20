@@ -41,8 +41,27 @@ export function CompanyItem({ company, toggleCompany, handleLinkClick }: Company
   const handleTabClick = (url: string, event: React.MouseEvent) => {
     event.preventDefault(); // 기본 링크 동작 방지
     
-    // 이미 활성화된 탭이면 무시
-    if (url === activeTab) {
+    // 포인터 이벤트 정상화 (터치 이벤트 문제 방지)
+    if (typeof document !== 'undefined' && document.body.style.pointerEvents === 'none') {
+      document.body.style.pointerEvents = '';
+    }
+    
+    // URL에서 회사 ID 추출
+    const urlCompanyId = url.startsWith('/companies/') ? url.split('/')[2] : null;
+    
+    // 현재 URL과 클릭한 URL의 패턴 비교 (회사 ID 제외)
+    const currentUrlPattern = pathname.replace(/\/companies\/[^\/]+/, '');
+    const clickedUrlPattern = url.replace(/\/companies\/[^\/]+/, '');
+    
+    // 회사 간 동일 패턴 탭 전환 감지 (예: A회사 식단관리 → B회사 식단관리)
+    const isCompanySwitchWithSameTab = 
+      urlCompanyId !== currentCompanyIdInUrl && 
+      currentUrlPattern === clickedUrlPattern &&
+      currentUrlPattern !== '';
+    
+    // 이미 활성화된 탭이면서 같은 회사 내 이동인 경우만 무시
+    // 다른 회사로 같은 패턴의 탭 이동은 허용
+    if (url === activeTab && urlCompanyId === currentCompanyIdInUrl) {
       handleLinkClick();
       return;
     }
@@ -53,6 +72,16 @@ export function CompanyItem({ company, toggleCompany, handleLinkClick }: Company
     // 내비게이션 기능 호출
     if (company.navigateToTab) {
       company.navigateToTab(url);
+    }
+    
+    // 회사 간 동일 패턴 탭 전환 시 추가 처리
+    if (isCompanySwitchWithSameTab) {
+      // 약간의 지연 후 추가 작업 수행 (포인터 이벤트 등 정상화를 위해)
+      setTimeout(() => {
+        if (typeof document !== 'undefined' && document.body.style.pointerEvents === 'none') {
+          document.body.style.pointerEvents = '';
+        }
+      }, 100);
     }
     
     handleLinkClick();

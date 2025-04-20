@@ -40,11 +40,34 @@ export default function TouchEventFixer() {
       } catch (error) {
         console.warn("TouchEventFixer 인터벌 처리 중 오류 발생:", error);
       }
-    }, 1500); // 1.5초마다 체크 (성능 개선)
+    }, 1000); // 1.5초 → 1초로 단축하여 더 자주 확인
+    
+    // 탭 클릭과 회사 전환 시 문제 해결을 위한 이벤트 추가
+    const handleClick = () => {
+      // 클릭 시 포인터 이벤트 검사 및 정상화
+      if (typeof document !== 'undefined' && document.body.style.pointerEvents === 'none') {
+        document.body.style.pointerEvents = '';
+      }
+    };
+    
+    // 라우팅 변경 전후로 포인터 이벤트 검사
+    const handleBeforeHistoryChange = () => {
+      if (typeof document !== 'undefined' && document.body.style.pointerEvents === 'none') {
+        document.body.style.pointerEvents = '';
+      }
+    };
+    
+    // 이벤트 리스너 등록
+    document.addEventListener('click', handleClick);
+    
+    // 커스텀 이벤트 추가 (Next.js 라우팅 이벤트와 유사)
+    window.addEventListener('beforeHistoryChange', handleBeforeHistoryChange);
 
     return () => {
       observer.disconnect();
       clearInterval(intervalId);
+      document.removeEventListener('click', handleClick);
+      window.removeEventListener('beforeHistoryChange', handleBeforeHistoryChange);
     };
   }, []);
 
@@ -116,6 +139,11 @@ export default function TouchEventFixer() {
           // 제거 중 오류 발생 시 무시
         }
       });
+    }
+
+    // 항상 포인터 이벤트 정상화 확인 (추가)
+    if (typeof document !== 'undefined' && document.body.style.pointerEvents === 'none') {
+      document.body.style.pointerEvents = '';
     }
   };
 
