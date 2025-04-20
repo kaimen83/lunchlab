@@ -54,15 +54,24 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return Response.json({ error: '스프레드시트 URL이 필요합니다.' }, { status: 400 });
     }
 
-    // 스프레드시트 ID 추출
-    const match = spreadsheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (!match?.[1]) {
-      return Response.json({ error: '유효하지 않은 구글 스프레드시트 URL입니다.' }, { status: 400 });
+    // CSV URL 초기화
+    let csvUrl = '';
+
+    // 'pub?output=csv' 형식의 URL 확인
+    if (spreadsheetUrl.includes('/pub?output=csv')) {
+      // 이미 CSV URL 형식이므로 그대로 사용
+      csvUrl = spreadsheetUrl;
+    } else {
+      // 일반 스프레드시트 URL에서 ID 추출
+      const match = spreadsheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (!match?.[1]) {
+        return Response.json({ error: '유효하지 않은 구글 스프레드시트 URL입니다.' }, { status: 400 });
+      }
+      const spreadsheetId = match[1];
+      
+      // CSV URL 생성 (UTF-8 인코딩 지정)
+      csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&charset=utf-8`;
     }
-    const spreadsheetId = match[1];
-    
-    // CSV URL 생성 (UTF-8 인코딩 지정)
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&charset=utf-8`;
     
     // CSV 데이터 가져오기
     const response = await fetch(csvUrl, {
