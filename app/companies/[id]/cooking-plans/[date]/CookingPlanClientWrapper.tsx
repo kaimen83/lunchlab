@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import CookingPlanResult from '../components/CookingPlanResult';
-import { CookingPlan } from '../types';
+import { CookingPlan, MenuPortion, ExtendedCookingPlan, ContainerRequirement } from '../types';
 import * as XLSX from 'xlsx';
 
 interface CookingPlanClientWrapperProps {
@@ -45,10 +47,133 @@ interface MenuContainer {
   };
 }
 
+// 용기 정보 타입 정의
+interface Container {
+  id: string;
+  name: string;
+  code_name?: string;
+  description?: string;
+  price?: number;
+}
+
 export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanClientWrapperProps) {
   const { toast } = useToast();
   // 현재 활성화된 탭 상태 관리
   const [activeTab, setActiveTab] = useState<'menu-portions' | 'ingredients'>('menu-portions');
+  // 용기 정보 저장 상태
+  const [containers, setContainers] = useState<Container[]>([]);
+  // 로딩 상태
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  
+  // 모든 용기 정보 가져오기
+  useEffect(() => {
+    const fetchContainers = async () => {
+      setIsLoading(true);
+      try {
+        // URL에서 회사 ID 추출
+        const pathParts = window.location.pathname.split('/');
+        const companyIdIndex = pathParts.findIndex(part => part === 'companies') + 1;
+        const companyId = pathParts[companyIdIndex];
+        
+        if (!companyId) {
+          console.error('회사 ID를 찾을 수 없습니다.');
+          return;
+        }
+        
+        // API를 통해 용기 정보 가져오기
+        const response = await fetch(`/api/companies/${companyId}/containers`);
+        
+        if (!response.ok) {
+          throw new Error('용기 정보를 가져오는데 실패했습니다.');
+        }
+        
+        const data = await response.json();
+        setContainers(data || []);
+      } catch (error) {
+        console.error('용기 정보 가져오기 오류:', error);
+        toast({
+          title: '용기 정보 가져오기 실패',
+          description: '용기 정보를 가져오는 중 오류가 발생했습니다.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchContainers();
+  }, [toast]);
+  
+  // 용기별 필요 수량 계산 함수
+  const calculateContainerRequirements = (menuPortions: typeof cookingPlan.menu_portions): ContainerRequirement[] => {
+    // 용기별 사용 수량을 저장할 Map
+    const containerMap = new Map<string, ContainerRequirement>();
+    
+    // 모든 메뉴 포션을 순회하면서 용기 사용량 집계
+    menuPortions.forEach(portion => {
+      // 용기가 없는 경우 건너뜀
+      if (!portion.container_id || !portion.container_name) return;
+      
+      // 이미 집계된 용기인지 확인
+      if (containerMap.has(portion.container_id)) {
+        // 기존 용기의 필요 수량 증가
+        const container = containerMap.get(portion.container_id)!;
+        container.needed_quantity += portion.headcount;
+        // 가격 정보가 있으면 총 비용 업데이트
+        if (container.price) {
+          container.total_price = container.price * container.needed_quantity;
+        }
+      } else {
+        // 새 용기 정보 생성
+        // 용기 가격 정보 가져오기
+        let containerPrice: number | undefined = undefined;
+        
+        // meal_plans에서 용기 가격 정보 찾기
+        for (const mealPlan of cookingPlan.meal_plans) {
+          if (!mealPlan.meal_plan_menus) continue;
+          
+          for (const mealPlanMenu of mealPlan.meal_plan_menus) {
+            if (mealPlanMenu.container_id === portion.container_id && mealPlanMenu.container?.price) {
+              containerPrice = mealPlanMenu.container.price;
+              break;
+            }
+          }
+          
+          if (containerPrice !== undefined) break;
+        }
+        
+        // 용기 코드명 찾기
+        const codeName = findContainerCodeName(portion.container_id);
+        
+        // 용기 정보 저장
+        containerMap.set(portion.container_id, {
+          container_id: portion.container_id,
+          container_name: portion.container_name,
+          code_name: codeName,
+          needed_quantity: portion.headcount,
+          price: containerPrice,
+          total_price: containerPrice ? containerPrice * portion.headcount : 0
+        });
+      }
+    });
+    
+    // Map을 배열로 변환하여 반환
+    return Array.from(containerMap.values());
+  };
+
+  // 용기 코드명 찾기 보조 함수
+  const findContainerCodeName = useCallback((containerId: string): string | undefined => {
+    // 상태에 저장된 용기 목록에서 해당 ID의 용기 찾기
+    const container = containers.find(c => c.id === containerId);
+    // 찾은 용기의 code_name 반환 (없으면 undefined)
+    return container?.code_name;
+  }, [containers]);
+  
+  // 확장된 조리계획서 데이터 생성
+  const extendedCookingPlan: ExtendedCookingPlan = {
+    ...cookingPlan,
+    container_requirements: calculateContainerRequirements(cookingPlan.menu_portions)
+  };
   
   // 인쇄 처리
   const handlePrint = () => {
@@ -187,10 +312,37 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
       ]);
     });
     
+    // 빈 행 추가 (구분용)
+    excelData.push(['']);
+    excelData.push(['']);
+    
+    // 용기 데이터 추가
+    const totalContainerCost = extendedCookingPlan.container_requirements.reduce(
+      (sum, item) => sum + item.total_price, 0
+    );
+    
+    excelData.push(['필요 용기 목록']);
+    excelData.push([`총 ${extendedCookingPlan.container_requirements.length}개 품목 / 예상 비용: ${formatCurrency(totalContainerCost)}`]);
+    excelData.push(['']);
+    excelData.push(['용기명', '품목코드', '필요 수량', '단가', '총 비용']);
+    
+    // 용기 데이터 추가
+    extendedCookingPlan.container_requirements.forEach(item => {
+      excelData.push([
+        item.container_name,
+        item.code_name || "-",
+        `${item.needed_quantity}개`,
+        item.price ? formatCurrency(item.price) : "-",
+        formatCurrency(item.total_price)
+      ]);
+    });
+    
     // 주석 행 추가
     excelData.push(['']);
     excelData.push(['* 포장단위는 식재료 마스터에 등록된 정보입니다. 정보가 없는 경우 "-"로 표시됩니다.']);
     excelData.push(['* 투입량은 필요 수량을 포장단위로 나눈 값입니다. 포장단위가 없으면 계산할 수 없습니다.']);
+    excelData.push(['* 용기 단가는 용기 마스터에 등록된 정보입니다. 가격 정보가 없는 경우 "-"로 표시됩니다.']);
+    excelData.push(['* 필요 수량은 해당 날짜의 조리계획에서 각 용기가 필요한 총 수량입니다.']);
     
     return excelData;
   };
@@ -470,7 +622,7 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
 
   return (
     <CookingPlanResult 
-      cookingPlan={cookingPlan} 
+      cookingPlan={extendedCookingPlan} 
       onPrint={handlePrint} 
       onDownload={handleDownload}
       onTabChange={(value: string) => setActiveTab(value as 'menu-portions' | 'ingredients')}

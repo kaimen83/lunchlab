@@ -8,17 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CookingPlan, MenuPortion, IngredientRequirement } from '../types';
+import { CookingPlan, MenuPortion, IngredientRequirement, ExtendedCookingPlan, ContainerRequirement } from '../types';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 
 // 확장된 식재료 요구사항 타입 정의 - 외부에서 import하는 IngredientRequirement 사용
 interface ExtendedIngredientRequirement extends IngredientRequirement {}
 
-// 확장된 조리계획서 타입 정의
-interface ExtendedCookingPlan extends Omit<CookingPlan, 'ingredient_requirements'> {
-  ingredient_requirements: ExtendedIngredientRequirement[];
-}
+// 확장된 조리계획서 타입 정의는 types.ts에서 import
 
 interface CookingPlanResultProps {
   cookingPlan: ExtendedCookingPlan;
@@ -415,6 +412,11 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
     (sum, item) => sum + item.total_price, 0
   );
 
+  // 총 용기 비용 계산
+  const totalContainerCost = cookingPlan.container_requirements?.reduce(
+    (sum, item) => sum + item.total_price, 0
+  ) || 0;
+
   // 식수 포맷 (용기별로 구분)
   const formatHeadcounts = (containersInfo: ExtendedContainerInfo[]) => {
     // 용기가 하나인 경우 식수만 표시
@@ -677,6 +679,59 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
               </p>
               <p className="text-xs text-gray-500">
                 * 식재료 업체는 식재료 마스터에 등록된 공급업체 정보입니다.
+              </p>
+            </CardContent>
+          </Card>
+          
+          {/* 용기 목록 카드 추가 */}
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>필요 용기 목록</CardTitle>
+              <CardDescription>
+                총 {cookingPlan.container_requirements.length}개 품목 / 
+                예상 비용: {formatCurrency(totalContainerCost)}원
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>용기명</TableHead>
+                    <TableHead>품목코드</TableHead>
+                    <TableHead className="text-right">필요 수량</TableHead>
+                    <TableHead className="text-right">단가 (원)</TableHead>
+                    <TableHead className="text-right">총 비용 (원)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {cookingPlan.container_requirements.length > 0 ? (
+                    cookingPlan.container_requirements.map((item, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-bold">{item.container_name}</TableCell>
+                        <TableCell>{item.code_name || "-"}</TableCell>
+                        <TableCell className="text-right">
+                          {item.needed_quantity}개
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {item.price ? formatCurrency(item.price) : "-"}
+                        </TableCell>
+                        <TableCell className="text-right">{formatCurrency(item.total_price)}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                        등록된 용기가 없습니다.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+              <p className="text-xs text-gray-500 mt-2">
+                * 용기 단가는 용기 마스터에 등록된 정보입니다. 가격 정보가 없는 경우 "-"로 표시됩니다.
+              </p>
+              <p className="text-xs text-gray-500">
+                * 필요 수량은 해당 날짜의 조리계획에서 각 용기가 필요한 총 수량입니다.
               </p>
             </CardContent>
           </Card>
