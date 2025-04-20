@@ -324,7 +324,7 @@ export default function MenuIngredientsSelector({
               </Button>
             </SheetTrigger>
             <SheetContent 
-              className="w-full max-h-[92vh] p-0 rounded-t-2xl border-t-0 bg-gradient-to-b from-gray-50 to-white" 
+              className="w-full max-h-[92vh] p-0 rounded-t-2xl border-t-0 bg-gradient-to-b from-gray-50 to-white md:max-w-2xl md:mx-auto md:rounded-2xl md:border md:h-auto md:max-h-[600px] md:top-[50%] md:translate-y-[-50%] md:bottom-auto" 
               side="bottom" 
               closeButton={false}
             >
@@ -368,7 +368,7 @@ export default function MenuIngredientsSelector({
               
               <div className="px-4 pb-6">
                 <Command className="rounded-xl border-none shadow-none bg-transparent overflow-hidden">
-                  <CommandList className="max-h-[60vh] overflow-y-auto py-2">
+                  <CommandList className="max-h-[60vh] overflow-y-auto py-2 md:max-h-[400px]">
                     <CommandEmpty className="py-6 text-center text-gray-500">
                       <div className="flex flex-col items-center gap-2">
                         <CircleSlash className="h-8 w-8 text-gray-300" />
