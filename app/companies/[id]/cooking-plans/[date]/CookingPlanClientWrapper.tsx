@@ -109,52 +109,86 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
     // 용기별 사용 수량을 저장할 Map
     const containerMap = new Map<string, ContainerRequirement>();
     
-    // 모든 메뉴 포션을 순회하면서 용기 사용량 집계
+    // 식단별로 메뉴를 그룹화합니다
+    const mealPlanMap = new Map<string, {
+      headcount: number,
+      containers: Set<string>, // 식단에서 사용되는 용기 ID 집합
+      containerNames: Map<string, string> // 용기 ID와 이름 매핑
+    }>();
+    
+    // 먼저 식단별로 그룹화하고 각 식단에서 사용하는 용기를 중복 없이 식별
     menuPortions.forEach(portion => {
       // 용기가 없는 경우 건너뜀
       if (!portion.container_id || !portion.container_name) return;
       
-      // 이미 집계된 용기인지 확인
-      if (containerMap.has(portion.container_id)) {
-        // 기존 용기의 필요 수량 증가
-        const container = containerMap.get(portion.container_id)!;
-        container.needed_quantity += portion.headcount;
-        // 가격 정보가 있으면 총 비용 업데이트
-        if (container.price) {
-          container.total_price = container.price * container.needed_quantity;
-        }
+      // 식단 ID가 없는 경우 메뉴 ID를 키로 사용 (임시 식단으로 간주)
+      const planKey = portion.meal_plan_id || `menu-${portion.menu_id}`;
+      
+      if (mealPlanMap.has(planKey)) {
+        // 기존 식단 정보 업데이트
+        const mealPlan = mealPlanMap.get(planKey)!;
+        
+        // 식단에 해당 용기 추가 (Set이므로 중복 없음)
+        mealPlan.containers.add(portion.container_id);
+        mealPlan.containerNames.set(portion.container_id, portion.container_name);
+        
+        // 주의: headcount는 식단별로 동일해야 함. 동일하지 않은 경우 값을 유지
+        // 같은 식단인데 식수가 다르다면 데이터 오류일 가능성이 있음
       } else {
-        // 새 용기 정보 생성
-        // 용기 가격 정보 가져오기
-        let containerPrice: number | undefined = undefined;
-        
-        // meal_plans에서 용기 가격 정보 찾기
-        for (const mealPlan of cookingPlan.meal_plans) {
-          if (!mealPlan.meal_plan_menus) continue;
-          
-          for (const mealPlanMenu of mealPlan.meal_plan_menus) {
-            if (mealPlanMenu.container_id === portion.container_id && mealPlanMenu.container?.price) {
-              containerPrice = mealPlanMenu.container.price;
-              break;
-            }
-          }
-          
-          if (containerPrice !== undefined) break;
-        }
-        
-        // 용기 코드명 찾기
-        const codeName = findContainerCodeName(portion.container_id);
-        
-        // 용기 정보 저장
-        containerMap.set(portion.container_id, {
-          container_id: portion.container_id,
-          container_name: portion.container_name,
-          code_name: codeName,
-          needed_quantity: portion.headcount,
-          price: containerPrice,
-          total_price: containerPrice ? containerPrice * portion.headcount : 0
+        // 새 식단 추가
+        mealPlanMap.set(planKey, {
+          headcount: portion.headcount,
+          containers: new Set([portion.container_id]),
+          containerNames: new Map([[portion.container_id, portion.container_name]])
         });
       }
+    });
+    
+    // 이제 각 식단별로 필요한 용기 수량을 계산
+    mealPlanMap.forEach((mealPlan, planKey) => {
+      // 식단의 각 용기에 대해 처리
+      mealPlan.containers.forEach(containerId => {
+        if (containerMap.has(containerId)) {
+          // 기존 용기에 식단의 식수만큼 추가
+          const container = containerMap.get(containerId)!;
+          container.needed_quantity += mealPlan.headcount;
+          
+          // 가격 정보가 있으면 총 비용 업데이트
+          if (container.price) {
+            container.total_price = container.price * container.needed_quantity;
+          }
+        } else {
+          // 용기 가격 정보 가져오기
+          let containerPrice: number | undefined = undefined;
+          
+          // meal_plans에서 용기 가격 정보 찾기
+          for (const mealPlan of cookingPlan.meal_plans) {
+            if (!mealPlan.meal_plan_menus) continue;
+            
+            for (const mealPlanMenu of mealPlan.meal_plan_menus) {
+              if (mealPlanMenu.container_id === containerId && mealPlanMenu.container?.price) {
+                containerPrice = mealPlanMenu.container.price;
+                break;
+              }
+            }
+            
+            if (containerPrice !== undefined) break;
+          }
+          
+          // 용기 코드명 찾기
+          const codeName = findContainerCodeName(containerId);
+          
+          // 용기 정보 저장
+          containerMap.set(containerId, {
+            container_id: containerId,
+            container_name: mealPlan.containerNames.get(containerId) || '알 수 없음',
+            code_name: codeName,
+            needed_quantity: mealPlan.headcount,
+            price: containerPrice,
+            total_price: containerPrice ? containerPrice * mealPlan.headcount : 0
+          });
+        }
+      });
     });
     
     // Map을 배열로 변환하여 반환
