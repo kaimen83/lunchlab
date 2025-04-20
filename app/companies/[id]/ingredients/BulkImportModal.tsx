@@ -157,7 +157,7 @@ export default function BulkImportModal({
               <AlertDescription>
                 스프레드시트가 <strong>공개 접근 가능</strong>하도록 설정되어 있어야 합니다.
                 <br />
-                일반 공유 링크(https://docs.google.com/spreadsheets/d/...)나 웹에 게시한 링크(pub?output=csv) 모두 사용 가능합니다.
+                공유시 "웹페이지"가 아닌 "csv"를 선택해야 합니다.
               </AlertDescription>
             </Alert>
             
