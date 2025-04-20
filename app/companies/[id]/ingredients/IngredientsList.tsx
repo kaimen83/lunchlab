@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { 
   Plus, FilePen, Trash2, Search, PackageOpen, 
   ChevronDown, ChevronUp, LineChart, MoreVertical, Eye,
-  Settings, X, ChevronRight, Info
+  Settings, X, ChevronRight, Info, FileSpreadsheet
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +32,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import React from 'react';
+import BulkImportModal from './BulkImportModal';
 
 interface Ingredient {
   id: string;
@@ -91,6 +92,7 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
     nutrition: false,
     allergens: false
   });
+  const [bulkImportModalOpen, setBulkImportModalOpen] = useState(false);
 
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin';
 
@@ -727,9 +729,16 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
               </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button onClick={handleAddIngredient}>
-            <Plus className="mr-2 h-4 w-4" /> 식재료 추가
-          </Button>
+          {isOwnerOrAdmin && (
+            <>
+              <Button variant="outline" onClick={() => setBulkImportModalOpen(true)}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> 일괄 추가
+              </Button>
+              <Button onClick={handleAddIngredient}>
+                <Plus className="mr-2 h-4 w-4" /> 식재료 추가
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -982,6 +991,14 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 일괄 추가 모달 */}
+      <BulkImportModal
+        open={bulkImportModalOpen}
+        onOpenChange={setBulkImportModalOpen}
+        companyId={companyId}
+        onImportComplete={loadIngredients}
+      />
     </div>
   );
 } 
