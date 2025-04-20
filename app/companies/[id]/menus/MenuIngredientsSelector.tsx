@@ -1,16 +1,27 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetTrigger,
+  SheetFooter,
+} from '@/components/ui/sheet';
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandSeparator,
+} from '@/components/ui/command';
 import { 
   Table, 
   TableBody, 
@@ -23,9 +34,19 @@ import {
   Plus, 
   Trash2, 
   PackageOpen, 
-  ArrowDownUp 
+  Search,
+  Clock,
+  ListFilter,
+  CheckCircle2,
+  Sparkles,
+  Tag,
+  CircleSlash,
+  ChevronUp
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface Ingredient {
   id: string;
@@ -52,6 +73,51 @@ interface MenuIngredientsSelectorProps {
   amountEditable?: boolean;
 }
 
+// 한글 초성 추출 유틸리티 함수
+const getKoreanInitial = (text: string): string => {
+  const firstChar = text.charAt(0);
+  const unicodeValue = firstChar.charCodeAt(0);
+  
+  // 한글 범위 확인 (유니코드: AC00-D7A3)
+  if (unicodeValue >= 44032 && unicodeValue <= 55203) {
+    const idx = Math.floor((unicodeValue - 44032) / 588);
+    const initials = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+    return initials[idx] || firstChar;
+  }
+  
+  // 영문자인 경우
+  if (/[a-zA-Z]/.test(firstChar)) {
+    return firstChar.toUpperCase();
+  }
+  
+  // 숫자나 기타 문자인 경우
+  return /[0-9]/.test(firstChar) ? '#' : '기타';
+};
+
+// 로컬 스토리지에서 최근 사용 식재료 관리
+const getRecentIngredients = (companyId: string): string[] => {
+  if (typeof window === 'undefined') return [];
+  
+  const key = `recent-ingredients-${companyId}`;
+  const saved = localStorage.getItem(key);
+  return saved ? JSON.parse(saved) : [];
+};
+
+const addRecentIngredient = (companyId: string, ingredientId: string) => {
+  if (typeof window === 'undefined') return;
+  
+  const key = `recent-ingredients-${companyId}`;
+  const recent = getRecentIngredients(companyId);
+  
+  // 이미 있으면 제거 후 맨 앞에 추가
+  const filtered = recent.filter(id => id !== ingredientId);
+  filtered.unshift(ingredientId);
+  
+  // 최대 5개만 유지
+  const updated = filtered.slice(0, 5);
+  localStorage.setItem(key, JSON.stringify(updated));
+};
+
 export default function MenuIngredientsSelector({
   companyId,
   selectedIngredients,
@@ -63,6 +129,9 @@ export default function MenuIngredientsSelector({
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIngredientId, setSelectedIngredientId] = useState<string>('');
   const [amount, setAmount] = useState<number>(1);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [recentIngredientIds, setRecentIngredientIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // 식재료 목록 로드
   useEffect(() => {
@@ -90,7 +159,56 @@ export default function MenuIngredientsSelector({
     };
 
     fetchIngredients();
+    
+    // 로컬 스토리지에서 최근 사용 식재료 로드
+    const recent = getRecentIngredients(companyId);
+    setRecentIngredientIds(recent);
   }, [companyId, toast]);
+
+  // 사용 가능한 식재료 목록 (이미 선택된 식재료 제외)
+  const availableIngredients = useMemo(() => {
+    return ingredients
+      .filter(ingredient => 
+        !selectedIngredients.some(item => item.ingredient_id === ingredient.id)
+      )
+      .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  }, [ingredients, selectedIngredients]);
+  
+  // 최근 사용 식재료 목록
+  const recentIngredients = useMemo(() => {
+    return recentIngredientIds
+      .map(id => availableIngredients.find(ing => ing.id === id))
+      .filter(Boolean) as Ingredient[];
+  }, [availableIngredients, recentIngredientIds]);
+  
+  // 검색 및 그룹화된 식재료 목록
+  const filteredAndGroupedIngredients = useMemo(() => {
+    // 검색어 필터링
+    const filtered = searchQuery
+      ? availableIngredients.filter(ing => 
+          ing.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          ing.unit.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : availableIngredients;
+    
+    // 그룹화
+    const groups: Record<string, Ingredient[]> = {};
+    
+    filtered.forEach(ing => {
+      // 검색 중일 때는 그룹화하지 않음
+      if (searchQuery) {
+        const key = '검색 결과';
+        groups[key] = [...(groups[key] || []), ing];
+        return;
+      }
+      
+      const initial = getKoreanInitial(ing.name);
+      groups[initial] = [...(groups[initial] || []), ing];
+    });
+    
+    // 그룹 정렬
+    return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0], 'ko'));
+  }, [availableIngredients, searchQuery]);
 
   // 식재료 추가
   const handleAddIngredient = () => {
@@ -129,6 +247,10 @@ export default function MenuIngredientsSelector({
       return;
     }
 
+    // 최근 사용 식재료에 추가
+    addRecentIngredient(companyId, selectedIngredient.id);
+    setRecentIngredientIds(getRecentIngredients(companyId));
+
     // 새 항목 추가
     const newItem: SelectedIngredient = {
       ingredient_id: selectedIngredient.id,
@@ -141,6 +263,14 @@ export default function MenuIngredientsSelector({
     // 입력 필드 초기화
     setSelectedIngredientId('');
     setAmount(1);
+  };
+
+  // 식재료 선택
+  const handleIngredientSelect = (id: string) => {
+    setSelectedIngredientId(id);
+    setSheetOpen(false);
+    addRecentIngredient(companyId, id);
+    setRecentIngredientIds(getRecentIngredients(companyId));
   };
 
   // 식재료 양 변경
@@ -166,13 +296,6 @@ export default function MenuIngredientsSelector({
     onChange(updatedIngredients);
   };
 
-  // 사용 가능한 식재료 목록 (이미 선택된 식재료 제외)
-  const availableIngredients = ingredients
-    .filter(ingredient => 
-      !selectedIngredients.some(item => item.ingredient_id === ingredient.id)
-    )
-    .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-
   // 양 포맷팅
   const formatAmount = (amount: number) => {
     if (amount % 1 === 0) {
@@ -184,29 +307,154 @@ export default function MenuIngredientsSelector({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-2">
-        <Label htmlFor="ingredient-select">식재료 추가</Label>
+        <Label htmlFor="ingredient-select" className="text-sm font-medium text-gray-700">식재료 추가</Label>
         <div className="flex gap-3">
-          <Select
-            value={selectedIngredientId}
-            onValueChange={setSelectedIngredientId}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="식재료 선택" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableIngredients.length === 0 ? (
-                <SelectItem value="none" disabled>
-                  추가 가능한 식재료가 없습니다
-                </SelectItem>
-              ) : (
-                availableIngredients.map((ingredient) => (
-                  <SelectItem key={ingredient.id} value={ingredient.id}>
-                    {ingredient.name} ({ingredient.package_amount} {ingredient.unit})
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetTrigger asChild>
+              <Button 
+                variant="outline" 
+                className="w-full justify-start bg-white hover:bg-gray-50 border border-gray-200 shadow-sm transition-all duration-200"
+                type="button"
+                disabled={isLoading || availableIngredients.length === 0}
+              >
+                <Search className="h-4 w-4 mr-2 text-blue-500" />
+                {selectedIngredientId 
+                  ? ingredients.find(i => i.id === selectedIngredientId)?.name || '식재료 선택'
+                  : '식재료 선택'}
+              </Button>
+            </SheetTrigger>
+            <SheetContent 
+              className="w-full max-h-[92vh] p-0 rounded-t-2xl border-t-0 bg-gradient-to-b from-gray-50 to-white" 
+              side="bottom" 
+              closeButton={false}
+            >
+              <div className="sticky top-0 z-10 backdrop-blur-sm bg-white/90 border-b border-gray-100 rounded-t-2xl">
+                <div className="flex justify-center pt-2 pb-1">
+                  <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
+                </div>
+                <SheetHeader className="px-6 pt-2 pb-4">
+                  <SheetTitle className="text-xl font-bold text-gray-800">식재료 선택</SheetTitle>
+                  <SheetDescription className="text-gray-500">
+                    추가할 식재료를 검색하거나 목록에서 선택하세요
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="px-4 pb-3">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                      <Search className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="식재료 이름 검색..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-100 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-200 placeholder:text-gray-400 border-none"
+                    />
+                    {searchQuery && (
+                      <div className="absolute inset-y-0 right-3 flex items-center">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 text-gray-500 hover:text-gray-700"
+                          onClick={() => setSearchQuery('')}
+                        >
+                          <CircleSlash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="px-4 pb-6">
+                <Command className="rounded-xl border-none shadow-none bg-transparent overflow-hidden">
+                  <CommandList className="max-h-[60vh] overflow-y-auto py-2">
+                    <CommandEmpty className="py-6 text-center text-gray-500">
+                      <div className="flex flex-col items-center gap-2">
+                        <CircleSlash className="h-8 w-8 text-gray-300" />
+                        <p>검색 결과가 없습니다</p>
+                      </div>
+                    </CommandEmpty>
+                    
+                    {/* 최근 사용 식재료 섹션 */}
+                    {recentIngredients.length > 0 && !searchQuery && (
+                      <>
+                        <CommandGroup heading="최근 사용" className="pb-1">
+                          <div className="py-1 px-1 space-y-1">
+                            {recentIngredients.map(ingredient => (
+                              <CommandItem
+                                key={ingredient.id}
+                                value={ingredient.id}
+                                onSelect={handleIngredientSelect}
+                                className="flex items-center px-3 py-2.5 rounded-lg hover:bg-blue-50 transition-colors duration-150 cursor-pointer"
+                              >
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                  <Clock className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                                  <div className="flex-1 truncate">
+                                    <span className="font-medium">{ingredient.name}</span>
+                                    <Badge variant="outline" className="ml-2 bg-gray-50 text-xs font-normal">
+                                      {ingredient.package_amount} {ingredient.unit}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                <CheckCircle2 className={cn(
+                                  "h-4 w-4 flex-shrink-0 transition-opacity",
+                                  selectedIngredientId === ingredient.id ? "text-blue-500 opacity-100" : "opacity-0"
+                                )} />
+                              </CommandItem>
+                            ))}
+                          </div>
+                        </CommandGroup>
+                        <CommandSeparator className="my-1 bg-gray-100" />
+                      </>
+                    )}
+                    
+                    {/* 그룹화된 식재료 목록 */}
+                    <div className="py-2">
+                      {filteredAndGroupedIngredients.map(([group, items]) => (
+                        <CommandGroup key={group} heading={group} className="pb-1">
+                          <div className="py-1 px-1 space-y-1">
+                            {items.map(ingredient => (
+                              <CommandItem
+                                key={ingredient.id}
+                                value={ingredient.id}
+                                onSelect={handleIngredientSelect}
+                                className="flex items-center px-3 py-2.5 rounded-lg hover:bg-blue-50 transition-colors duration-150 cursor-pointer"
+                              >
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                  <Tag className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                  <div className="flex-1 truncate">
+                                    <span className="font-medium">{ingredient.name}</span>
+                                    <Badge variant="outline" className="ml-2 bg-gray-50 text-xs font-normal">
+                                      {ingredient.package_amount} {ingredient.unit}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                <CheckCircle2 className={cn(
+                                  "h-4 w-4 flex-shrink-0 transition-opacity",
+                                  selectedIngredientId === ingredient.id ? "text-blue-500 opacity-100" : "opacity-0"
+                                )} />
+                              </CommandItem>
+                            ))}
+                          </div>
+                        </CommandGroup>
+                      ))}
+                    </div>
+                  </CommandList>
+                </Command>
+              </div>
+              
+              <SheetFooter className="px-6 py-4 border-t border-gray-100 bg-white">
+                <Button 
+                  onClick={() => setSheetOpen(false)}
+                  className="w-full bg-blue-500 hover:bg-blue-600 text-white shadow-md py-3"
+                >
+                  <ChevronUp className="h-4 w-4 mr-2" />
+                  닫기
+                </Button>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
           
           {amountEditable && (
             <div className="flex items-center gap-2">
@@ -214,11 +462,11 @@ export default function MenuIngredientsSelector({
                 type="number"
                 min="0.1"
                 step="0.1"
-                className="w-24"
+                className="w-24 border-gray-200 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
                 value={amount}
                 onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
               />
-              <span className="text-sm">
+              <span className="text-sm font-medium text-gray-600">
                 {selectedIngredientId && 
                   ingredients.find(i => i.id === selectedIngredientId)?.unit}
               </span>
@@ -228,7 +476,7 @@ export default function MenuIngredientsSelector({
           <Button 
             type="button" 
             onClick={handleAddIngredient}
-            className="shrink-0"
+            className="shrink-0 bg-green-500 hover:bg-green-600 text-white shadow-md transition-all duration-200"
             disabled={!selectedIngredientId}
           >
             <Plus className="h-4 w-4 mr-1" /> 추가
@@ -237,70 +485,73 @@ export default function MenuIngredientsSelector({
       </div>
 
       {selectedIngredients.length > 0 ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>식재료명</TableHead>
-              <TableHead>패키지</TableHead>
-              {amountEditable && <TableHead className="text-right">사용량</TableHead>}
-              <TableHead className="text-right">단가</TableHead>
-              <TableHead className="w-[70px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {selectedIngredients.map((item, index) => (
-              <TableRow key={index}>
-                <TableCell>{item.ingredient.name}</TableCell>
-                <TableCell>
-                  <div className="flex items-center">
-                    <PackageOpen className="h-4 w-4 mr-1 text-muted-foreground" />
-                    <span>
-                      {item.ingredient.package_amount} {item.ingredient.unit}
-                    </span>
-                  </div>
-                </TableCell>
-                {amountEditable && (
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Input
-                        type="number"
-                        min="0.1"
-                        step="0.1"
-                        className="w-16 text-right"
-                        value={formatAmount(item.amount)}
-                        onChange={(e) => 
-                          handleAmountChange(index, parseFloat(e.target.value) || 0)
-                        }
-                      />
-                      <span className="text-sm w-8">
-                        {item.ingredient.unit}
+        <div className="rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+          <Table>
+            <TableHeader className="bg-gray-50">
+              <TableRow>
+                <TableHead className="font-medium">식재료명</TableHead>
+                <TableHead className="font-medium">패키지</TableHead>
+                {amountEditable && <TableHead className="text-right font-medium">사용량</TableHead>}
+                <TableHead className="text-right font-medium">단가</TableHead>
+                <TableHead className="w-[70px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {selectedIngredients.map((item, index) => (
+                <TableRow key={index} className="hover:bg-gray-50 transition-colors duration-150">
+                  <TableCell className="font-medium">{item.ingredient.name}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center">
+                      <PackageOpen className="h-4 w-4 mr-1 text-blue-500" />
+                      <span>
+                        {item.ingredient.package_amount} {item.ingredient.unit}
                       </span>
                     </div>
                   </TableCell>
-                )}
-                <TableCell className="text-right">
-                  {new Intl.NumberFormat('ko-KR', { 
-                    style: 'currency', 
-                    currency: 'KRW' 
-                  }).format(item.ingredient.price)}
-                </TableCell>
-                <TableCell>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => handleRemoveIngredient(index)}
-                  >
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                  {amountEditable && (
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Input
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          className="w-16 text-right focus:ring-blue-500 focus:border-blue-500"
+                          value={formatAmount(item.amount)}
+                          onChange={(e) => 
+                            handleAmountChange(index, parseFloat(e.target.value) || 0)
+                          }
+                        />
+                        <span className="text-sm w-8 text-gray-600">
+                          {item.ingredient.unit}
+                        </span>
+                      </div>
+                    </TableCell>
+                  )}
+                  <TableCell className="text-right font-medium">
+                    {new Intl.NumberFormat('ko-KR', { 
+                      style: 'currency', 
+                      currency: 'KRW' 
+                    }).format(item.ingredient.price)}
+                  </TableCell>
+                  <TableCell>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="h-7 w-7 hover:bg-red-50 transition-colors duration-150"
+                      onClick={() => handleRemoveIngredient(index)}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       ) : (
-        <div className="text-center py-4 text-muted-foreground bg-slate-50 rounded-md">
-          추가된 식재료가 없습니다. 위에서 식재료를 선택해 추가해주세요.
+        <div className="text-center py-6 px-4 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-200 flex flex-col items-center gap-2">
+          <Sparkles className="h-6 w-6 text-gray-400" />
+          <p>추가된 식재료가 없습니다. 위에서 식재료를 선택해 추가해주세요.</p>
         </div>
       )}
     </div>

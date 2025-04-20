@@ -74,12 +74,6 @@ export function CompanyItem({ company, toggleCompany, handleLinkClick }: Company
   };
   
   // 디버깅용 로그 추가
-  console.log(`회사 ${name}(${id}) 기능 상태:`, {
-    ingredients: hasIngredientsFeature,
-    menus: hasMenusFeature,
-    mealPlanning: hasMealPlanningFeature,
-    cookingPlan: hasCookingPlanFeature
-  });
 
   return (
     <li className="px-2">
