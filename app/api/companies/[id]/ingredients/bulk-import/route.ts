@@ -48,7 +48,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     // 요청 데이터 파싱
-    const { spreadsheetUrl } = await request.json();
+    let requestData;
+    try {
+      requestData = await request.json();
+    } catch (error) {
+      return Response.json({ error: '요청 데이터를 파싱할 수 없습니다.' }, { status: 400 });
+    }
+    
+    const { spreadsheetUrl } = requestData;
     
     if (!spreadsheetUrl) {
       return Response.json({ error: '스프레드시트 URL이 필요합니다.' }, { status: 400 });
@@ -73,28 +80,147 @@ export async function POST(request: NextRequest, context: RouteContext) {
       csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&charset=utf-8`;
     }
     
-    // CSV 데이터 가져오기
-    const response = await fetch(csvUrl, {
-      headers: {
-        'Accept': 'text/csv;charset=UTF-8',
-      },
-    });
+    // CSV 데이터 가져오기 - 타임아웃 설정 (60초)
+    const controller = new AbortController();
+    const signal = controller.signal;
     
-    if (!response.ok) {
+    // 60초 타임아웃 설정
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    
+    try {
+      // CSV 데이터 가져오기
+      const response = await fetch(csvUrl, {
+        headers: {
+          'Accept': 'text/csv;charset=UTF-8',
+        },
+        signal: signal
+      });
+      
+      // 타임아웃 제거
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('스프레드시트 응답 오류:', response.status, errorText.substring(0, 200));
+        return Response.json(
+          { message: `스프레드시트를 가져올 수 없습니다(${response.status}). 스프레드시트가 공개되어 있는지 확인하세요.` },
+          { status: 400 }
+        );
+      }
+      
+      const csvText = await response.text();
+      
+      if (!csvText || csvText.trim() === '') {
+        return Response.json(
+          { message: '스프레드시트 내용이 비어있습니다.' },
+          { status: 400 }
+        );
+      }
+      
+      // CSV 파싱 (csv-parse 사용)
+      let records;
+      try {
+        records = parse(csvText, {
+          skip_empty_lines: true,
+          trim: true,
+          from_line: 4, // 4행부터 데이터 시작
+        });
+      } catch (parseError) {
+        console.error('CSV 파싱 오류:', parseError);
+        return Response.json(
+          { message: 'CSV 파싱 오류: ' + (parseError instanceof Error ? parseError.message : '알 수 없는 오류') },
+          { status: 400 }
+        );
+      }
+      
+      if (records.length === 0) {
+        return Response.json(
+          { message: '스프레드시트에 데이터가 없습니다.' },
+          { status: 400 }
+        );
+      }
+    } catch (fetchError: unknown) {
+      // 타임아웃 제거
+      clearTimeout(timeoutId);
+      
+      // AbortError인 경우 타임아웃 메시지 반환
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        return Response.json(
+          { message: '스프레드시트 데이터를 가져오는 데 시간이 너무 오래 걸립니다. 스프레드시트 크기가 너무 큰지 확인하세요.' },
+          { status: 408 }
+        );
+      }
+      
+      console.error('스프레드시트 가져오기 오류:', fetchError);
       return Response.json(
-        { message: '스프레드시트를 가져올 수 없습니다. 스프레드시트가 공개되어 있는지 확인하세요.' },
+        { message: '스프레드시트를 가져오는 중 오류가 발생했습니다: ' + (fetchError instanceof Error ? fetchError.message : '알 수 없는 오류') },
+        { status: 500 }
+      );
+    }
+    
+    // CSV 데이터 가져오기
+    let response;
+    try {
+      response = await fetch(csvUrl, {
+        headers: {
+          'Accept': 'text/csv;charset=UTF-8',
+        },
+      });
+    } catch (error) {
+      console.error('스프레드시트 URL 요청 오류:', error);
+      return Response.json(
+        { message: '스프레드시트 URL에 접근할 수 없습니다. 올바른 URL인지 확인하세요.' },
         { status: 400 }
       );
     }
     
-    const csvText = await response.text();
+    if (!response.ok) {
+      try {
+        const errorText = await response.text();
+        console.error('스프레드시트 응답 오류:', response.status, errorText.substring(0, 200));
+      } catch (err) {
+        console.error('응답 텍스트 추출 오류:', err);
+      }
+      
+      return Response.json(
+        { message: `스프레드시트를 가져올 수 없습니다(${response.status}). 스프레드시트가 공개되어 있는지 확인하세요.` },
+        { status: 400 }
+      );
+    }
+    
+    let csvText;
+    try {
+      csvText = await response.text();
+    } catch (error) {
+      console.error('CSV 텍스트 추출 오류:', error);
+      return Response.json(
+        { message: 'CSV 데이터를 추출하는 중 오류가 발생했습니다.' },
+        { status: 500 }
+      );
+    }
+    
+    if (!csvText || csvText.trim() === '') {
+      return Response.json(
+        { message: '스프레드시트 내용이 비어있습니다.' },
+        { status: 400 }
+      );
+    }
     
     // CSV 파싱 (csv-parse 사용)
-    const records = parse(csvText, {
-      skip_empty_lines: true,
-      trim: true,
-      from_line: 4, // 4행부터 데이터 시작
-    });
+    let records;
+    try {
+      records = parse(csvText, {
+        skip_empty_lines: true,
+        trim: true,
+        from_line: 4, // 4행부터 데이터 시작
+      });
+    } catch (parseError) {
+      console.error('CSV 파싱 오류:', parseError);
+      return Response.json(
+        { message: 'CSV 파싱 오류: ' + (parseError instanceof Error ? parseError.message : '알 수 없는 오류') },
+        { status: 400 }
+      );
+    }
     
     if (records.length === 0) {
       return Response.json(
@@ -358,85 +484,112 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
     }
     
+    // 데이터 처리 성능 개선: 배열이 너무 큰 경우 청크로 나누어 처리
+    const chunkArray = <T>(array: T[], chunkSize: number): T[][] => {
+      const chunks = [];
+      for (let i = 0; i < array.length; i += chunkSize) {
+        chunks.push(array.slice(i, i + chunkSize));
+      }
+      return chunks;
+    };
+    
+    // 일괄 추가를 청크로 나누어 처리 (최대 50개씩)
+    const insertChunks = chunkArray(ingredientsToInsert, 50);
+    
     // 배치 처리
-    // 1. 새 식재료 일괄 추가
-    let insertedIngredients = [];
-    if (ingredientsToInsert.length > 0) {
+    // 1. 새 식재료 일괄 추가 (청크 단위로)
+    let insertedIngredients: { id: string; price: number }[] = [];
+    for (const chunk of insertChunks) {
+      if (chunk.length === 0) continue;
+      
       try {
         const { data: inserted, error: batchInsertError } = await supabase
           .from('ingredients')
-          .insert(ingredientsToInsert)
+          .insert(chunk)
           .select('id, price'); // ID와 가격 정보 반환 추가
         
         if (batchInsertError) {
-          console.error('대량 삽입 오류:', batchInsertError);
-          results.failed += ingredientsToInsert.length;
+          console.error('식재료 청크 삽입 오류:', batchInsertError);
+          results.failed += chunk.length;
           results.errors.push(`식재료 일괄 추가 실패: ${batchInsertError.message}`);
         } else {
-          results.success += ingredientsToInsert.length;
-          insertedIngredients = inserted || [];
-          
-          // 새로 추가된 식재료들의 가격 이력 데이터 준비
-          const currentTime = new Date().toISOString();
-          const priceHistories = insertedIngredients.map(item => ({
-            ingredient_id: item.id,
-            price: item.price,
-            recorded_at: currentTime
-          }));
-          
-          // 가격 이력 배열에 추가
-          priceHistoryToInsert.push(...priceHistories);
+          results.success += chunk.length;
+          if (inserted) {
+            insertedIngredients = [...insertedIngredients, ...inserted] as { id: string; price: number }[];
+          }
         }
       } catch (error) {
-        console.error('대량 삽입 오류:', error);
-        results.failed += ingredientsToInsert.length;
+        console.error('식재료 청크 삽입 오류:', error);
+        results.failed += chunk.length;
         results.errors.push(`식재료 일괄 추가 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
       }
     }
     
+    // 새로 추가된 식재료들의 가격 이력 데이터 준비
+    if (insertedIngredients.length > 0) {
+      const currentTime = new Date().toISOString();
+      const priceHistories = insertedIngredients.map(item => ({
+        ingredient_id: item.id,
+        price: item.price,
+        recorded_at: currentTime
+      }));
+      
+      // 가격 이력 배열에 추가
+      priceHistoryToInsert.push(...priceHistories);
+    }
+    
     // 2. 기존 식재료 개별 업데이트 (Supabase에서는 일괄 업데이트를 지원하지 않음)
-    for (const item of ingredientsToUpdate) {
-      try {
-        const { error: updateError } = await supabase
-          .from('ingredients')
-          .update(item.data)
-          .eq('id', item.id);
-        
-        if (updateError) {
-          results.failed++;
-          results.errors.push(`'${item.name}' 업데이트 실패: ${updateError.message}`);
-        } else {
-          results.success++;
+    // 업데이트 처리도 청크 단위로 수행
+    const updateChunks = chunkArray(ingredientsToUpdate, 20);
+    
+    for (const chunk of updateChunks) {
+      for (const item of chunk) {
+        try {
+          const { error: updateError } = await supabase
+            .from('ingredients')
+            .update(item.data)
+            .eq('id', item.id);
           
-          // 가격이 변경된 경우에만 가격 이력에 추가
-          if (item.priceChanged) {
-            priceHistoryToInsert.push({
-              ingredient_id: item.id,
-              price: item.data.price,
-              recorded_at: new Date().toISOString()
-            });
+          if (updateError) {
+            results.failed++;
+            results.errors.push(`'${item.name}' 업데이트 실패: ${updateError.message}`);
+          } else {
+            results.success++;
+            
+            // 가격이 변경된 경우에만 가격 이력에 추가
+            if (item.priceChanged) {
+              priceHistoryToInsert.push({
+                ingredient_id: item.id,
+                price: item.data.price,
+                recorded_at: new Date().toISOString()
+              });
+            }
           }
+        } catch (error) {
+          results.failed++;
+          results.errors.push(`'${item.name}' 업데이트 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
         }
-      } catch (error) {
-        results.failed++;
-        results.errors.push(`'${item.name}' 업데이트 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
       }
     }
     
-    // 3. 가격 이력 일괄 추가
-    if (priceHistoryToInsert.length > 0) {
+    // 3. 가격 이력 일괄 추가 (청크 단위로)
+    const priceHistoryChunks = chunkArray(priceHistoryToInsert, 100);
+    
+    for (const chunk of priceHistoryChunks) {
+      if (chunk.length === 0) continue;
+      
       try {
         const { error: historyError } = await supabase
           .from('ingredient_price_history')
-          .insert(priceHistoryToInsert);
+          .insert(chunk);
         
         if (historyError) {
-          console.error('가격 이력 추가 오류:', historyError);
+          console.error('가격 이력 청크 추가 오류:', historyError);
           // 이력 추가 실패는 심각한 오류가 아니므로 결과에 영향을 주지 않음
           results.errors.push(`가격 이력 추가 중 오류 발생 (식재료 추가/업데이트는 성공): ${historyError.message}`);
         }
       } catch (error) {
-        console.error('가격 이력 추가 오류:', error);
+        console.error('가격 이력 청크 추가 오류:', error);
         // 이력 추가 실패는 심각한 오류가 아니므로 결과에 영향을 주지 않음
         results.errors.push(`가격 이력 추가 중 오류 발생 (식재료 추가/업데이트는 성공): ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
       }

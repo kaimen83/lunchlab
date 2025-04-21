@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { FileSpreadsheet, AlertCircle, CheckCircle } from 'lucide-react';
+import { FileSpreadsheet, AlertCircle, CheckCircle, ServerCrash } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { 
   Accordion, 
@@ -39,6 +39,7 @@ export default function BulkImportModal({
     errors?: string[];
   } | null>(null);
   const [progress, setProgress] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // URL 유효성 검사 함수
   const isValidGoogleSheetUrl = (url: string) => {
@@ -59,48 +60,95 @@ export default function BulkImportModal({
     setIsLoading(true);
     setProgress(10);
     setImportResult(null);
+    setErrorMessage(null);
 
     try {
-      // 진행 상태 시뮬레이션
+      // 진행 상태 시뮬레이션 - 더 느리게 진행하도록 조정
       const progressInterval = setInterval(() => {
-        setProgress(prev => Math.min(prev + 10, 90));
-      }, 500);
+        setProgress(prev => {
+          // 90%에 도달하면 더 이상 증가하지 않음 (서버 응답 대기 중)
+          if (prev >= 90) return 90;
+          // 처음에는 빠르게, 나중에는 천천히 증가
+          const increment = prev < 30 ? 8 : prev < 60 ? 5 : 2;
+          return Math.min(prev + increment, 90);
+        });
+      }, 800);
 
-      const response = await fetch(`/api/companies/${companyId}/ingredients/bulk-import`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ spreadsheetUrl: url }),
-      });
+      // 타임아웃 설정 (2분)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
 
-      clearInterval(progressInterval);
-      setProgress(100);
+      try {
+        const response = await fetch(`/api/companies/${companyId}/ingredients/bulk-import`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ spreadsheetUrl: url }),
+          signal: controller.signal
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || '식재료 일괄 추가 중 오류가 발생했습니다.');
-      }
+        clearTimeout(timeoutId);
+        clearInterval(progressInterval);
+        setProgress(100);
 
-      const result = await response.json();
-      setImportResult(result);
-      
-      toast({
-        title: '식재료 일괄 추가 완료',
-        description: `성공: ${result.success}개, 실패: ${result.failed}개`,
-        variant: result.failed === 0 ? 'default' : 'destructive',
-      });
+        if (!response.ok) {
+          let errorText = '';
+          try {
+            const errorData = await response.json();
+            errorText = errorData.message || '식재료 일괄 추가 중 오류가 발생했습니다.';
+          } catch (jsonError) {
+            // JSON 파싱 실패 시 상태 코드 기반 오류 메시지
+            if (response.status === 504) {
+              errorText = '서버 처리 시간이 초과되었습니다. 스프레드시트의 데이터 양을 줄이고 다시 시도해주세요.';
+            } else {
+              errorText = `서버 오류가 발생했습니다 (${response.status}). 잠시 후 다시 시도해주세요.`;
+            }
+          }
+          setErrorMessage(errorText);
+          throw new Error(errorText);
+        }
 
-      if (result.success > 0) {
-        // 데이터가 추가되었을 경우에만 목록 갱신
-        onImportComplete?.();
-      }
+        const result = await response.json();
+        setImportResult(result);
+        
+        toast({
+          title: '식재료 일괄 추가 완료',
+          description: `성공: ${result.success}개, 실패: ${result.failed}개`,
+          variant: result.failed === 0 ? 'default' : 'destructive',
+        });
 
-      if (onSuccess) {
-        onSuccess();
+        if (result.success > 0) {
+          // 데이터가 추가되었을 경우에만 목록 갱신
+          onImportComplete?.();
+        }
+
+        if (onSuccess) {
+          onSuccess();
+        }
+      } catch (abortError) {
+        clearTimeout(timeoutId);
+        clearInterval(progressInterval);
+        
+        if (abortError instanceof Error && abortError.name === 'AbortError') {
+          setProgress(100);
+          setErrorMessage('처리 시간이 너무 오래 걸립니다. 스프레드시트의 데이터 양이 너무 많을 수 있습니다.');
+          toast({
+            title: '처리 시간 초과',
+            description: '스프레드시트 데이터가 너무 많아 처리가 중단되었습니다. 더 작은 단위로 나누어 시도해보세요.',
+            variant: 'destructive',
+          });
+        } else {
+          throw abortError;
+        }
       }
     } catch (error) {
       console.error('식재료 일괄 추가 오류:', error);
+      // 이미 설정된 errorMessage가 없는 경우에만 기본 메시지 설정
+      if (!errorMessage) {
+        setErrorMessage(error instanceof Error ? error.message : '데이터를 가져오는데 실패했습니다.');
+      }
+      
       toast({
         title: '일괄 추가 실패',
         description: error instanceof Error ? error.message : '데이터를 가져오는데 실패했습니다.',
@@ -109,6 +157,13 @@ export default function BulkImportModal({
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleReset = () => {
+    setUrl('');
+    setImportResult(null);
+    setErrorMessage(null);
+    setProgress(0);
   };
 
   return (
@@ -163,7 +218,7 @@ export default function BulkImportModal({
               <AlertDescription>
                 스프레드시트가 <strong>공개 접근 가능</strong>하도록 설정되어 있어야 합니다.
                 <br />
-                공유시 "웹페이지"가 아닌 "csv"를 선택해야 합니다.
+                공유시 "링크가 있는 모든 사용자가 보기 가능"으로 설정해야 합니다.
               </AlertDescription>
             </Alert>
             
@@ -179,6 +234,24 @@ export default function BulkImportModal({
             <div className="space-y-2">
               <p className="text-sm text-center">데이터를 가져오는 중...</p>
               <Progress value={progress} className="h-2" />
+              <p className="text-xs text-center text-muted-foreground">
+                데이터 양에 따라 최대 2분까지 소요될 수 있습니다
+              </p>
+            </div>
+          )}
+          
+          {errorMessage && (
+            <div className="p-4 bg-red-50 rounded-md border border-red-200">
+              <div className="flex items-center gap-2 mb-2">
+                <ServerCrash className="h-5 w-5 text-red-500" />
+                <span className="font-medium text-red-800">오류 발생</span>
+              </div>
+              <p className="text-sm text-red-700">{errorMessage}</p>
+              {(errorMessage.includes('시간이 초과') || errorMessage.includes('처리 시간')) && (
+                <p className="text-xs mt-2 text-red-600">
+                  스프레드시트의 데이터 양이 너무 많을 수 있습니다. 데이터를 더 작은 단위로 나누어 시도해보세요.
+                </p>
+              )}
             </div>
           )}
 
@@ -208,17 +281,24 @@ export default function BulkImportModal({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
-            취소
-          </Button>
-          {importResult ? (
-            <Button onClick={() => onOpenChange(false)}>
-              닫기
-            </Button>
+          {importResult || errorMessage ? (
+            <>
+              <Button variant="outline" onClick={handleReset}>
+                재시도
+              </Button>
+              <Button onClick={() => onOpenChange(false)}>
+                닫기
+              </Button>
+            </>
           ) : (
-            <Button onClick={handleImport} disabled={isLoading || !url}>
-              {isLoading ? '가져오는 중...' : '가져오기'}
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+                취소
+              </Button>
+              <Button onClick={handleImport} disabled={isLoading || !url}>
+                {isLoading ? '가져오는 중...' : '가져오기'}
+              </Button>
+            </>
           )}
         </DialogFooter>
       </DialogContent>
