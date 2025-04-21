@@ -1366,51 +1366,6 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
         </div>
       </div>
 
-      {/* 모바일 전용 FAB 버튼 */}
-      {isOwnerOrAdmin && (
-        <div className="sm:hidden fixed right-4 bottom-4 flex flex-col-reverse gap-2 z-10">
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="rounded-full h-12 w-12 shadow-md">
-                <MoreVertical className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="h-auto rounded-t-xl">
-              <SheetHeader className="text-left pb-4">
-                <SheetTitle>식재료 관리</SheetTitle>
-                <SheetDescription>다양한 관리 옵션을 선택하세요</SheetDescription>
-              </SheetHeader>
-              <div className="grid gap-4 py-4">
-                <Button onClick={() => setBulkImportModalOpen(true)} variant="outline" className="w-full justify-start">
-                  <FileSpreadsheet className="mr-2 h-4 w-4" />
-                  <span>일괄 추가</span>
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start">
-                      <SlidersHorizontal className="mr-2 h-4 w-4" />
-                      <span>칼럼 설정</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56">
-                    {/* 여기에 칼럼 체크박스 아이템들을 위와 동일하게 복사 (코드 중복 방지를 위해 생략) */}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              <SheetFooter className="flex flex-row justify-end gap-2">
-                <SheetClose asChild>
-                  <Button variant="ghost">닫기</Button>
-                </SheetClose>
-              </SheetFooter>
-            </SheetContent>
-          </Sheet>
-          
-          <Button onClick={handleAddIngredient} size="icon" className="rounded-full h-14 w-14 shadow-lg">
-            <Plus className="h-6 w-6" />
-          </Button>
-        </div>
-      )}
-
       <Card className="border border-slate-200 hover:border-slate-300 transition-colors overflow-hidden">
         {/* 모바일 뷰 - 카드 형태로 표시 */}
         <div className="block sm:hidden">

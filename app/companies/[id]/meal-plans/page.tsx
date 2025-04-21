@@ -442,17 +442,6 @@ export default function MealPlansPage() {
         </div>
       </main>
 
-      {/* 모바일 화면용 떠 있는 추가 버튼 */}
-      <div className="md:hidden fixed bottom-6 right-6 z-10">
-        <button
-          type="button"
-          onClick={handleAddMealPlan}
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-colors"
-        >
-          <Plus className="h-6 w-6" />
-        </button>
-      </div>
-
       {/* 식단 폼 모달 */}
       <Dialog open={showMealPlanForm} onOpenChange={setShowMealPlanForm}>
         <DialogContent className="max-w-md md:max-w-lg max-h-[90vh] overflow-y-auto">
