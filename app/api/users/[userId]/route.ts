@@ -3,9 +3,16 @@ import { auth } from '@clerk/nextjs/server'
 import { clerkClient } from '@clerk/nextjs/server'
 import { isHeadAdmin } from '@/lib/clerk'
 
+// 라우트 핸들러 컨텍스트에 대한 타입 정의
+interface RouteContext {
+  params: Promise<{
+    userId: string;
+  }>;
+}
+
 export async function GET(
   req: Request,
-  { params }: { params: { userId: string } }
+  context: RouteContext
 ) {
   try {
     // 요청자 인증 확인
@@ -16,7 +23,7 @@ export async function GET(
 
     // 권한 확인 (본인이거나 관리자만 접근 가능)
     const isAdmin = await isHeadAdmin(userId)
-    const targetUserId = params.userId
+    const { userId: targetUserId } = await context.params
 
     // Clerk API를 통해 사용자 정보 조회
     const client = await clerkClient()
