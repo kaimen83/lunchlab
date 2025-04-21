@@ -7,13 +7,49 @@ import { Badge } from '@/components/ui/badge'
 import FeedbackModal from './FeedbackModal'
 import { useUser } from '@clerk/nextjs'
 
+// localStorage 관련 유틸리티 함수
+const getRepliesViewedKey = (userId: string | undefined) => {
+  return `feedback-replies-viewed-${userId || 'guest'}`
+}
+
+const getSavedRepliesViewed = (userId: string | undefined): boolean => {
+  if (typeof window === 'undefined') return false
+  
+  try {
+    const saved = localStorage.getItem(getRepliesViewedKey(userId))
+    return saved === 'true'
+  } catch (error) {
+    console.error('localStorage 접근 오류:', error)
+    return false
+  }
+}
+
+const saveRepliesViewed = (userId: string | undefined, value: boolean): void => {
+  if (typeof window === 'undefined') return
+  
+  try {
+    localStorage.setItem(getRepliesViewedKey(userId), value.toString())
+  } catch (error) {
+    console.error('localStorage 저장 오류:', error)
+  }
+}
+
 export default function FloatingFeedbackButton() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [hasRepliedFeedback, setHasRepliedFeedback] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
-  const [repliesViewed, setRepliesViewed] = useState(false)
+  // localStorage에서 초기 상태를 가져오도록 수정
+  const [repliesViewed, setRepliesViewed] = useState<boolean>(() => false)
   const [isAdmin, setIsAdmin] = useState(false)
   const { user } = useUser()
+  
+  // localStorage에서 repliesViewed 상태 불러오기
+  useEffect(() => {
+    if (user?.id) {
+      const savedState = getSavedRepliesViewed(user.id)
+      setRepliesViewed(savedState)
+    }
+  }, [user?.id])
 
   // 관리자 여부 확인
   useEffect(() => {
@@ -94,6 +130,11 @@ export default function FloatingFeedbackButton() {
   const handleRepliesViewed = () => {
     setHasRepliedFeedback(0) // 답변을 확인했으므로 알림 뱃지 제거
     setRepliesViewed(true) // 답변을 확인한 상태로 저장
+    
+    // localStorage에 상태 저장
+    if (user?.id) {
+      saveRepliesViewed(user.id, true)
+    }
   }
 
   return (
