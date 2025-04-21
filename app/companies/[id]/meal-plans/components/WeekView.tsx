@@ -96,84 +96,89 @@ const WeekView: React.FC<WeekViewProps> = ({
       </div>
       
       {/* 나머지 열: 요일별 식단 */} 
-      {daysOfWeek.map((day, index) => (
-        <div key={index} className="col-span-1 border-r border-gray-200">
-          <div className="h-16 text-center py-3 border-b border-gray-200 bg-gray-50">
-            <div className="font-semibold text-sm">{format(day, 'E', { locale: ko })}</div>
-            <div className="text-lg font-bold mt-1">{format(day, 'd')}</div>
-          </div>
-          
-          {templateGroups.length > 0 ? (
-            /* 템플릿별 식단 표시 */
-            templateGroups.map((templateName, templateIndex) => {
-              const templateMealPlans = getMealPlansByTemplateAndDate(templateName, day);
-              return (
-                <div key={`day-${index}-template-${templateIndex}`} className="h-48 border-b border-gray-200 p-2 relative group">
-                  <div className="h-[calc(100%-30px)] overflow-y-auto pr-1 space-y-2">
-                    {templateMealPlans.map(renderMealPlanCard)}
-                  </div>
-                  <div className="absolute bottom-2 right-2 left-2 flex justify-end">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="w-auto opacity-40 hover:opacity-100 transition-opacity text-xs bg-white/80 rounded-full h-7 px-2"
-                      onClick={() => {
-                        // 현재 시간에 따라 기본 식사 시간 설정
-                        const now = new Date();
-                        const hour = now.getHours();
-                        let mealTime: 'breakfast' | 'lunch' | 'dinner';
-                        
-                        if (hour < 10) {
-                          mealTime = 'breakfast';
-                        } else if (hour < 15) {
-                          mealTime = 'lunch';
-                        } else {
-                          mealTime = 'dinner';
-                        }
-                        
-                        onAddMealPlan(day, mealTime);
-                      }}
-                    >
-                      <Plus className="h-3 w-3 mr-1" /> 추가
-                    </Button>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            /* 템플릿이 없는 경우 기본 셀 표시 */
-            <div className="h-48 border-b border-gray-200 p-2 relative group flex flex-col">
-              <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
-                등록된 식단이 없습니다
-              </div>
-              <div className="text-center mb-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="w-auto opacity-40 hover:opacity-100 transition-opacity text-xs bg-white/80 rounded-full h-7 px-2"
-                  onClick={() => {
-                    const now = new Date();
-                    const hour = now.getHours();
-                    let mealTime: 'breakfast' | 'lunch' | 'dinner';
-                    
-                    if (hour < 10) {
-                      mealTime = 'breakfast';
-                    } else if (hour < 15) {
-                      mealTime = 'lunch';
-                    } else {
-                      mealTime = 'dinner';
-                    }
-                    
-                    onAddMealPlan(day, mealTime);
-                  }}
-                >
-                  <Plus className="h-3 w-3 mr-1" /> 추가
-                </Button>
-              </div>
+      {daysOfWeek.map((day, index) => {
+        // 오늘 날짜인지 확인
+        const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+        
+        return (
+          <div key={index} className="col-span-1 border-r border-gray-200">
+            <div className={`h-16 text-center py-3 border-b border-gray-200 ${isToday ? 'bg-blue-50 border-blue-300 border-b-2' : 'bg-gray-50'}`}>
+              <div className={`font-semibold text-sm ${isToday ? 'text-blue-600' : ''}`}>{format(day, 'E', { locale: ko })}</div>
+              <div className={`text-lg font-bold mt-1 ${isToday ? 'text-blue-700' : ''}`}>{format(day, 'd')}</div>
             </div>
-          )}
-        </div>
-      ))}
+            
+            {templateGroups.length > 0 ? (
+              /* 템플릿별 식단 표시 */
+              templateGroups.map((templateName, templateIndex) => {
+                const templateMealPlans = getMealPlansByTemplateAndDate(templateName, day);
+                return (
+                  <div key={`day-${index}-template-${templateIndex}`} className={`h-48 border-b border-gray-200 p-2 relative group ${isToday ? 'bg-blue-50/30' : ''}`}>
+                    <div className="h-[calc(100%-30px)] overflow-y-auto pr-1 space-y-2">
+                      {templateMealPlans.map(renderMealPlanCard)}
+                    </div>
+                    <div className="absolute bottom-2 right-2 left-2 flex justify-end">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="w-auto opacity-40 hover:opacity-100 transition-opacity text-xs bg-white/80 rounded-full h-7 px-2"
+                        onClick={() => {
+                          // 현재 시간에 따라 기본 식사 시간 설정
+                          const now = new Date();
+                          const hour = now.getHours();
+                          let mealTime: 'breakfast' | 'lunch' | 'dinner';
+                          
+                          if (hour < 10) {
+                            mealTime = 'breakfast';
+                          } else if (hour < 15) {
+                            mealTime = 'lunch';
+                          } else {
+                            mealTime = 'dinner';
+                          }
+                          
+                          onAddMealPlan(day, mealTime);
+                        }}
+                      >
+                        <Plus className="h-3 w-3 mr-1" /> 추가
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              /* 템플릿이 없는 경우 기본 셀 표시 */
+              <div className={`h-48 border-b border-gray-200 p-2 relative group flex flex-col ${isToday ? 'bg-blue-50/30' : ''}`}>
+                <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
+                  등록된 식단이 없습니다
+                </div>
+                <div className="text-center mb-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="w-auto opacity-40 hover:opacity-100 transition-opacity text-xs bg-white/80 rounded-full h-7 px-2"
+                    onClick={() => {
+                      const now = new Date();
+                      const hour = now.getHours();
+                      let mealTime: 'breakfast' | 'lunch' | 'dinner';
+                      
+                      if (hour < 10) {
+                        mealTime = 'breakfast';
+                      } else if (hour < 15) {
+                        mealTime = 'lunch';
+                      } else {
+                        mealTime = 'dinner';
+                      }
+                      
+                      onAddMealPlan(day, mealTime);
+                    }}
+                  >
+                    <Plus className="h-3 w-3 mr-1" /> 추가
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 

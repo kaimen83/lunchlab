@@ -65,10 +65,10 @@ const MonthView: React.FC<MonthViewProps> = ({
                 <div
                   key={`day-${weekIndex}-${dayIndex}`}
                   className={`min-h-[120px] border-r border-b border-gray-200 p-2 overflow-hidden relative group ${ 
-                    !isCurrentMonth ? 'bg-gray-50 text-gray-400' : isToday ? 'bg-blue-50' : 'bg-white'
-                  }`}
+                    !isCurrentMonth ? 'bg-gray-50 text-gray-400' : isToday ? 'bg-blue-50 border-blue-300' : 'bg-white'
+                  } ${isToday && isCurrentMonth ? 'ring-2 ring-blue-400 ring-inset' : ''}`}
                 >
-                  <div className={`text-right text-sm font-semibold mb-1 ${isToday ? 'text-blue-600' : ''}`}>
+                  <div className={`text-right text-sm font-semibold mb-1 ${isToday && isCurrentMonth ? 'text-blue-700' : ''}`}>
                     {format(day, 'd')}
                   </div>
                   
