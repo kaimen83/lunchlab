@@ -138,7 +138,8 @@ export default function MenuIngredientsSelector({
     const fetchIngredients = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/companies/${companyId}/ingredients`);
+        // limit 파라미터를 1000으로 설정하고 detailed 파라미터를 true로 설정하여 모든 식재료를 가져옵니다.
+        const response = await fetch(`/api/companies/${companyId}/ingredients?limit=1000&detailed=true`);
         
         if (!response.ok) {
           throw new Error('식재료 목록을 불러오는데 실패했습니다.');
