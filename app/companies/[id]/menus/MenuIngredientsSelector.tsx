@@ -145,7 +145,7 @@ export default function MenuIngredientsSelector({
         }
         
         const data = await response.json();
-        setIngredients(data);
+        setIngredients(data.ingredients || []);
       } catch (error) {
         console.error('식재료 로드 오류:', error);
         toast({
