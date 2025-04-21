@@ -74,9 +74,9 @@ export default function BulkImportModal({
         });
       }, 800);
 
-      // 타임아웃 설정 (2분)
+      // 타임아웃 설정 (60초로 변경 - Vercel Hobby 플랜 최대 한도에 맞춤)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000);
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
 
       try {
         const response = await fetch(`/api/companies/${companyId}/ingredients/bulk-import`, {
@@ -95,8 +95,27 @@ export default function BulkImportModal({
         if (!response.ok) {
           let errorText = '';
           try {
-            const errorData = await response.json();
-            errorText = errorData.message || '식재료 일괄 추가 중 오류가 발생했습니다.';
+            // 응답이 JSON인지 확인 후 파싱
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const errorData = await response.json();
+              errorText = errorData.message || '식재료 일괄 추가 중 오류가 발생했습니다.';
+            } else {
+              // JSON이 아닌 경우 텍스트로 처리
+              errorText = await response.text();
+              
+              // 텍스트가 너무 길면 자르기
+              if (errorText.length > 150) {
+                errorText = errorText.substring(0, 150) + '...';
+              }
+              
+              // 상태 코드에 따른 메시지 추가
+              if (response.status === 504) {
+                errorText = '서버 처리 시간이 초과되었습니다. 스프레드시트의 데이터 양을 줄이고 다시 시도해주세요.';
+              } else {
+                errorText = `서버 오류가 발생했습니다 (${response.status}). 잠시 후 다시 시도해주세요.`;
+              }
+            }
           } catch (jsonError) {
             // JSON 파싱 실패 시 상태 코드 기반 오류 메시지
             if (response.status === 504) {
@@ -107,6 +126,12 @@ export default function BulkImportModal({
           }
           setErrorMessage(errorText);
           throw new Error(errorText);
+        }
+
+        // 응답이 JSON인지 확인 후 파싱
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new Error('서버에서 유효한 JSON 응답을 받지 못했습니다.');
         }
 
         const result = await response.json();
@@ -222,12 +247,17 @@ export default function BulkImportModal({
               </AlertDescription>
             </Alert>
             
-            <Input
-              placeholder="https://docs.google.com/spreadsheets/d/..."
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              disabled={isLoading}
-            />
+            <div className="space-y-1">
+              <Input
+                placeholder="https://docs.google.com/spreadsheets/d/..."
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                disabled={isLoading}
+              />
+              <p className="text-xs text-amber-700">
+                대용량 데이터의 경우 처리 시간이 오래 걸릴 수 있습니다. 데이터를 더 작은 단위로 나누어 시도하는 것이 좋습니다.
+              </p>
+            </div>
           </div>
 
           {isLoading && (
@@ -235,7 +265,7 @@ export default function BulkImportModal({
               <p className="text-sm text-center">데이터를 가져오는 중...</p>
               <Progress value={progress} className="h-2" />
               <p className="text-xs text-center text-muted-foreground">
-                데이터 양에 따라 최대 2분까지 소요될 수 있습니다
+                데이터 양에 따라 최대 1분까지 소요될 수 있습니다
               </p>
             </div>
           )}
@@ -249,7 +279,7 @@ export default function BulkImportModal({
               <p className="text-sm text-red-700">{errorMessage}</p>
               {(errorMessage.includes('시간이 초과') || errorMessage.includes('처리 시간')) && (
                 <p className="text-xs mt-2 text-red-600">
-                  스프레드시트의 데이터 양이 너무 많을 수 있습니다. 데이터를 더 작은 단위로 나누어 시도해보세요.
+                  스프레드시트의 데이터 양이 너무 많습니다. 데이터를 더 작은 단위로 나누어 시도해보세요.
                 </p>
               )}
             </div>

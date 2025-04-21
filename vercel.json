@@ -5,5 +5,10 @@
   "framework": "nextjs",
   "github": {
     "silent": true
+  },
+  "functions": {
+    "app/api/**/*": {
+      "maxDuration": 60
+    }
   }
 } 
