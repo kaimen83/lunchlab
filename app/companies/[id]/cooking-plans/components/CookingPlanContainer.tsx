@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import CookingPlanForm from './CookingPlanForm';
 import CookingPlanResult from './CookingPlanResult';
-import { CookingPlan, CookingPlanFormData } from '../types';
+import { CookingPlan, CookingPlanFormData, ExtendedCookingPlan } from '../types';
 
 interface CookingPlanContainerProps {
   companyId: string;
@@ -14,7 +14,7 @@ interface CookingPlanContainerProps {
 
 export default function CookingPlanContainer({ companyId, initialDate, onComplete }: CookingPlanContainerProps) {
   const { toast } = useToast();
-  const [cookingPlan, setCookingPlan] = useState<CookingPlan | null>(null);
+  const [cookingPlan, setCookingPlan] = useState<ExtendedCookingPlan | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   
   // 현재 컴포넌트가 마운트된 상태인지 추적
@@ -65,7 +65,13 @@ export default function CookingPlanContainer({ companyId, initialDate, onComplet
         throw new Error('조리계획서 정보를 불러오는데 실패했습니다.');
       }
       
-      const cookingPlanData = await fetchResponse.json();
+      const cookingPlanData = await fetchResponse.json() as ExtendedCookingPlan;
+      
+      // container_requirements 필드가 없는 경우 빈 배열로 초기화
+      if (!cookingPlanData.container_requirements) {
+        cookingPlanData.container_requirements = [];
+      }
+      
       setCookingPlan(cookingPlanData);
       
       // 완료 콜백 함수 호출

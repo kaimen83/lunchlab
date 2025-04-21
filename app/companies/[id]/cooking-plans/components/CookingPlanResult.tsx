@@ -688,7 +688,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
             <CardHeader>
               <CardTitle>필요 용기 목록</CardTitle>
               <CardDescription>
-                총 {cookingPlan.container_requirements.length}개 품목 / 
+                총 {cookingPlan.container_requirements?.length || 0}개 품목 / 
                 예상 비용: {formatCurrency(totalContainerCost)}원
               </CardDescription>
             </CardHeader>
@@ -704,8 +704,8 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {cookingPlan.container_requirements.length > 0 ? (
-                    cookingPlan.container_requirements.map((item, index) => (
+                  {(cookingPlan.container_requirements?.length || 0) > 0 ? (
+                    cookingPlan.container_requirements?.map((item, index) => (
                       <TableRow key={index}>
                         <TableCell className="font-bold">{item.container_name}</TableCell>
                         <TableCell>{item.code_name || "-"}</TableCell>
