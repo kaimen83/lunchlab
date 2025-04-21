@@ -5,7 +5,7 @@ import { isHeadAdmin } from '@/lib/clerk'
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: { userId: string } }
 ) {
   try {
     // 요청자 인증 확인
@@ -16,7 +16,7 @@ export async function GET(
 
     // 권한 확인 (본인이거나 관리자만 접근 가능)
     const isAdmin = await isHeadAdmin(userId)
-    const targetUserId = params.id
+    const targetUserId = params.userId
 
     // Clerk API를 통해 사용자 정보 조회
     const client = await clerkClient()
