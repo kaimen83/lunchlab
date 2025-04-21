@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Plus, FilePen, Trash2, Search, PackageOpen, 
   ChevronDown, ChevronUp, LineChart, MoreVertical, Eye,
   Settings, X, ChevronRight, Info, FileSpreadsheet,
-  SlidersHorizontal, Command, ArrowUpDown, Filter
+  SlidersHorizontal, Command, ArrowUpDown, Filter,
+  ChevronLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,6 +79,14 @@ interface Ingredient {
   updated_at?: string;
 }
 
+// 페이지네이션 정보 인터페이스
+interface PaginationInfo {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 interface IngredientsListProps {
   companyId: string;
   userRole: string;
@@ -89,6 +98,7 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [sortField, setSortField] = useState<keyof Ingredient>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null);
@@ -114,11 +124,24 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
     allergens: false
   });
   const [bulkImportModalOpen, setBulkImportModalOpen] = useState(false);
+  
+  // 페이지네이션 관련 상태 추가
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    total: 0,
+    page: 1,
+    limit: 25,
+    totalPages: 0
+  });
+  // 상세 정보 상태 (아코디언 지연 로딩용)
+  const [detailedIngredients, setDetailedIngredients] = useState<Record<string, Ingredient>>({});
+  // 현재 로딩 중인 상세 정보 ID 추적
+  const [loadingDetails, setLoadingDetails] = useState<Record<string, boolean>>({});
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin';
 
   // 식재료 목록 로드 - useCallback으로 메모이제이션
-  const loadIngredients = useCallback(async () => {
+  const loadIngredients = useCallback(async (page: number = 1, search: string = '') => {
     setIsLoading(true);
     try {
       // 모든 공급업체 목록을 먼저 가져옵니다
@@ -129,14 +152,16 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
         suppliersList = await suppliersResponse.json();
       }
       
-      // 식재료 목록을 가져옵니다
-      const response = await fetch(`/api/companies/${companyId}/ingredients`);
+      // 식재료 목록을 페이지네이션과 함께 가져옵니다
+      const response = await fetch(
+        `/api/companies/${companyId}/ingredients?page=${page}&limit=${pagination.limit}&search=${encodeURIComponent(search)}`
+      );
       
       if (!response.ok) {
         throw new Error('식재료 목록을 불러오는데 실패했습니다.');
       }
       
-      const data = await response.json();
+      const { ingredients: data, pagination: paginationData } = await response.json();
       
       // supplier_id가 있는 경우 공급업체 정보를 연결합니다
       const ingredientsWithSuppliers = data.map((ingredient: Ingredient) => {
@@ -153,6 +178,10 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
       });
       
       setIngredients(ingredientsWithSuppliers);
+      setPagination(paginationData);
+      
+      // 페이지가 변경되면 확장된 행 상태 초기화
+      setExpandedRows({});
     } catch (error) {
       console.error('식재료 로드 오류:', error);
       toast({
@@ -163,8 +192,100 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
     } finally {
       setIsLoading(false);
     }
-  }, [companyId, toast]);
+  }, [companyId, pagination.limit, toast]);
 
+  // 특정 식재료의 상세 정보를 로드하는 함수
+  const loadIngredientDetails = useCallback(async (ingredientId: string) => {
+    // 이미 로딩 중이거나 상세 정보가 있으면 중복 요청 방지
+    if (loadingDetails[ingredientId] || detailedIngredients[ingredientId]) {
+      return;
+    }
+    
+    setLoadingDetails(prev => ({ ...prev, [ingredientId]: true }));
+    
+    try {
+      const response = await fetch(`/api/companies/${companyId}/ingredients/${ingredientId}`);
+      
+      if (!response.ok) {
+        throw new Error('식재료 상세 정보를 불러오는데 실패했습니다.');
+      }
+      
+      const detailedIngredient = await response.json();
+      
+      setDetailedIngredients(prev => ({
+        ...prev,
+        [ingredientId]: detailedIngredient
+      }));
+    } catch (error) {
+      console.error('식재료 상세 정보 로드 오류:', error);
+      toast({
+        title: '오류 발생',
+        description: error instanceof Error ? error.message : '식재료 상세 정보를 불러오는데 실패했습니다.',
+        variant: 'destructive',
+      });
+      
+      // 에러 발생 시 확장된 행에서 제거
+      setExpandedRows(prev => {
+        const newState = { ...prev };
+        delete newState[ingredientId];
+        return newState;
+      });
+    } finally {
+      setLoadingDetails(prev => {
+        const newState = { ...prev };
+        delete newState[ingredientId];
+        return newState;
+      });
+    }
+  }, [companyId, loadingDetails, detailedIngredients, toast]);
+
+  // 검색 입력 핸들러 (실시간 업데이트)
+  const handleSearchInput = (value: string) => {
+    setSearchQuery(value);
+    
+    // 이전 타이머 제거
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // 300ms 후에 검색 실행 (타이핑 완료 대기)
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearchQuery(value);
+    }, 300);
+  };
+  
+  // 검색 실행 (버튼 클릭 또는 엔터 키)
+  const executeSearch = () => {
+    setDebouncedSearchQuery(searchQuery);
+    
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+  };
+  
+  // 엔터 키 핸들러
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      executeSearch();
+    }
+  };
+
+  // 검색어 변경 시 첫 페이지로 데이터 로드
+  useEffect(() => {
+    loadIngredients(1, debouncedSearchQuery);
+  }, [debouncedSearchQuery, loadIngredients]);
+
+  // 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // 초기 데이터 로드
   useEffect(() => {
     loadIngredients();
   }, [loadIngredients]);
@@ -179,32 +300,23 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
     }
   };
 
-  // 정렬 및 필터링된 식재료 목록
-  const filteredIngredients = ingredients
-    .filter(ingredient => 
-      ingredient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (ingredient.code_name && ingredient.code_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (ingredient.origin && ingredient.origin.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (ingredient.allergens && ingredient.allergens.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (ingredient.unit && ingredient.unit.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (ingredient.memo1 && ingredient.memo1.toLowerCase().includes(searchQuery.toLowerCase()))
-    )
-    .sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-      
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortDirection === 'asc' 
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
-      }
-      
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
-      }
-      
-      return 0;
-    });
+  // 정렬된 식재료 목록 (클라이언트 측 정렬만 적용)
+  const sortedIngredients = [...ingredients].sort((a, b) => {
+    const aValue = a[sortField];
+    const bValue = b[sortField];
+    
+    if (typeof aValue === 'string' && typeof bValue === 'string') {
+      return sortDirection === 'asc' 
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue);
+    }
+    
+    if (typeof aValue === 'number' && typeof bValue === 'number') {
+      return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+    }
+    
+    return 0;
+  });
 
   // 식재료 추가 모달 열기
   const handleAddIngredient = () => {
@@ -224,6 +336,14 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
   const handleDeleteConfirm = (ingredient: Ingredient) => {
     setIngredientToDelete(ingredient);
     setDeleteConfirmOpen(true);
+  };
+
+  // 페이지 변경 핸들러
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > pagination.totalPages || newPage === pagination.page) {
+      return;
+    }
+    loadIngredients(newPage, searchQuery);
   };
 
   // 식재료 삭제 처리
@@ -282,6 +402,26 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
 
   const formatNumber = (number: number) => {
     return new Intl.NumberFormat('ko-KR').format(number);
+  };
+
+  // 행 확장 토글 함수 (아코디언)
+  const toggleRowExpand = (ingredientId: string) => {
+    const newExpandedRows = { ...expandedRows };
+    
+    if (newExpandedRows[ingredientId]) {
+      // 이미 확장된 경우 닫기
+      delete newExpandedRows[ingredientId];
+    } else {
+      // 확장하는 경우, 상세 정보 로드
+      newExpandedRows[ingredientId] = true;
+      
+      // 상세 정보가 없는 경우에만 로드
+      if (!detailedIngredients[ingredientId]) {
+        loadIngredientDetails(ingredientId);
+      }
+    }
+    
+    setExpandedRows(newExpandedRows);
   };
 
   // 테이블 헤더 렌더링 함수 개선
@@ -550,302 +690,188 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
 
   // 테이블 행 렌더링 함수 개선
   const renderTableRows = () => (
-    <TableBody>
-      {isLoading ? (
-        // 로딩 중 표시
-        <TableRow>
-          <TableCell colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} 
-            className="h-24 text-center text-muted-foreground"
-          >
-            <div className="flex flex-col items-center justify-center gap-2">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-              <span>식재료 로딩 중...</span>
-            </div>
-          </TableCell>
-        </TableRow>
-      ) : filteredIngredients.length === 0 ? (
-        // 결과 없음 표시
-        <TableRow>
-          <TableCell colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} 
-            className="h-24 text-center"
-          >
-            <div className="flex flex-col items-center justify-center text-muted-foreground">
-              {searchQuery ? (
-                <>
-                  <Search className="h-10 w-10 mb-2 opacity-20" />
-                  <p>'{searchQuery}'에 대한 검색 결과가 없습니다.</p>
-                </>
-              ) : (
-                <>
-                  <PackageOpen className="h-10 w-10 mb-2 opacity-20" />
-                  <p>등록된 식재료가 없습니다.</p>
-                  {isOwnerOrAdmin && (
-                    <Button 
-                      variant="link" 
-                      onClick={handleAddIngredient}
-                      className="mt-2 text-primary"
-                    >
-                      식재료 추가하기
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
-          </TableCell>
-        </TableRow>
-      ) : (
-        // 데이터 행 표시
-        filteredIngredients.map(ingredient => (
-          <React.Fragment key={ingredient.id}>
-            <TableRow className={expandedRows[ingredient.id] ? "bg-muted/10" : ""}>
-              {/* 확장 버튼 */}
+    sortedIngredients.map(ingredient => {
+      const isExpanded = !!expandedRows[ingredient.id];
+      const detailedData = detailedIngredients[ingredient.id] || ingredient;
+      const isDetailLoading = loadingDetails[ingredient.id];
+      
+      return (
+        <React.Fragment key={ingredient.id}>
+          {/* 기본 행 */}
+          <TableRow className={isExpanded ? 'bg-muted/50' : ''}>
+            {/* 확장 버튼 */}
+            <TableCell className="p-2 w-10">
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => toggleRowExpand(ingredient.id)}
+                className="h-8 w-8"
+              >
+                {isExpanded ? 
+                  <ChevronUp className="h-4 w-4" /> : 
+                  <ChevronDown className="h-4 w-4" />
+                }
+              </Button>
+            </TableCell>
+            
+            {/* 기본 필드들 */}
+            {visibleColumns.name && (
+              <TableCell className="font-medium">{ingredient.name}</TableCell>
+            )}
+            
+            {visibleColumns.code_name && (
+              <TableCell>{ingredient.code_name || '-'}</TableCell>
+            )}
+            
+            {visibleColumns.supplier && (
+              <TableCell>{ingredient.supplier || '-'}</TableCell>
+            )}
+            
+            {visibleColumns.package_amount && (
+              <TableCell>{formatNumber(ingredient.package_amount)} {ingredient.unit}</TableCell>
+            )}
+            
+            {visibleColumns.price && (
               <TableCell>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => toggleRowExpand(ingredient.id)}
-                  className="h-8 w-8 rounded-full p-0 hover:bg-muted/30"
-                >
-                  {expandedRows[ingredient.id] ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                </Button>
-              </TableCell>
-              
-              {/* 식재료명 */}
-              {visibleColumns.name && (
-                <TableCell className="font-medium">
-                  {ingredient.name}
-                </TableCell>
-              )}
-              
-              {/* 코드명 */}
-              {visibleColumns.code_name && (
-                <TableCell>
-                  {ingredient.code_name || '-'}
-                </TableCell>
-              )}
-              
-              {/* 식재료 업체 */}
-              {visibleColumns.supplier && (
-                <TableCell>
-                  {ingredient.supplier || '-'}
-                </TableCell>
-              )}
-              
-              {/* 포장 단위 */}
-              {visibleColumns.package_amount && (
-                <TableCell>
-                  {ingredient.package_amount}{ingredient.unit === 'l' ? 'ml' : ingredient.unit}
-                </TableCell>
-              )}
-              
-              {/* 가격 */}
-              {visibleColumns.price && (
-                <TableCell>
-                  <div className="flex items-center gap-1">
-                    <span>{formatCurrency(ingredient.price)}</span>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-6 w-6 rounded-full p-0 hover:bg-muted/30"
-                            onClick={() => handleViewPriceHistory(ingredient)}
-                          >
-                            <LineChart className="h-3 w-3 text-muted-foreground" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>가격 이력 보기</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </TableCell>
-              )}
-              
-              {/* 박스당 갯수 */}
-              {visibleColumns.items_per_box && (
-                <TableCell>
-                  {ingredient.items_per_box ? formatNumber(ingredient.items_per_box) : '-'}
-                </TableCell>
-              )}
-              
-              {/* 재고관리 등급 */}
-              {visibleColumns.stock_grade && (
-                <TableCell>
-                  {ingredient.stock_grade ? (
-                    <Badge variant={
-                      ingredient.stock_grade === 'A' ? 'destructive' : 
-                      ingredient.stock_grade === 'B' ? 'secondary' : 
-                      ingredient.stock_grade === 'C' ? 'default' : 
-                      'outline'
-                    }>
-                      {ingredient.stock_grade}
-                    </Badge>
-                  ) : '-'}
-                </TableCell>
-              )}
-              
-              {/* 원산지 */}
-              {visibleColumns.origin && (
-                <TableCell>
-                  {ingredient.origin || '-'}
-                </TableCell>
-              )}
-              
-              {/* 칼로리 */}
-              {visibleColumns.calories && (
-                <TableCell>
-                  {ingredient.calories ? `${ingredient.calories} kcal` : '-'}
-                </TableCell>
-              )}
-              
-              {/* 영양성분 */}
-              {visibleColumns.nutrition && (
-                <TableCell className="max-w-[150px] truncate">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger className="text-left w-full truncate">
-                        {(ingredient.protein || ingredient.fat || ingredient.carbs) ? (
-                          <span className="text-xs">
-                            {ingredient.protein ? `단백질 ${ingredient.protein}g` : ''}
-                            {ingredient.fat ? (ingredient.protein ? ', ' : '') + `지방 ${ingredient.fat}g` : ''}
-                            {ingredient.carbs ? ((ingredient.protein || ingredient.fat) ? ', ' : '') + `탄수화물 ${ingredient.carbs}g` : ''}
-                          </span>
-                        ) : '-'}
-                      </TooltipTrigger>
-                      {(ingredient.protein || ingredient.fat || ingredient.carbs) && (
-                        <TooltipContent>
-                          <div className="space-y-1">
-                            {ingredient.protein && <p>단백질: {ingredient.protein}g</p>}
-                            {ingredient.fat && <p>지방: {ingredient.fat}g</p>}
-                            {ingredient.carbs && <p>탄수화물: {ingredient.carbs}g</p>}
-                          </div>
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-                  </TooltipProvider>
-                </TableCell>
-              )}
-              
-              {/* 알러지 유발물질 */}
-              {visibleColumns.allergens && (
-                <TableCell className="max-w-[150px] truncate">
-                  {ingredient.allergens ? (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger className="text-left w-full truncate">
-                          {ingredient.allergens}
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {ingredient.allergens}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  ) : '-'}
-                </TableCell>
-              )}
-              
-              {/* 작업 버튼 */}
-              <TableCell>
-                <div className="flex items-center justify-end gap-1">
-                  {isOwnerOrAdmin && (
-                    <>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEditIngredient(ingredient)}
-                              className="h-8 w-8 p-0"
-                            >
-                              <FilePen className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>편집</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                      
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteConfirm(ingredient)}
-                              className="h-8 w-8 p-0 text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>삭제</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </>
-                  )}
+                <div className="flex items-center space-x-1">
+                  <span>{formatCurrency(ingredient.price)}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleViewPriceHistory(ingredient);
+                    }}
+                    aria-label="가격 기록 보기"
+                  >
+                    <LineChart className="h-3 w-3 text-muted-foreground" />
+                  </Button>
                 </div>
               </TableCell>
-            </TableRow>
-            
-            {/* 확장 행 */}
-            {expandedRows[ingredient.id] && (
-              <TableRow key={`${ingredient.id}-expanded`}>
-                <TableCell colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} className="bg-muted/5 px-6 py-3 border-t border-muted/20">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {!visibleColumns.origin && ingredient.origin && (
-                      <div>
-                        <span className="font-medium text-sm text-muted-foreground">원산지:</span>
-                        <p>{ingredient.origin}</p>
-                      </div>
-                    )}
-                    {!visibleColumns.calories && ingredient.calories && (
-                      <div>
-                        <span className="font-medium text-sm text-muted-foreground">칼로리:</span>
-                        <p>{ingredient.calories} kcal</p>
-                      </div>
-                    )}
-                    {!visibleColumns.nutrition && (ingredient.protein || ingredient.fat || ingredient.carbs) && (
-                      <div>
-                        <span className="font-medium text-sm text-muted-foreground">영양성분:</span>
-                        <p className="text-sm">
-                          {ingredient.protein ? `단백질: ${ingredient.protein}g` : ''}
-                          {ingredient.protein && <br />}
-                          {ingredient.fat ? `지방: ${ingredient.fat}g` : ''}
-                          {ingredient.fat && <br />}
-                          {ingredient.carbs ? `탄수화물: ${ingredient.carbs}g` : ''}
-                        </p>
-                      </div>
-                    )}
-                    {!visibleColumns.allergens && ingredient.allergens && (
-                      <div>
-                        <span className="font-medium text-sm text-muted-foreground">알러지 유발물질:</span>
-                        <p>{ingredient.allergens}</p>
-                      </div>
-                    )}
-                    {ingredient.memo1 && (
-                      <div>
-                        <span className="font-medium text-sm text-muted-foreground">메모:</span>
-                        <p>{ingredient.memo1}</p>
-                      </div>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
             )}
-          </React.Fragment>
-        ))
-      )}
-    </TableBody>
+            
+            {visibleColumns.items_per_box && (
+              <TableCell>{ingredient.items_per_box || '-'}</TableCell>
+            )}
+            
+            {visibleColumns.stock_grade && (
+              <TableCell>
+                {ingredient.stock_grade ? (
+                  <Badge variant={
+                    ingredient.stock_grade === 'A' ? 'default' :
+                    ingredient.stock_grade === 'B' ? 'secondary' :
+                    ingredient.stock_grade === 'C' ? 'outline' : 'destructive'
+                  }>
+                    {ingredient.stock_grade}
+                  </Badge>
+                ) : '-'}
+              </TableCell>
+            )}
+            
+            {/* 작업 */}
+            <TableCell>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreVertical className="h-4 w-4" />
+                    <span className="sr-only">메뉴</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleEditIngredient(ingredient)}>
+                    <FilePen className="mr-2 h-4 w-4" />
+                    <span>수정</span>
+                  </DropdownMenuItem>
+                  {isOwnerOrAdmin && (
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => handleDeleteConfirm(ingredient)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      <span>삭제</span>
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </TableCell>
+          </TableRow>
+          
+          {/* 확장된 행 (상세 정보) */}
+          {isExpanded && (
+            <TableRow className="bg-muted/25 border-0">
+              <TableCell colSpan={12} className="px-4 py-3">
+                {isDetailLoading ? (
+                  <div className="flex justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* 영양 정보 */}
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium flex items-center">
+                        <Info className="h-4 w-4 mr-1 text-muted-foreground" />
+                        <span>영양 정보</span>
+                      </h4>
+                      <div className="text-sm grid grid-cols-2 gap-x-4 gap-y-1">
+                        <span className="text-muted-foreground">칼로리:</span>
+                        <span>{detailedData.calories ? `${detailedData.calories} kcal` : '-'}</span>
+                        
+                        <span className="text-muted-foreground">단백질:</span>
+                        <span>{detailedData.protein ? `${detailedData.protein}g` : '-'}</span>
+                        
+                        <span className="text-muted-foreground">지방:</span>
+                        <span>{detailedData.fat ? `${detailedData.fat}g` : '-'}</span>
+                        
+                        <span className="text-muted-foreground">탄수화물:</span>
+                        <span>{detailedData.carbs ? `${detailedData.carbs}g` : '-'}</span>
+                      </div>
+                    </div>
+                    
+                    {/* 원산지 및 알러지 정보 */}
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium">원산지 및 알러지 정보</h4>
+                      <div className="text-sm grid grid-cols-2 gap-x-4 gap-y-1">
+                        <span className="text-muted-foreground">원산지:</span>
+                        <span>{detailedData.origin || '-'}</span>
+                        
+                        <span className="text-muted-foreground">알러지 유발물질:</span>
+                        <span>{detailedData.allergens || '-'}</span>
+                      </div>
+                    </div>
+                    
+                    {/* 기타 정보 */}
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium">기타 정보</h4>
+                      <div className="text-sm grid grid-cols-2 gap-x-4 gap-y-1">
+                        <span className="text-muted-foreground">메모:</span>
+                        <span>{detailedData.memo1 || '-'}</span>
+                        
+                        <span className="text-muted-foreground">등록일:</span>
+                        <span>
+                          {detailedData.created_at ? 
+                            new Date(detailedData.created_at).toLocaleDateString() : 
+                            '-'
+                          }
+                        </span>
+                        
+                        <span className="text-muted-foreground">최종 수정일:</span>
+                        <span>
+                          {detailedData.updated_at ? 
+                            new Date(detailedData.updated_at).toLocaleDateString() : 
+                            '-'
+                          }
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </TableCell>
+            </TableRow>
+          )}
+        </React.Fragment>
+      );
+    })
   );
 
   // 모바일 카드 렌더링 함수 개선
@@ -1001,12 +1027,102 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
     </Card>
   );
 
-  // 행 확장 토글
-  const toggleRowExpand = (ingredientId: string) => {
-    setExpandedRows(prev => ({
-      ...prev,
-      [ingredientId]: !prev[ingredientId]
-    }));
+  // 페이지네이션 UI 렌더링
+  const renderPagination = () => {
+    if (pagination.totalPages <= 1) return null;
+    
+    return (
+      <div className="flex items-center justify-between mt-4">
+        <div className="text-sm text-muted-foreground">
+          전체 {pagination.total}개 중 {(pagination.page - 1) * pagination.limit + 1}-
+          {Math.min(pagination.page * pagination.limit, pagination.total)}개 표시
+        </div>
+        
+        <nav className="flex items-center space-x-1" aria-label="페이지네이션">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 rounded-md"
+            onClick={() => handlePageChange(1)}
+            disabled={pagination.page === 1}
+            aria-label="첫 페이지"
+          >
+            <ChevronLeft className="h-3 w-3" />
+            <ChevronLeft className="h-3 w-3 -ml-2" />
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 rounded-md"
+            onClick={() => handlePageChange(pagination.page - 1)}
+            disabled={pagination.page === 1}
+            aria-label="이전 페이지"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          
+          <div className="flex items-center gap-1">
+            {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+              // 현재 페이지를 중심으로 표시할 페이지 계산
+              let pageToShow;
+              if (pagination.totalPages <= 5) {
+                // 전체 페이지가 5개 이하면 모두 표시
+                pageToShow = i + 1;
+              } else if (pagination.page <= 3) {
+                // 현재 페이지가 1~3이면 1~5 표시
+                pageToShow = i + 1;
+              } else if (pagination.page >= pagination.totalPages - 2) {
+                // 현재 페이지가 마지막에 가까우면 마지막 5개 표시
+                pageToShow = pagination.totalPages - 4 + i;
+              } else {
+                // 그 외에는 현재 페이지 중심으로 앞뒤 2개씩 표시
+                pageToShow = pagination.page - 2 + i;
+              }
+              
+              const isCurrentPage = pageToShow === pagination.page;
+              
+              return (
+                <Button
+                  key={pageToShow}
+                  variant={isCurrentPage ? "default" : "outline"}
+                  size="icon"
+                  className={`h-8 w-8 rounded-md ${isCurrentPage ? "pointer-events-none" : ""}`}
+                  onClick={() => handlePageChange(pageToShow)}
+                  aria-current={isCurrentPage ? "page" : undefined}
+                  aria-label={`${pageToShow} 페이지`}
+                >
+                  {pageToShow}
+                </Button>
+              );
+            })}
+          </div>
+          
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 rounded-md"
+            onClick={() => handlePageChange(pagination.page + 1)}
+            disabled={pagination.page === pagination.totalPages}
+            aria-label="다음 페이지"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 rounded-md"
+            onClick={() => handlePageChange(pagination.totalPages)}
+            disabled={pagination.page === pagination.totalPages}
+            aria-label="마지막 페이지"
+          >
+            <ChevronRight className="h-3 w-3" />
+            <ChevronRight className="h-3 w-3 -ml-2" />
+          </Button>
+        </nav>
+      </div>
+    );
   };
 
   return (
@@ -1021,14 +1137,44 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
       
       {/* 상단 검색 및 추가 버튼 영역 */}
       <div className="flex flex-col sm:flex-row gap-3 justify-between">
-        <div className="relative flex-1 sm:w-64">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="식재료 검색..." 
-            className="pl-9"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        <div className="relative flex-1 sm:max-w-md">
+          <div className="flex">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="식재료 검색..." 
+                className="pl-9 pr-14"
+                value={searchQuery}
+                onChange={(e) => handleSearchInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-10 top-0 h-full"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setDebouncedSearchQuery('');
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            <Button 
+              variant="secondary"
+              className="ml-2"
+              onClick={executeSearch}
+            >
+              검색
+            </Button>
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground ml-1">
+            {pagination.total > 0 && (
+              <span>전체 {pagination.total}건</span>
+            )}
+          </div>
         </div>
         
         <div className="flex gap-2 items-center">
@@ -1222,7 +1368,7 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
                 <span>식재료 로딩 중...</span>
               </div>
             </div>
-          ) : filteredIngredients.length === 0 ? (
+          ) : sortedIngredients.length === 0 ? (
             <div className="p-8 text-center">
               <div className="flex flex-col items-center justify-center text-muted-foreground">
                 {searchQuery ? (
@@ -1249,21 +1395,49 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
             </div>
           ) : (
             <div className="px-2 py-2 divide-y divide-border">
-              {filteredIngredients.map(ingredient => (
+              {sortedIngredients.map(ingredient => (
                 <div key={ingredient.id} className="py-1">
                   {renderMobileCard(ingredient)}
                 </div>
               ))}
             </div>
           )}
+          
+          {/* 모바일 페이지네이션 */}
+          <div className="p-4 border-t">
+            {renderPagination()}
+          </div>
         </div>
 
         {/* 데스크톱 뷰 - 테이블 형태로 표시 */}
         <div className="hidden sm:block overflow-x-auto">
           <Table>
             {renderTableHeader()}
-            {renderTableRows()}
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={12} className="h-24 text-center">
+                    <div className="flex justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : sortedIngredients.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={12} className="h-24 text-center">
+                    검색 결과가 없습니다.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                renderTableRows()
+              )}
+            </TableBody>
           </Table>
+          
+          {/* 데스크톱 페이지네이션 */}
+          <div className="p-4 border-t">
+            {renderPagination()}
+          </div>
         </div>
       </Card>
 
@@ -1385,7 +1559,10 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
         open={bulkImportModalOpen}
         onOpenChange={setBulkImportModalOpen}
         companyId={companyId}
-        onImportComplete={loadIngredients}
+        onSuccess={() => {
+          loadIngredients();
+          setBulkImportModalOpen(false);
+        }}
       />
     </div>
   );

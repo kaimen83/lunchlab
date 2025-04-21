@@ -58,7 +58,7 @@ export default async function InventoryPage({ params, searchParams }: InventoryP
   
   // 회사가 없는 경우 404 페이지로 이동
   if (companyError || !company) {
-    notFound();
+    return notFound();
   }
   
   // 멤버십이 없는 경우 회사 상세 페이지로 리다이렉트

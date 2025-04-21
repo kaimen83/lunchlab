@@ -118,22 +118,82 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return Response.json({ error: '식재료 기능이 활성화되지 않았습니다.' }, { status: 403 });
     }
 
+    // URL 쿼리 파라미터 파싱
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get('page') || '1', 10);
+    const limit = parseInt(url.searchParams.get('limit') || '25', 10);
+    const search = url.searchParams.get('search') || '';
+    const detailed = url.searchParams.get('detailed') === 'true';
+    
+    // 페이지네이션 계산
+    const offset = (page - 1) * limit;
+    
     // Supabase 클라이언트 생성
     const supabase = createServerSupabaseClient();
 
-    // 식재료 목록 조회
-    const { data: ingredients, error } = await supabase
-      .from('ingredients')
-      .select('*')
-      .eq('company_id', companyId)
-      .order('name');
+    // 기본 필드와 상세 필드 정의
+    const basicFields = 'id, name, code_name, supplier, supplier_id, package_amount, unit, price, items_per_box, stock_grade';
+    const detailedFields = 'origin, memo1, calories, protein, fat, carbs, allergens, created_at, updated_at';
+    
+    // 조회할 필드 결정
+    const fields = detailed ? `${basicFields}, ${detailedFields}` : basicFields;
 
-    if (error) {
-      console.error('식재료 목록 조회 오류:', error);
+    // Promise.all을 사용하여 전체 개수와 페이지 데이터를 병렬로 가져옴
+    const [countResult, dataResult] = await Promise.all([
+      // 전체 식재료 개수 조회 (검색어가 있는 경우 필터링)
+      (search 
+        ? supabase
+            .from('ingredients')
+            .select('id', { count: 'exact', head: true })
+            .eq('company_id', companyId)
+            .ilike('name', `%${search}%`)
+        : supabase
+            .from('ingredients')
+            .select('id', { count: 'exact', head: true })
+            .eq('company_id', companyId)
+      ),
+      
+      // 현재 페이지 식재료 데이터 조회 (검색어가 있는 경우 필터링)
+      (search
+        ? supabase
+            .from('ingredients')
+            .select(fields)
+            .eq('company_id', companyId)
+            .ilike('name', `%${search}%`)
+            .order('name')
+            .range(offset, offset + limit - 1)
+        : supabase
+            .from('ingredients')
+            .select(fields)
+            .eq('company_id', companyId)
+            .order('name')
+            .range(offset, offset + limit - 1)
+      )
+    ]);
+
+    const { count, error: countError } = countResult;
+    const { data: ingredients, error: dataError } = dataResult;
+
+    if (countError) {
+      console.error('식재료 개수 조회 오류:', countError);
+      return Response.json({ error: '식재료 개수를 조회하는 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+
+    if (dataError) {
+      console.error('식재료 목록 조회 오류:', dataError);
       return Response.json({ error: '식재료 목록을 불러오는 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
-    return Response.json(ingredients || []);
+    // 결과 반환 (페이지네이션 정보 포함)
+    return Response.json({
+      ingredients: ingredients || [],
+      pagination: {
+        total: count || 0,
+        page,
+        limit,
+        totalPages: Math.ceil((count || 0) / limit)
+      }
+    });
   } catch (error) {
     console.error('식재료 목록 API 오류:', error);
     return Response.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });

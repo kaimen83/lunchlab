@@ -62,7 +62,7 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
     .single();
   
   if (companyError || !company) {
-    notFound();
+    return notFound();
   }
   
   // 현재 사용자가 회사의 멤버인지 확인
@@ -90,12 +90,12 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
     
     if (portionsError) {
       console.error('식수 계획 조회 오류:', portionsError);
-      notFound();
+      return notFound();
     }
     
     if (!mealPortions || mealPortions.length === 0) {
       console.error('해당 날짜의 조리계획서가 없습니다:', date);
-      notFound();
+      return notFound();
     }
     
     // 2. 식단 정보 조회
@@ -137,7 +137,7 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
     
     if (mealPlansError) {
       console.error('식단 정보 조회 오류:', mealPlansError);
-      notFound();
+      return notFound();
     }
     
     // 3. 결과 데이터 구성
@@ -304,6 +304,6 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
     
   } catch (error) {
     console.error('조리계획서 조회 오류:', error);
-    notFound();
+    return notFound();
   }
 } 

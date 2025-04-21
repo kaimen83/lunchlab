@@ -40,7 +40,7 @@ export default async function CompanyPage({ params }: CompanyPageProps) {
     .single();
   
   if (companyError || !company) {
-    notFound();
+    return notFound();
   }
   
   // 현재 사용자가 회사의 멤버인지 확인

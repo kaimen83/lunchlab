@@ -19,14 +19,16 @@ interface BulkImportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   companyId: string;
-  onImportComplete: () => void;
+  onImportComplete?: () => void;
+  onSuccess?: () => void;
 }
 
 export default function BulkImportModal({ 
   open, 
   onOpenChange, 
   companyId, 
-  onImportComplete 
+  onImportComplete, 
+  onSuccess
 }: BulkImportModalProps) {
   const { toast } = useToast();
   const [url, setUrl] = useState('');
@@ -91,7 +93,11 @@ export default function BulkImportModal({
 
       if (result.success > 0) {
         // 데이터가 추가되었을 경우에만 목록 갱신
-        onImportComplete();
+        onImportComplete?.();
+      }
+
+      if (onSuccess) {
+        onSuccess();
       }
     } catch (error) {
       console.error('식재료 일괄 추가 오류:', error);

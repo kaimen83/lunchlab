@@ -39,7 +39,7 @@ export default async function CompanySettingsPage({ params }: CompanySettingsPag
     .single();
 
   if (companyError || !company) {
-    notFound();
+    return notFound();
   }
 
   // 현재 사용자가 회사의 멤버인지 확인 (소유자나 관리자만 접근 가능)
