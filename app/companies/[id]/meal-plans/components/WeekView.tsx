@@ -79,14 +79,20 @@ const WeekView: React.FC<WeekViewProps> = ({
   // PC 버전 렌더링
   const renderDesktopView = () => (
     <div className="hidden md:grid grid-cols-8 border-t border-l border-gray-200">
-      {/* 첫 번째 열: 템플릿 이름 */}
+      {/* 첫 번째 열: 템플릿 이름 또는 안내 텍스트 */}
       <div className="col-span-1 border-r border-gray-200">
         <div className="h-16 border-b border-gray-200"></div> {/* 날짜 헤더 높이 맞춤 */} 
-        {templateGroups.map((templateName, index) => (
-          <div key={`template-${index}`} className="h-48 flex items-center justify-center font-semibold text-sm text-gray-500 border-b border-gray-200">
-            {templateName}
+        {templateGroups.length > 0 ? (
+          templateGroups.map((templateName, index) => (
+            <div key={`template-${index}`} className="h-48 flex items-center justify-center font-semibold text-sm text-gray-500 border-b border-gray-200">
+              {templateName}
+            </div>
+          ))
+        ) : (
+          <div className="h-48 flex items-center justify-center font-semibold text-sm text-gray-500 border-b border-gray-200">
+            식단 템플릿
           </div>
-        ))}
+        )}
       </div>
       
       {/* 나머지 열: 요일별 식단 */} 
@@ -97,20 +103,55 @@ const WeekView: React.FC<WeekViewProps> = ({
             <div className="text-lg font-bold mt-1">{format(day, 'd')}</div>
           </div>
           
-          {/* 템플릿별 식단 표시 */}
-          {templateGroups.map((templateName, templateIndex) => {
-            const templateMealPlans = getMealPlansByTemplateAndDate(templateName, day);
-            return (
-              <div key={`day-${index}-template-${templateIndex}`} className="h-48 border-b border-gray-200 p-2 relative group">
-                <div className="h-[90%] overflow-y-auto pr-1 space-y-2 mb-2">
-                  {templateMealPlans.map(renderMealPlanCard)}
+          {templateGroups.length > 0 ? (
+            /* 템플릿별 식단 표시 */
+            templateGroups.map((templateName, templateIndex) => {
+              const templateMealPlans = getMealPlansByTemplateAndDate(templateName, day);
+              return (
+                <div key={`day-${index}-template-${templateIndex}`} className="h-48 border-b border-gray-200 p-2 relative group">
+                  <div className="h-[calc(100%-30px)] overflow-y-auto pr-1 space-y-2">
+                    {templateMealPlans.map(renderMealPlanCard)}
+                  </div>
+                  <div className="absolute bottom-2 right-2 left-2 flex justify-end">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-auto opacity-40 hover:opacity-100 transition-opacity text-xs bg-white/80 rounded-full h-7 px-2"
+                      onClick={() => {
+                        // 현재 시간에 따라 기본 식사 시간 설정
+                        const now = new Date();
+                        const hour = now.getHours();
+                        let mealTime: 'breakfast' | 'lunch' | 'dinner';
+                        
+                        if (hour < 10) {
+                          mealTime = 'breakfast';
+                        } else if (hour < 15) {
+                          mealTime = 'lunch';
+                        } else {
+                          mealTime = 'dinner';
+                        }
+                        
+                        onAddMealPlan(day, mealTime);
+                      }}
+                    >
+                      <Plus className="h-3 w-3 mr-1" /> 추가
+                    </Button>
+                  </div>
                 </div>
+              );
+            })
+          ) : (
+            /* 템플릿이 없는 경우 기본 셀 표시 */
+            <div className="h-48 border-b border-gray-200 p-2 relative group flex flex-col">
+              <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
+                등록된 식단이 없습니다
+              </div>
+              <div className="text-center mb-2">
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="absolute bottom-2 right-2 w-auto opacity-40 hover:opacity-100 transition-opacity text-xs bg-white/80 rounded-full h-7 px-2"
+                  className="w-auto opacity-40 hover:opacity-100 transition-opacity text-xs bg-white/80 rounded-full h-7 px-2"
                   onClick={() => {
-                    // 현재 시간에 따라 기본 식사 시간 설정
                     const now = new Date();
                     const hour = now.getHours();
                     let mealTime: 'breakfast' | 'lunch' | 'dinner';
@@ -129,8 +170,8 @@ const WeekView: React.FC<WeekViewProps> = ({
                   <Plus className="h-3 w-3 mr-1" /> 추가
                 </Button>
               </div>
-            );
-          })}
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -173,17 +214,6 @@ const WeekView: React.FC<WeekViewProps> = ({
                   <div className="text-xs text-gray-500">{format(day, 'yyyy년 MM월 dd일')}</div>
                 </div>
               </div>
-              
-              <div className="flex gap-1">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="text-xs h-8"
-                  onClick={() => onAddMealPlan(day, 'lunch')} // 기본값으로 점심 선택
-                >
-                  <Plus className="h-3 w-3 mr-1" /> 식단 추가
-                </Button>
-              </div>
             </div>
             
             {hasMealPlans ? (
@@ -222,21 +252,23 @@ const WeekView: React.FC<WeekViewProps> = ({
                 등록된 식단이 없습니다.
               </div>
             )}
+            
+            {/* 추가 버튼을 항상 하단에 표시 */}
+            <div className="px-4 py-2 border-t flex justify-end">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="text-xs h-8"
+                onClick={() => onAddMealPlan(day, 'lunch')} // 기본값으로 점심 선택
+              >
+                <Plus className="h-3 w-3 mr-1" /> 식단 추가
+              </Button>
+            </div>
           </div>
         );
       })}
     </div>
   );
-
-  // 아무 템플릿도 없을 경우 안내 메시지
-  if (templateGroups.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 text-center">
-        <div className="text-gray-400 mb-4">등록된 식단 템플릿이 없습니다.</div>
-        <div className="text-sm text-gray-500">식단 추가 시 생성된 템플릿(식단 이름)이 여기에 표시됩니다.</div>
-      </div>
-    );
-  }
 
   return (
     <>
