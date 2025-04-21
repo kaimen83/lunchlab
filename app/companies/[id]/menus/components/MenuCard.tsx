@@ -77,25 +77,23 @@ export default function MenuCard({
             >
               <Eye className="h-4 w-4" />
             </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onEditMenu(menu)}
+              className="h-8 w-8"
+            >
+              <FilePen className="h-4 w-4" />
+            </Button>
             {isOwnerOrAdmin && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => onEditMenu(menu)}
-                  className="h-8 w-8"
-                >
-                  <FilePen className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => onDeleteConfirm(menu)}
-                  className="h-8 w-8 text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onDeleteConfirm(menu)}
+                className="h-8 w-8 text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             )}
           </div>
         </div>
@@ -201,13 +199,13 @@ export function MobileMenuCard({
                 <PackageOpen className="h-4 w-4 mr-2" />
                 <span>식자재 보기</span>
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEditMenu(menu)}>
+                <FilePen className="h-4 w-4 mr-2" />
+                <span>수정</span>
+              </DropdownMenuItem>
               {isOwnerOrAdmin && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onEditMenu(menu)}>
-                    <FilePen className="h-4 w-4 mr-2" />
-                    <span>수정</span>
-                  </DropdownMenuItem>
                   <DropdownMenuItem
                     className="text-red-500"
                     onClick={() => onDeleteConfirm(menu)}

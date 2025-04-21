@@ -321,6 +321,13 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
       // 목록에서 해당 식재료 제거
       setIngredients(prev => prev.filter(i => i.id !== ingredientToDelete.id));
       
+      // 페이지네이션 정보 업데이트
+      setPagination(prev => ({
+        ...prev,
+        total: prev.total - 1,
+        totalPages: Math.ceil((prev.total - 1) / prev.limit)
+      }));
+      
       toast({
         title: '삭제 완료',
         description: `${ingredientToDelete.name} 식재료가 삭제되었습니다.`,
@@ -467,6 +474,13 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
       if (successfullyDeletedIds.length > 0) {
         setIngredients(prev => prev.filter(i => !successfullyDeletedIds.includes(i.id)));
         
+        // 페이지네이션 정보 업데이트
+        setPagination(prev => ({
+          ...prev,
+          total: prev.total - successfullyDeletedIds.length,
+          totalPages: Math.ceil((prev.total - successfullyDeletedIds.length) / prev.limit)
+        }));
+        
         // 성공 메시지 표시
         toast({
           title: '삭제 완료',
@@ -526,28 +540,28 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
             </span>
           )}
           
-          {isOwnerOrAdmin && (
-            <Button onClick={handleAddIngredient} className="w-full sm:w-auto">
-              <Plus className="mr-2 h-4 w-4" />
-              식재료 추가
-            </Button>
-          )}
+          {/* 식재료 추가 버튼 - 모든 사용자에게 허용 */}
+          <Button onClick={handleAddIngredient} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            식재료 추가
+          </Button>
           
-          {/* 부가 기능 드롭다운 */}
-          {isOwnerOrAdmin && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="ml-2">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>관리 옵션</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setBulkImportModalOpen(true)}>
-                  <FileSpreadsheet className="mr-2 h-4 w-4" />
-                  <span>일괄 추가</span>
-                </DropdownMenuItem>
+          {/* 부가 기능 드롭다운 - 모든 사용자에게 허용 */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="ml-2">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>관리 옵션</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setBulkImportModalOpen(true)}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                <span>일괄 추가</span>
+              </DropdownMenuItem>
+              {/* 일괄 삭제는 관리자/소유자만 허용 */}
+              {isOwnerOrAdmin && (
                 <DropdownMenuItem 
                   onClick={handleOpenBulkDelete}
                   className={selectedIngredients.length > 0 ? "text-destructive focus:text-destructive" : ""}
@@ -555,9 +569,9 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
                   <Trash2 className="mr-2 h-4 w-4" />
                   <span>일괄 삭제{selectedIngredients.length > 0 ? ` (${selectedIngredients.length})` : ''}</span>
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
