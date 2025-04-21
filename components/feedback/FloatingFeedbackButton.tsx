@@ -8,27 +8,29 @@ import FeedbackModal from './FeedbackModal'
 import { useUser } from '@clerk/nextjs'
 
 // localStorage 관련 유틸리티 함수
-const getRepliesViewedKey = (userId: string | undefined) => {
-  return `feedback-replies-viewed-${userId || 'guest'}`
+const getLastViewedAtKey = (userId: string | undefined) => {
+  return `feedback-last-viewed-at-${userId || 'guest'}`
 }
 
-const getSavedRepliesViewed = (userId: string | undefined): boolean => {
-  if (typeof window === 'undefined') return false
+// 마지막으로 피드백을 확인한 시간을 가져오는 함수
+const getSavedLastViewedAt = (userId: string | undefined): number => {
+  if (typeof window === 'undefined') return 0
   
   try {
-    const saved = localStorage.getItem(getRepliesViewedKey(userId))
-    return saved === 'true'
+    const saved = localStorage.getItem(getLastViewedAtKey(userId))
+    return saved ? parseInt(saved, 10) : 0
   } catch (error) {
     console.error('localStorage 접근 오류:', error)
-    return false
+    return 0
   }
 }
 
-const saveRepliesViewed = (userId: string | undefined, value: boolean): void => {
+// 마지막으로 피드백을 확인한 시간을 저장하는 함수
+const saveLastViewedAt = (userId: string | undefined, timestamp: number): void => {
   if (typeof window === 'undefined') return
   
   try {
-    localStorage.setItem(getRepliesViewedKey(userId), value.toString())
+    localStorage.setItem(getLastViewedAtKey(userId), timestamp.toString())
   } catch (error) {
     console.error('localStorage 저장 오류:', error)
   }
@@ -38,16 +40,16 @@ export default function FloatingFeedbackButton() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [hasRepliedFeedback, setHasRepliedFeedback] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
-  // localStorage에서 초기 상태를 가져오도록 수정
-  const [repliesViewed, setRepliesViewed] = useState<boolean>(() => false)
+  // 마지막으로 확인한 시간을 저장하는 상태
+  const [lastViewedAt, setLastViewedAt] = useState<number>(() => 0)
   const [isAdmin, setIsAdmin] = useState(false)
   const { user } = useUser()
   
-  // localStorage에서 repliesViewed 상태 불러오기
+  // localStorage에서 lastViewedAt 상태 불러오기
   useEffect(() => {
     if (user?.id) {
-      const savedState = getSavedRepliesViewed(user.id)
-      setRepliesViewed(savedState)
+      const savedTimestamp = getSavedLastViewedAt(user.id)
+      setLastViewedAt(savedTimestamp)
     }
   }, [user?.id])
 
@@ -71,12 +73,9 @@ export default function FloatingFeedbackButton() {
     }
   };
 
-  // 피드백 목록을 조회하여 답변이 있는지 확인
+  // 피드백 목록을 조회하여 마지막 확인 시간 이후에 답변된 피드백이 있는지 확인
   const checkForRepliedFeedback = async () => {
-    // 이미 답변을 확인한 상태라면 체크하지 않음
-    if (repliesViewed || !user) {
-      return;
-    }
+    if (!user) return;
     
     try {
       setIsLoading(true)
@@ -88,11 +87,17 @@ export default function FloatingFeedbackButton() {
       
       const { data } = await response.json()
       
-      // 답변이 있는 피드백 수 계산 (관리자의 경우 자신의 피드백에 대한 답변만 확인)
+      // 마지막 확인 시간 이후에 답변된 피드백 수 계산
       const repliedCount = data?.filter(
-        (feedback: any) => 
-          feedback.status === 'replied' && 
-          (!isAdmin || (isAdmin && feedback.user_id === user.id))
+        (feedback: any) => {
+          // 피드백 상태가 'replied'이고
+          // 마지막 확인 시간 이후에 업데이트된 경우에만 카운트
+          // 관리자의 경우 자신의 피드백에 대한 답변만 확인
+          const updatedAt = new Date(feedback.updated_at).getTime();
+          return feedback.status === 'replied' && 
+                 updatedAt > lastViewedAt && 
+                 (!isAdmin || (isAdmin && feedback.user_id === user.id));
+        }
       ).length || 0
       
       setHasRepliedFeedback(repliedCount)
@@ -103,7 +108,7 @@ export default function FloatingFeedbackButton() {
     }
   }
   
-  // 컴포넌트 마운트 시 답변된 피드백 확인
+  // 컴포넌트 마운트 시와 주기적으로 답변된 피드백 확인
   useEffect(() => {
     if (user) {
       checkForRepliedFeedback()
@@ -115,25 +120,23 @@ export default function FloatingFeedbackButton() {
       
       return () => clearInterval(interval)
     }
-  }, [repliesViewed, user, isAdmin])
+  }, [lastViewedAt, user, isAdmin])
   
   // 모달이 닫힐 때 호출
   const handleModalClose = () => {
     setIsModalOpen(false)
-    // 이미 답변을 확인한 상태가 아닐 때만 체크
-    if (!repliesViewed) {
-      checkForRepliedFeedback()
-    }
+    checkForRepliedFeedback()
   }
   
-  // 답변 확인 처리
+  // 답변 확인 처리 - 현재 시간을 마지막 확인 시간으로 저장
   const handleRepliesViewed = () => {
+    const currentTime = Date.now()
     setHasRepliedFeedback(0) // 답변을 확인했으므로 알림 뱃지 제거
-    setRepliesViewed(true) // 답변을 확인한 상태로 저장
+    setLastViewedAt(currentTime) // 현재 시간을 마지막 확인 시간으로 설정
     
-    // localStorage에 상태 저장
+    // localStorage에 현재 시간 저장
     if (user?.id) {
-      saveRepliesViewed(user.id, true)
+      saveLastViewedAt(user.id, currentTime)
     }
   }
 
