@@ -203,7 +203,7 @@ export default async function InventoryPage({ params, searchParams }: InventoryP
               <TabsContent value="menus">
                 <div className="bg-white p-4 rounded-lg shadow border">
                   <h2 className="text-xl font-semibold mb-4">메뉴 관리</h2>
-                  <p className="text-muted-foreground mb-6">
+                  <p className="text-muted-foreground mb-6 hidden sm:block">
                     식당에서 제공하는 메뉴를 등록하고 관리하세요. 등록된 메뉴는 식단 계획과 원가 관리에 활용됩니다.
                   </p>
                   <MenusList companyId={companyId} userRole={membership.role} />
@@ -215,7 +215,7 @@ export default async function InventoryPage({ params, searchParams }: InventoryP
               <TabsContent value="containers">
                 <div className="bg-white p-4 rounded-lg shadow border">
                   <h2 className="text-xl font-semibold mb-4">용기 관리</h2>
-                  <p className="text-muted-foreground mb-6">
+                  <p className="text-muted-foreground mb-6 hidden sm:block">
                     메뉴에 사용할 용기를 등록하고 관리하세요. 용기 정보는 원가 계산과 메뉴 구성에 활용됩니다.
                   </p>
                   <ContainersList companyId={companyId} userRole={membership.role} />

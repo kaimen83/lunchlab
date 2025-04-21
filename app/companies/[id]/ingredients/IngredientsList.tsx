@@ -194,6 +194,249 @@ const SearchInput = memo(({
 
 SearchInput.displayName = 'SearchInput';
 
+// 모바일 테이블 컴포넌트 추가
+const MobileTable = ({ 
+  ingredients, 
+  isLoading, 
+  searchQuery, 
+  isOwnerOrAdmin, 
+  handleAddIngredient,
+  handleEditIngredient,
+  handleViewPriceHistory,
+  handleDeleteConfirm,
+  formatCurrency,
+  formatNumber
+}: { 
+  ingredients: Ingredient[]; 
+  isLoading: boolean; 
+  searchQuery: string; 
+  isOwnerOrAdmin: boolean; 
+  handleAddIngredient: () => void;
+  handleEditIngredient: (ingredient: Ingredient) => void;
+  handleViewPriceHistory: (ingredient: Ingredient) => void;
+  handleDeleteConfirm: (ingredient: Ingredient) => void;
+  formatCurrency: (amount: number) => string;
+  formatNumber: (number: number) => string;
+}) => {
+  // 모바일에서 확장된 행 상태 관리 (한 번에 하나만 열림)
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  
+  const toggleExpand = (id: string) => {
+    setExpandedId(prev => prev === id ? null : id);
+  };
+  
+  if (isLoading) {
+    return (
+      <div className="p-6 text-center text-gray-500">
+        <div className="flex flex-col items-center justify-center gap-2">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+          <span>식재료 로딩 중...</span>
+        </div>
+      </div>
+    );
+  }
+  
+  if (ingredients.length === 0) {
+    return (
+      <div className="p-8 text-center">
+        <div className="flex flex-col items-center justify-center text-muted-foreground">
+          {searchQuery ? (
+            <>
+              <Search className="h-12 w-12 mb-3 opacity-20" />
+              <p className="text-base">'{searchQuery}'에 대한 검색 결과가 없습니다.</p>
+            </>
+          ) : (
+            <>
+              <PackageOpen className="h-12 w-12 mb-3 opacity-20" />
+              <p className="text-base">등록된 식재료가 없습니다.</p>
+              {isOwnerOrAdmin && (
+                <Button 
+                  variant="link" 
+                  onClick={handleAddIngredient}
+                  className="mt-2 text-primary"
+                >
+                  식재료 추가하기
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse">
+        <thead className="bg-muted/30 sticky top-0 z-10">
+          <tr className="text-left text-xs font-medium text-muted-foreground">
+            <th className="px-3 py-2.5 whitespace-nowrap">식재료명</th>
+            <th className="px-3 py-2.5 text-right whitespace-nowrap">가격</th>
+            <th className="w-10 px-2 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border text-sm">
+          {ingredients.map(ingredient => (
+            <React.Fragment key={ingredient.id}>
+              <tr 
+                className={`hover:bg-muted/20 transition-colors ${expandedId === ingredient.id ? 'bg-muted/10' : ''}`}
+                onClick={() => toggleExpand(ingredient.id)}
+              >
+                <td className="px-3 py-2.5">
+                  <div className="font-medium truncate max-w-[150px]">
+                    {ingredient.name}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate max-w-[150px]">
+                    {ingredient.supplier || '공급업체 미지정'}
+                  </div>
+                </td>
+                <td className="px-3 py-2.5 text-right">
+                  <div className="font-mono font-medium whitespace-nowrap">
+                    {formatCurrency(ingredient.price)}
+                  </div>
+                  <div className="text-xs text-muted-foreground whitespace-nowrap">
+                    {ingredient.package_amount}{ingredient.unit === 'l' ? 'ml' : ingredient.unit}
+                  </div>
+                </td>
+                <td className="px-2 py-2.5">
+                  <div className="flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpand(ingredient.id);
+                      }}
+                    >
+                      {expandedId === ingredient.id ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+              
+              {/* 확장된 상세 정보 행 */}
+              {expandedId === ingredient.id && (
+                <tr className="bg-muted/5" onClick={(e) => e.stopPropagation()}>
+                  <td colSpan={3} className="px-3 py-2 border-t border-border/30">
+                    <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-xs py-1">
+                      {ingredient.code_name && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-muted-foreground">코드명:</span>
+                          <span>{ingredient.code_name}</span>
+                        </div>
+                      )}
+                      
+                      {ingredient.items_per_box && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-muted-foreground">박스당:</span>
+                          <span>{formatNumber(ingredient.items_per_box)}개</span>
+                        </div>
+                      )}
+                      
+                      {ingredient.stock_grade && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-muted-foreground">재고등급:</span>
+                          <Badge variant={
+                            ingredient.stock_grade === 'A' ? 'default' :
+                            ingredient.stock_grade === 'B' ? 'secondary' :
+                            ingredient.stock_grade === 'C' ? 'outline' : 'destructive'
+                          } className="h-5 text-xs">{ingredient.stock_grade}</Badge>
+                        </div>
+                      )}
+                      
+                      {ingredient.origin && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-muted-foreground">원산지:</span>
+                          <span>{ingredient.origin}</span>
+                        </div>
+                      )}
+                      
+                      {ingredient.calories && (
+                        <div className="flex items-center gap-1.5 col-span-2">
+                          <span className="text-muted-foreground">칼로리:</span>
+                          <span>{ingredient.calories} kcal</span>
+                        </div>
+                      )}
+                      
+                      {(ingredient.protein || ingredient.fat || ingredient.carbs) && (
+                        <div className="col-span-2 mt-1 flex flex-wrap gap-1.5">
+                          {ingredient.protein && (
+                            <Badge variant="outline" className="text-xs font-normal">
+                              단백질 {ingredient.protein}g
+                            </Badge>
+                          )}
+                          {ingredient.fat && (
+                            <Badge variant="outline" className="text-xs font-normal">
+                              지방 {ingredient.fat}g
+                            </Badge>
+                          )}
+                          {ingredient.carbs && (
+                            <Badge variant="outline" className="text-xs font-normal">
+                              탄수화물 {ingredient.carbs}g
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                      
+                      {ingredient.allergens && (
+                        <div className="col-span-2 mt-1">
+                          <span className="text-muted-foreground block">알러지:</span>
+                          <span>{ingredient.allergens}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="mt-3 pt-2 border-t border-border/30 flex gap-2 justify-end">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-7 text-xs"
+                        onClick={() => handleViewPriceHistory(ingredient)}
+                      >
+                        <LineChart className="h-3 w-3 mr-1" />
+                        가격 이력
+                      </Button>
+                      
+                      {isOwnerOrAdmin && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="h-7 text-xs"
+                            onClick={() => handleEditIngredient(ingredient)}
+                          >
+                            <FilePen className="h-3 w-3 mr-1" />
+                            편집
+                          </Button>
+                          
+                          <Button 
+                            size="sm" 
+                            variant="destructive" 
+                            className="h-7 text-xs"
+                            onClick={() => handleDeleteConfirm(ingredient)}
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            삭제
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
 export default function IngredientsList({ companyId, userRole }: IngredientsListProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -211,6 +454,8 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
   const [ingredientToDelete, setIngredientToDelete] = useState<Ingredient | null>(null);
   // 확장된 행 상태 관리
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  // 카드 확장 상태 관리 추가
+  const [expandedCardIds, setExpandedCardIds] = useState<Record<string, boolean>>({});
   // 칼럼 가시성 상태 관리
   const [visibleColumns, setVisibleColumns] = useState({
     name: true,
@@ -508,6 +753,14 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
     }
     
     setExpandedRows(newExpandedRows);
+  };
+
+  // 카드 확장 토글 처리 함수
+  const toggleCardExpand = (ingredientId: string) => {
+    setExpandedCardIds(prev => ({
+      ...prev,
+      [ingredientId]: !prev[ingredientId]
+    }));
   };
 
   // 테이블 헤더 렌더링 함수 개선
@@ -961,157 +1214,187 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
   );
 
   // 모바일 카드 렌더링 함수 개선
-  const renderMobileCard = (ingredient: Ingredient) => (
-    <Card className="mb-3 overflow-hidden border-0 shadow-sm hover:shadow transition-shadow">
-      <div className="p-4">
-        <div className="flex justify-between items-start">
-          <div>
-            <h3 className="font-medium text-base">{ingredient.name}</h3>
-            {ingredient.code_name && (
-              <div className="text-xs text-muted-foreground mt-0.5">
-                코드: {ingredient.code_name}
-              </div>
-            )}
-          </div>
-          
-          {/* 모바일 액션 버튼 */}
-          {isOwnerOrAdmin && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleEditIngredient(ingredient)}>
-                  <FilePen className="mr-2 h-4 w-4" />
-                  <span>편집</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleViewPriceHistory(ingredient)}>
-                  <LineChart className="mr-2 h-4 w-4" />
-                  <span>가격 이력</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={() => handleDeleteConfirm(ingredient)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  <span>삭제</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-        
-        <div className="mt-2">
-          <div className="flex items-center">
-            <Badge className="mr-2" variant="outline">
-              {formatCurrency(ingredient.price)}
-            </Badge>
-            <span className="text-xs text-muted-foreground">
-              / {ingredient.package_amount}{ingredient.unit === 'l' ? 'ml' : ingredient.unit}
-            </span>
-            
-            {ingredient.stock_grade && (
-              <Badge 
-                className="ml-auto" 
-                variant={
-                  ingredient.stock_grade === 'A' ? 'destructive' : 
-                  ingredient.stock_grade === 'B' ? 'secondary' : 
-                  ingredient.stock_grade === 'C' ? 'default' : 
-                  'outline'
-                }
-              >
-                등급 {ingredient.stock_grade}
-              </Badge>
-            )}
-          </div>
-        </div>
-        
-        <div className="mt-3 pt-3 border-t grid grid-cols-2 gap-2 text-sm">
-          <div className="flex flex-col">
-            <span className="text-xs text-muted-foreground">공급업체</span>
-            <span>{ingredient.supplier || '-'}</span>
-          </div>
-          
-          {ingredient.items_per_box && (
-            <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground">박스당 갯수</span>
-              <span>{formatNumber(ingredient.items_per_box)}개</span>
-            </div>
-          )}
-          
-          {ingredient.origin && (
-            <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground">원산지</span>
-              <span>{ingredient.origin}</span>
-            </div>
-          )}
-          
-          {ingredient.calories && (
-            <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground">칼로리</span>
-              <span>{ingredient.calories} kcal</span>
-            </div>
-          )}
-        </div>
-        
-        {(ingredient.protein || ingredient.fat || ingredient.carbs || ingredient.allergens) && (
-          <div className="mt-3 pt-2 border-t">
-            {(ingredient.protein || ingredient.fat || ingredient.carbs) && (
-              <div className="mb-2">
-                <span className="text-xs text-muted-foreground block mb-1">영양성분</span>
-                <div className="flex flex-wrap gap-2">
-                  {ingredient.protein && (
-                    <Badge variant="outline" className="text-xs">
-                      단백질 {ingredient.protein}g
-                    </Badge>
-                  )}
-                  {ingredient.fat && (
-                    <Badge variant="outline" className="text-xs">
-                      지방 {ingredient.fat}g
-                    </Badge>
-                  )}
-                  {ingredient.carbs && (
-                    <Badge variant="outline" className="text-xs">
-                      탄수화물 {ingredient.carbs}g
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            )}
-            
-            {ingredient.allergens && (
-              <div>
-                <span className="text-xs text-muted-foreground block mb-1">알러지 유발물질</span>
-                <p className="text-xs">{ingredient.allergens}</p>
-              </div>
-            )}
-          </div>
-        )}
-        
-        {ingredient.memo1 && (
-          <div className="mt-3 pt-2 border-t">
-            <span className="text-xs text-muted-foreground block mb-1">메모</span>
-            <p className="text-sm">{ingredient.memo1}</p>
-          </div>
-        )}
-      </div>
-      
-      <div className="bg-muted/5 py-2 px-4 flex justify-end gap-2 border-t">
-        <Button 
-          size="sm" 
-          variant="ghost" 
-          className="h-8 px-2 text-xs"
-          onClick={() => handleViewPriceHistory(ingredient)}
+  const renderMobileCard = (ingredient: Ingredient) => {
+    const isExpanded = expandedCardIds[ingredient.id] || false;
+    
+    return (
+      <div 
+        className="bg-white rounded-lg shadow-sm overflow-hidden border border-slate-100 transition-all duration-200"
+        style={{ borderLeftWidth: ingredient.stock_grade ? '4px' : '1px', 
+                 borderLeftColor: ingredient.stock_grade === 'A' ? 'hsl(var(--destructive))' : 
+                                ingredient.stock_grade === 'B' ? 'hsl(var(--secondary))' : 
+                                ingredient.stock_grade === 'C' ? 'hsl(var(--primary))' : 'hsl(var(--border))' }}
+      >
+        {/* 카드 헤더 - 항상 표시되는 부분 */}
+        <div 
+          className="p-3 flex flex-col gap-1.5"
+          onClick={() => toggleCardExpand(ingredient.id)}
         >
-          <LineChart className="h-3 w-3 mr-1" />
-          가격 이력
-        </Button>
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-medium text-base truncate">{ingredient.name}</h3>
+              {ingredient.code_name && (
+                <p className="text-xs text-muted-foreground truncate">
+                  코드: {ingredient.code_name}
+                </p>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-1">
+              {isOwnerOrAdmin && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleEditIngredient(ingredient)}>
+                      <FilePen className="mr-2 h-4 w-4" />
+                      <span>편집</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleViewPriceHistory(ingredient)}>
+                      <LineChart className="mr-2 h-4 w-4" />
+                      <span>가격 이력</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => handleDeleteConfirm(ingredient)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      <span>삭제</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              
+              <div onClick={(e) => e.stopPropagation()}>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-full"
+                  onClick={() => toggleCardExpand(ingredient.id)}>
+                  {isExpanded ? (
+                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+          
+          {/* 기본 정보 영역 - 항상 표시됨 */}
+          <div className="flex items-center justify-between mt-1">
+            <div className="flex items-center">
+              <Badge variant="outline" className="flex-grow-0 mr-1.5 font-medium">
+                {formatCurrency(ingredient.price)}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                / {ingredient.package_amount}{ingredient.unit === 'l' ? 'ml' : ingredient.unit}
+              </span>
+            </div>
+            
+            {ingredient.supplier && (
+              <div className="flex items-center text-xs text-muted-foreground">
+                <span>{ingredient.supplier}</span>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* 상세 정보 영역 - 확장 시에만 표시 */}
+        {isExpanded && (
+          <div className="px-3 pb-3 pt-1 border-t border-slate-100 text-sm">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+              {ingredient.items_per_box && (
+                <div className="flex items-center gap-1.5">
+                  <PackageOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs">
+                    <span className="text-muted-foreground mr-1">박스:</span>
+                    {formatNumber(ingredient.items_per_box)}개
+                  </span>
+                </div>
+              )}
+              
+              {ingredient.origin && (
+                <div className="flex items-center gap-1.5">
+                  <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs">
+                    <span className="text-muted-foreground mr-1">원산지:</span>
+                    {ingredient.origin}
+                  </span>
+                </div>
+              )}
+              
+              {ingredient.calories && (
+                <div className="flex items-center gap-1.5">
+                  <LineChart className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs">
+                    <span className="text-muted-foreground mr-1">칼로리:</span>
+                    {ingredient.calories} kcal
+                  </span>
+                </div>
+              )}
+              
+              {(ingredient.protein || ingredient.fat || ingredient.carbs) && (
+                <div className="col-span-2 mt-1">
+                  <div className="flex flex-wrap gap-1.5">
+                    {ingredient.protein && (
+                      <Badge variant="outline" className="text-xs font-normal">
+                        단백질 {ingredient.protein}g
+                      </Badge>
+                    )}
+                    {ingredient.fat && (
+                      <Badge variant="outline" className="text-xs font-normal">
+                        지방 {ingredient.fat}g
+                      </Badge>
+                    )}
+                    {ingredient.carbs && (
+                      <Badge variant="outline" className="text-xs font-normal">
+                        탄수화물 {ingredient.carbs}g
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {ingredient.allergens && (
+                <div className="col-span-2 mt-1">
+                  <p className="text-xs">
+                    <span className="text-muted-foreground mr-1">알러지:</span>
+                    {ingredient.allergens}
+                  </p>
+                </div>
+              )}
+              
+              {ingredient.memo1 && (
+                <div className="col-span-2 mt-1">
+                  <p className="text-xs">
+                    <span className="text-muted-foreground mr-1">메모:</span>
+                    {ingredient.memo1}
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-3 pt-2 flex justify-end">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="h-7 text-xs bg-slate-50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleViewPriceHistory(ingredient);
+                }}
+              >
+                <LineChart className="h-3 w-3 mr-1" />
+                가격 이력
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
-    </Card>
-  );
+    );
+  };
 
   // 페이지네이션 UI 렌더링
   const renderPagination = () => {
@@ -1216,7 +1499,7 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
       {/* 제목 및 설명 영역 */}
       <div>
         <h2 className="text-xl font-semibold mb-4">식재료 관리</h2>
-        <p className="text-muted-foreground mb-6">
+        <p className="text-muted-foreground mb-6 hidden sm:block">
           식당에서 사용하는 식재료를 등록하고 관리하세요. 등록된 식재료는 메뉴 구성과 원가 관리에 활용됩니다.
         </p>
       </div>
@@ -1367,49 +1650,20 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
       </div>
 
       <Card className="border border-slate-200 hover:border-slate-300 transition-colors overflow-hidden">
-        {/* 모바일 뷰 - 카드 형태로 표시 */}
+        {/* 모바일 뷰 - 테이블 형태로 표시 */}
         <div className="block sm:hidden">
-          {isLoading ? (
-            <div className="p-6 text-center text-gray-500">
-              <div className="flex flex-col items-center justify-center gap-2">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-                <span>식재료 로딩 중...</span>
-              </div>
-            </div>
-          ) : sortedIngredients.length === 0 ? (
-            <div className="p-8 text-center">
-              <div className="flex flex-col items-center justify-center text-muted-foreground">
-                {searchQuery ? (
-                  <>
-                    <Search className="h-12 w-12 mb-3 opacity-20" />
-                    <p className="text-base">'{searchQuery}'에 대한 검색 결과가 없습니다.</p>
-                  </>
-                ) : (
-                  <>
-                    <PackageOpen className="h-12 w-12 mb-3 opacity-20" />
-                    <p className="text-base">등록된 식재료가 없습니다.</p>
-                    {isOwnerOrAdmin && (
-                      <Button 
-                        variant="link" 
-                        onClick={handleAddIngredient}
-                        className="mt-2 text-primary"
-                      >
-                        식재료 추가하기
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="px-2 py-2 divide-y divide-border">
-              {sortedIngredients.map(ingredient => (
-                <div key={ingredient.id} className="py-1">
-                  {renderMobileCard(ingredient)}
-                </div>
-              ))}
-            </div>
-          )}
+          <MobileTable
+            ingredients={sortedIngredients}
+            isLoading={isLoading}
+            searchQuery={searchQuery}
+            isOwnerOrAdmin={isOwnerOrAdmin}
+            handleAddIngredient={handleAddIngredient}
+            handleEditIngredient={handleEditIngredient}
+            handleViewPriceHistory={handleViewPriceHistory}
+            handleDeleteConfirm={handleDeleteConfirm}
+            formatCurrency={formatCurrency}
+            formatNumber={formatNumber}
+          />
           
           {/* 모바일 페이지네이션 */}
           <div className="p-4 border-t">
