@@ -211,8 +211,17 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
 
   // 검색어 변경 시 첫 페이지로 데이터 로드
   useEffect(() => {
+    // 검색어가 변경되면 첫 페이지로 데이터 로드
     loadIngredients(1, debouncedSearchQuery);
   }, [debouncedSearchQuery, loadIngredients]);
+
+  // 페이지 변경 시 데이터 로드
+  useEffect(() => {
+    // 페이지가 변경되면 현재 검색어로 데이터 로드
+    if (pagination.page > 1) {
+      loadIngredients(pagination.page, debouncedSearchQuery);
+    }
+  }, [pagination.page, debouncedSearchQuery, loadIngredients]);
 
   // 컴포넌트 언마운트 시 타이머 정리
   useEffect(() => {
