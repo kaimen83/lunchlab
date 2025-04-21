@@ -1400,18 +1400,22 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
   const renderPagination = () => {
     if (pagination.totalPages <= 1) return null;
     
+    // 모바일에서 표시할 페이지 수 조정 (3개만 표시)
+    const displayPageCount = window.innerWidth < 640 ? 3 : 5;
+    
     return (
-      <div className="flex items-center justify-between mt-4">
-        <div className="text-sm text-muted-foreground">
-          전체 {pagination.total}개 중 {(pagination.page - 1) * pagination.limit + 1}-
-          {Math.min(pagination.page * pagination.limit, pagination.total)}개 표시
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-4 gap-2">
+        <div className="text-xs sm:text-sm text-muted-foreground order-2 sm:order-1">
+          <span className="hidden sm:inline">전체 {pagination.total}개 중 </span>
+          <span>{(pagination.page - 1) * pagination.limit + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)}
+          <span className="sm:hidden"> / {pagination.total}</span><span className="hidden sm:inline">개 표시</span></span>
         </div>
         
-        <nav className="flex items-center space-x-1" aria-label="페이지네이션">
+        <nav className="flex items-center justify-center sm:justify-end space-x-1 order-1 sm:order-2" aria-label="페이지네이션">
           <Button
             variant="outline"
             size="icon"
-            className="h-8 w-8 rounded-md"
+            className="h-8 w-8 rounded-md hidden sm:flex"
             onClick={() => handlePageChange(1)}
             disabled={pagination.page === 1}
             aria-label="첫 페이지"
@@ -1423,7 +1427,7 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
           <Button
             variant="outline"
             size="icon"
-            className="h-8 w-8 rounded-md"
+            className="h-9 w-9 sm:h-8 sm:w-8 rounded-md"
             onClick={() => handlePageChange(pagination.page - 1)}
             disabled={pagination.page === 1}
             aria-label="이전 페이지"
@@ -1432,21 +1436,22 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
           </Button>
           
           <div className="flex items-center gap-1">
-            {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+            {Array.from({ length: Math.min(displayPageCount, pagination.totalPages) }, (_, i) => {
               // 현재 페이지를 중심으로 표시할 페이지 계산
               let pageToShow;
-              if (pagination.totalPages <= 5) {
-                // 전체 페이지가 5개 이하면 모두 표시
+              if (pagination.totalPages <= displayPageCount) {
+                // 전체 페이지가 displayPageCount 이하면 모두 표시
                 pageToShow = i + 1;
-              } else if (pagination.page <= 3) {
-                // 현재 페이지가 1~3이면 1~5 표시
+              } else if (pagination.page <= Math.ceil(displayPageCount / 2)) {
+                // 현재 페이지가 1~2(모바일) 또는 1~3(데스크톱)이면 1~3(모바일) 또는 1~5(데스크톱) 표시
                 pageToShow = i + 1;
-              } else if (pagination.page >= pagination.totalPages - 2) {
-                // 현재 페이지가 마지막에 가까우면 마지막 5개 표시
-                pageToShow = pagination.totalPages - 4 + i;
+              } else if (pagination.page >= pagination.totalPages - Math.floor(displayPageCount / 2)) {
+                // 현재 페이지가 마지막에 가까우면 마지막 3개(모바일) 또는 5개(데스크톱) 표시
+                pageToShow = pagination.totalPages - displayPageCount + 1 + i;
               } else {
-                // 그 외에는 현재 페이지 중심으로 앞뒤 2개씩 표시
-                pageToShow = pagination.page - 2 + i;
+                // 그 외에는 현재 페이지 중심으로 앞뒤로 표시
+                const offset = Math.floor(displayPageCount / 2);
+                pageToShow = pagination.page - offset + i;
               }
               
               const isCurrentPage = pageToShow === pagination.page;
@@ -1456,7 +1461,7 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
                   key={pageToShow}
                   variant={isCurrentPage ? "default" : "outline"}
                   size="icon"
-                  className={`h-8 w-8 rounded-md ${isCurrentPage ? "pointer-events-none" : ""}`}
+                  className={`h-9 w-9 sm:h-8 sm:w-8 rounded-md ${isCurrentPage ? "pointer-events-none" : ""}`}
                   onClick={() => handlePageChange(pageToShow)}
                   aria-current={isCurrentPage ? "page" : undefined}
                   aria-label={`${pageToShow} 페이지`}
@@ -1470,7 +1475,7 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
           <Button
             variant="outline"
             size="icon"
-            className="h-8 w-8 rounded-md"
+            className="h-9 w-9 sm:h-8 sm:w-8 rounded-md"
             onClick={() => handlePageChange(pagination.page + 1)}
             disabled={pagination.page === pagination.totalPages}
             aria-label="다음 페이지"
@@ -1481,7 +1486,7 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
           <Button
             variant="outline"
             size="icon"
-            className="h-8 w-8 rounded-md"
+            className="h-8 w-8 rounded-md hidden sm:flex"
             onClick={() => handlePageChange(pagination.totalPages)}
             disabled={pagination.page === pagination.totalPages}
             aria-label="마지막 페이지"
