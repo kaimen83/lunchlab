@@ -106,6 +106,41 @@ export default function FeedbackDetailPage({ params }: PageProps) {
   // 피드백 상태 업데이트
   const updateFeedbackStatus = async (status: string) => {
     try {
+      // 먼저 사용자가 관리자인지 확인
+      if (!user) {
+        toast({
+          title: '인증 오류',
+          description: '로그인이 필요합니다.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      const supabase = createClientSupabaseClient()
+      
+      // 관리자 권한 확인
+      const { data: memberships, error: membershipError } = await supabase
+        .from('company_memberships')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle()
+        
+      if (membershipError) {
+        console.error('권한 확인 오류:', membershipError)
+        throw new Error('관리자 권한을 확인할 수 없습니다.')
+      }
+      
+      if (!memberships) {
+        toast({
+          title: '권한 오류',
+          description: '관리자만 상태를 변경할 수 있습니다.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      // API 요청 실행
       const response = await fetch(`/api/feedback/${params.id}`, {
         method: 'PATCH',
         headers: {
@@ -115,7 +150,9 @@ export default function FeedbackDetailPage({ params }: PageProps) {
       })
       
       if (!response.ok) {
-        throw new Error('상태 업데이트에 실패했습니다.')
+        const errorData = await response.json()
+        console.error('상태 업데이트 응답 오류:', errorData)
+        throw new Error(errorData.error || '상태 업데이트에 실패했습니다.')
       }
       
       const data = await response.json()
@@ -129,7 +166,7 @@ export default function FeedbackDetailPage({ params }: PageProps) {
       console.error('상태 업데이트 오류:', error)
       toast({
         title: '상태 업데이트 오류',
-        description: '피드백 상태 변경에 실패했습니다.',
+        description: error instanceof Error ? error.message : '피드백 상태 변경에 실패했습니다.',
         variant: 'destructive',
       })
     }
@@ -148,8 +185,43 @@ export default function FeedbackDetailPage({ params }: PageProps) {
     }
     
     try {
+      // 먼저 사용자가 관리자인지 확인
+      if (!user) {
+        toast({
+          title: '인증 오류',
+          description: '로그인이 필요합니다.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      const supabase = createClientSupabaseClient()
+      
+      // 관리자 권한 확인
+      const { data: memberships, error: membershipError } = await supabase
+        .from('company_memberships')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle()
+        
+      if (membershipError) {
+        console.error('권한 확인 오류:', membershipError)
+        throw new Error('관리자 권한을 확인할 수 없습니다.')
+      }
+      
+      if (!memberships) {
+        toast({
+          title: '권한 오류',
+          description: '관리자만 답변을 작성할 수 있습니다.',
+          variant: 'destructive',
+        })
+        return
+      }
+      
       setIsSubmitting(true)
       
+      // API 요청 실행
       const response = await fetch(`/api/feedback/${params.id}`, {
         method: 'PATCH',
         headers: {
@@ -159,7 +231,9 @@ export default function FeedbackDetailPage({ params }: PageProps) {
       })
       
       if (!response.ok) {
-        throw new Error('답변 저장에 실패했습니다.')
+        const errorData = await response.json()
+        console.error('답변 저장 응답 오류:', errorData)
+        throw new Error(errorData.error || '답변 저장에 실패했습니다.')
       }
       
       const data = await response.json()
@@ -173,7 +247,7 @@ export default function FeedbackDetailPage({ params }: PageProps) {
       console.error('답변 저장 오류:', error)
       toast({
         title: '오류가 발생했습니다',
-        description: '답변 저장에 실패했습니다.',
+        description: error instanceof Error ? error.message : '답변 저장에 실패했습니다.',
         variant: 'destructive',
       })
     } finally {

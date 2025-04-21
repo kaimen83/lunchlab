@@ -118,7 +118,9 @@ export default function FeedbackPanel() {
       })
       
       if (!response.ok) {
-        throw new Error('상태 업데이트에 실패했습니다.')
+        const errorData = await response.json();
+        console.error('상태 업데이트 응답 오류:', errorData);
+        throw new Error(errorData.error || '상태 업데이트에 실패했습니다.');
       }
       
       const data = await response.json()
@@ -132,8 +134,30 @@ export default function FeedbackPanel() {
       if (selectedFeedback && selectedFeedback.id === id) {
         setSelectedFeedback(data.data)
       }
+
+      // 성공 메시지 표시
+      toast({
+        title: '상태가 업데이트되었습니다',
+        description: `피드백 상태가 '${getStatusLabel(status)}'(으)로 변경되었습니다.`,
+      })
     } catch (error) {
       console.error('상태 업데이트 오류:', error)
+      // 에러 메시지 표시
+      toast({
+        title: '상태 업데이트 오류',
+        description: error instanceof Error ? error.message : '상태 업데이트에 실패했습니다.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  // 상태 라벨 변환 함수
+  const getStatusLabel = (status: string): string => {
+    switch(status) {
+      case 'unread': return '읽지 않음';
+      case 'read': return '검토중';
+      case 'replied': return '답변완료';
+      default: return status;
     }
   }
 

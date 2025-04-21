@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { auth } from '@clerk/nextjs/server'
+import { isHeadAdmin } from '@/lib/clerk'
 
 export async function POST(req: Request) {
   try {
@@ -56,23 +57,15 @@ export async function GET(req: Request) {
     // Supabase 클라이언트 생성
     const supabase = createServerSupabaseClient()
     
-    // 사용자가 관리자인지 확인
-    const { data: membership, error: membershipError } = await supabase
-      .from('company_memberships')
-      .select('role')
-      .eq('user_id', userId)
-      .eq('role', 'admin')
-      .maybeSingle()
+    // 서비스 전체 관리자(headAdmin) 여부 확인
+    const isAdmin = await isHeadAdmin(userId)
     
-    if (membershipError) {
-      console.error('회원 권한 확인 오류:', membershipError)
-      return NextResponse.json({ error: '권한 확인 중 오류가 발생했습니다.' }, { status: 500 })
-    }
+    console.log('GET 피드백 목록 - 사용자 권한:', isAdmin ? 'headAdmin' : 'not headAdmin', 'userId:', userId)
     
     // 관리자가 아닌 경우, 본인의 피드백만 조회 가능
     let query = supabase.from('feedbacks').select('*')
     
-    if (!membership) {
+    if (!isAdmin) {
       query = query.eq('user_id', userId)
     }
     
