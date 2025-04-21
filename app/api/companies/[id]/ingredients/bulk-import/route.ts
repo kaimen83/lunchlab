@@ -134,6 +134,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const ingredientsToInsert = [];
     const ingredientsToUpdate = [];
     
+    // 가격 이력을 위한 배열
+    const priceHistoryToInsert = [];
+    
     // 천단위 구분자(콤마)를 제거하고 숫자를 파싱하는 유틸리티 함수
     const parseNumericValue = (value: string | null | undefined): number | null => {
       if (!value) return null;
@@ -297,7 +300,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         // 중복 식재료 확인 (이름과 공급업체 기준)
         let existingIngredientQuery = supabase
           .from('ingredients')
-          .select('id')
+          .select('id, price')
           .eq('company_id', companyId)
           .eq('name', name)
           .eq('package_amount', packageAmount);
@@ -334,10 +337,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
         
         // 중복 식재료 처리 (이름이 같으면 업데이트)
         if (existingIngredient) {
+          // 가격이 변경된 경우에만 가격 이력에 추가할 것인지 확인
+          const priceChanged = existingIngredient.price !== price;
           ingredientsToUpdate.push({
             id: existingIngredient.id,
             data: ingredient,
-            name
+            name,
+            priceChanged
           });
         } 
         // 새 식재료 추가
@@ -354,11 +360,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
     
     // 배치 처리
     // 1. 새 식재료 일괄 추가
+    let insertedIngredients = [];
     if (ingredientsToInsert.length > 0) {
       try {
-        const { error: batchInsertError } = await supabase
+        const { data: inserted, error: batchInsertError } = await supabase
           .from('ingredients')
-          .insert(ingredientsToInsert);
+          .insert(ingredientsToInsert)
+          .select('id, price'); // ID와 가격 정보 반환 추가
         
         if (batchInsertError) {
           console.error('대량 삽입 오류:', batchInsertError);
@@ -366,6 +374,18 @@ export async function POST(request: NextRequest, context: RouteContext) {
           results.errors.push(`식재료 일괄 추가 실패: ${batchInsertError.message}`);
         } else {
           results.success += ingredientsToInsert.length;
+          insertedIngredients = inserted || [];
+          
+          // 새로 추가된 식재료들의 가격 이력 데이터 준비
+          const currentTime = new Date().toISOString();
+          const priceHistories = insertedIngredients.map(item => ({
+            ingredient_id: item.id,
+            price: item.price,
+            recorded_at: currentTime
+          }));
+          
+          // 가격 이력 배열에 추가
+          priceHistoryToInsert.push(...priceHistories);
         }
       } catch (error) {
         console.error('대량 삽입 오류:', error);
@@ -387,10 +407,38 @@ export async function POST(request: NextRequest, context: RouteContext) {
           results.errors.push(`'${item.name}' 업데이트 실패: ${updateError.message}`);
         } else {
           results.success++;
+          
+          // 가격이 변경된 경우에만 가격 이력에 추가
+          if (item.priceChanged) {
+            priceHistoryToInsert.push({
+              ingredient_id: item.id,
+              price: item.data.price,
+              recorded_at: new Date().toISOString()
+            });
+          }
         }
       } catch (error) {
         results.failed++;
         results.errors.push(`'${item.name}' 업데이트 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      }
+    }
+    
+    // 3. 가격 이력 일괄 추가
+    if (priceHistoryToInsert.length > 0) {
+      try {
+        const { error: historyError } = await supabase
+          .from('ingredient_price_history')
+          .insert(priceHistoryToInsert);
+        
+        if (historyError) {
+          console.error('가격 이력 추가 오류:', historyError);
+          // 이력 추가 실패는 심각한 오류가 아니므로 결과에 영향을 주지 않음
+          results.errors.push(`가격 이력 추가 중 오류 발생 (식재료 추가/업데이트는 성공): ${historyError.message}`);
+        }
+      } catch (error) {
+        console.error('가격 이력 추가 오류:', error);
+        // 이력 추가 실패는 심각한 오류가 아니므로 결과에 영향을 주지 않음
+        results.errors.push(`가격 이력 추가 중 오류 발생 (식재료 추가/업데이트는 성공): ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
       }
     }
     
