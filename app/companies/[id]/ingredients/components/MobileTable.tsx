@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -31,7 +32,11 @@ const MobileTable: React.FC<MobileTableProps> = ({
   handleAddIngredient,
   handleEditIngredient,
   handleViewPriceHistory,
-  handleDeleteConfirm
+  handleDeleteConfirm,
+  selectedIngredients,
+  handleToggleSelect,
+  formatCurrency,
+  formatNumber
 }) => {
   // 모바일에서 확장된 행 상태 관리 (한 번에 하나만 열림)
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -85,6 +90,11 @@ const MobileTable: React.FC<MobileTableProps> = ({
       <table className="w-full border-collapse">
         <thead className="bg-muted/30 sticky top-0 z-10">
           <tr className="text-left text-xs font-medium text-muted-foreground">
+            {isOwnerOrAdmin && (
+              <th className="px-2 py-2.5 w-8">
+                <span className="sr-only">선택</span>
+              </th>
+            )}
             <th className="px-3 py-2.5 whitespace-nowrap">식재료명</th>
             <th className="px-3 py-2.5 text-right whitespace-nowrap">가격</th>
             <th className="w-10 px-2 py-2.5"></th>
@@ -97,6 +107,15 @@ const MobileTable: React.FC<MobileTableProps> = ({
                 className={`hover:bg-muted/20 transition-colors ${expandedId === ingredient.id ? 'bg-muted/10' : ''}`}
                 onClick={() => toggleExpand(ingredient.id)}
               >
+                {isOwnerOrAdmin && (
+                  <td className="px-2 py-2.5 w-8" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selectedIngredients.includes(ingredient.id)}
+                      onCheckedChange={() => handleToggleSelect(ingredient.id)}
+                      aria-label={`${ingredient.name} 선택`}
+                    />
+                  </td>
+                )}
                 <td className="px-3 py-2.5">
                   <div className="font-medium truncate max-w-[150px]">
                     {ingredient.name}
@@ -134,7 +153,6 @@ const MobileTable: React.FC<MobileTableProps> = ({
                 </td>
               </tr>
               
-              {/* 확장된 상세 정보 행 */}
               {expandedId === ingredient.id && (
                 <tr className="bg-muted/5" onClick={(e) => e.stopPropagation()}>
                   <td colSpan={3} className="px-3 py-2 border-t border-border/30">

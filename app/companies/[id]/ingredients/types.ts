@@ -55,8 +55,10 @@ export interface MobileTableProps {
   handleEditIngredient: (ingredient: Ingredient) => void;
   handleViewPriceHistory: (ingredient: Ingredient) => void;
   handleDeleteConfirm: (ingredient: Ingredient) => void;
-  formatCurrency: (amount: number) => string;
-  formatNumber: (number: number) => string;
+  formatCurrency: (value: number) => string;
+  formatNumber: (value: number) => string;
+  selectedIngredients: string[];
+  handleToggleSelect: (ingredientId: string) => void;
 }
 
 // 칼럼 가시성 상태 타입
