@@ -404,7 +404,6 @@ export default function MealPlansPage() {
             onNextPeriod={handleNextPeriod}
             onToday={handleGoToToday}
             onExportToExcel={handleExportToExcel}
-            onAddMealPlan={handleAddMealPlan}
           />
           
           <Card className="shadow mt-4">

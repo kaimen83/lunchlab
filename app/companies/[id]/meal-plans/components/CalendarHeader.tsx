@@ -1,5 +1,5 @@
 import React from 'react';
-import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Menu, Calendar, CalendarDays, Download } from 'lucide-react';
+import { CalendarIcon, ChevronLeft, ChevronRight, Menu, Calendar, CalendarDays, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
@@ -14,7 +14,6 @@ interface CalendarHeaderProps {
   onNextPeriod: () => void;
   onToday: () => void;
   onExportToExcel: () => void;
-  onAddMealPlan: () => void;
 }
 
 const CalendarHeader: React.FC<CalendarHeaderProps> = ({
@@ -24,8 +23,7 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   onPreviousPeriod,
   onNextPeriod,
   onToday,
-  onExportToExcel,
-  onAddMealPlan
+  onExportToExcel
 }) => {
   // 현재 주의 시작일과 종료일
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
@@ -71,15 +69,6 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
             >
               <Download className="mr-1 h-4 w-4" />
               <span>내보내기</span>
-            </Button>
-            
-            {/* 식단 추가 버튼 */}
-            <Button
-              className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground shadow hover:bg-primary/90 rounded-md px-3 text-xs h-9"
-              onClick={onAddMealPlan}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">식단 추가</span>
             </Button>
           </div>
         </div>

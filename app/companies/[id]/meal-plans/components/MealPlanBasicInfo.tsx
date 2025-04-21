@@ -366,29 +366,12 @@ export default function MealPlanBasicInfo({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>날짜</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !date && "text-muted-foreground"
-                  )}
-                  disabled={isLoading}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, 'PPP', { locale: ko }) : <span>날짜 선택</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={setDate}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+            <div
+              className="w-full px-3 py-2 text-sm border rounded-md bg-muted flex items-center"
+            >
+              <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+              {date ? format(date, 'PPP', { locale: ko }) : <span className="text-muted-foreground">날짜 미설정</span>}
+            </div>
           </div>
           
           <div className="space-y-2">
