@@ -4,6 +4,7 @@ import { SidebarHeader } from './SidebarHeader';
 import { CompanyItem } from './CompanyItem';
 import { SidebarActions } from './SidebarActions';
 import { useSidebarState } from './useSidebarState';
+import { useCallback } from 'react';
 
 export function SidebarContent({ companies, isMobile = false, isSheetOpen, setIsSheetOpen }: CompanySidebarProps) {
   const { user } = useUser();
@@ -19,11 +20,20 @@ export function SidebarContent({ companies, isMobile = false, isSheetOpen, setIs
   } = useSidebarState(companies);
 
   // 모바일 사이드바 닫기 (링크 클릭 시)
-  const handleLinkClick = () => {
+  const handleLinkClick = useCallback(() => {
     if (isMobile && setIsSheetOpen) {
       setIsSheetOpen(false);
     }
-  };
+  }, [isMobile, setIsSheetOpen]);
+  
+  // 탭 이동 함수 (모바일 환경에서는 사이드바 닫기 기능 추가)
+  const handleNavigateToTab = useCallback((url: string) => {
+    // 기본 네비게이션 실행
+    navigateToTab(url);
+    
+    // 모바일 환경에서는 사이드바 닫기
+    handleLinkClick();
+  }, [navigateToTab, handleLinkClick]);
 
   return (
     <div className="py-2 text-gray-300 h-full flex flex-col">
@@ -57,7 +67,7 @@ export function SidebarContent({ companies, isMobile = false, isSheetOpen, setIs
                 hasMealPlanningFeature: isFeatureEnabled(company.id, 'mealPlanning'),
                 hasCookingPlanFeature: isFeatureEnabled(company.id, 'cookingPlan'),
                 navigationInProgress,
-                navigateToTab
+                navigateToTab: handleNavigateToTab
               };
               
               return (

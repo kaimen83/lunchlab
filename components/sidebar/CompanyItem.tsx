@@ -4,7 +4,7 @@ import { Building, ChevronDown, ChevronRight, Users, ClipboardList, Settings, Ca
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { CompanyWithFeatures } from './types';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface CompanyItemProps {
@@ -22,6 +22,16 @@ export function CompanyItem({ company, toggleCompany, handleLinkClick }: Company
   const [activeTab, setActiveTab] = useState<string | null>(
     currentCompanyIdInUrl === company.id ? pathname : null
   );
+  
+  // URL 변경 시 activeTab 업데이트
+  useEffect(() => {
+    if (currentCompanyIdInUrl === company.id) {
+      setActiveTab(pathname);
+    } else if (currentCompanyIdInUrl !== company.id && activeTab) {
+      // 다른 회사로 이동한 경우 activeTab 초기화
+      setActiveTab(null);
+    }
+  }, [pathname, currentCompanyIdInUrl, company.id, activeTab]);
   
   const {
     id,
@@ -60,22 +70,26 @@ export function CompanyItem({ company, toggleCompany, handleLinkClick }: Company
       currentUrlPattern !== '';
     
     // 이미 활성화된 탭이면서 같은 회사 내 이동인 경우만 무시
-    // 다른 회사로 같은 패턴의 탭 이동은 허용
+    // 다른 회사로 같은 패턴의 탭 이동은 항상 허용
     if (url === activeTab && urlCompanyId === currentCompanyIdInUrl) {
       handleLinkClick();
       return;
     }
+    
+    // 다른 회사로 이동하는 경우 - 무조건 내비게이션 처리
+    const isCompanySwitch = urlCompanyId !== currentCompanyIdInUrl;
     
     // 낙관적 UI 업데이트: 클릭한 탭을 즉시 활성화
     setActiveTab(url);
     
     // 내비게이션 기능 호출
     if (company.navigateToTab) {
+      // 다른 회사로 이동할 때도 무조건 내비게이션 처리
       company.navigateToTab(url);
     }
     
     // 회사 간 동일 패턴 탭 전환 시 추가 처리
-    if (isCompanySwitchWithSameTab) {
+    if (isCompanySwitch) {
       // 약간의 지연 후 추가 작업 수행 (포인터 이벤트 등 정상화를 위해)
       setTimeout(() => {
         if (typeof document !== 'undefined' && document.body.style.pointerEvents === 'none') {
@@ -113,7 +127,14 @@ export function CompanyItem({ company, toggleCompany, handleLinkClick }: Company
             "flex items-center px-2 py-1.5 rounded cursor-pointer",
             isCurrentCompany ? "bg-[#1164A3] text-white" : "hover:bg-gray-700"
           )}
-          onClick={() => toggleCompany(id)}
+          onClick={() => {
+            toggleCompany(id);
+            // 클릭 시 해당 회사의 일반 페이지로 이동 (닫혀 있는 경우에만)
+            if (!isExpanded && company.navigateToTab) {
+              company.navigateToTab(`/companies/${id}`);
+              handleLinkClick();
+            }
+          }}
         >
           {isExpanded ? (
             <ChevronDown className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />

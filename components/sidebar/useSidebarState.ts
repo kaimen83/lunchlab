@@ -289,64 +289,51 @@ export function useSidebarState(companies: Array<Company & { role: string }>) {
     };
   }, [expandedCompanyId, companies, fetchCompanyFeatures, preloadCompanyData]);
 
-  // 낙관적 업데이트를 위한 탭 이동 함수
-  const navigateToTab = useCallback((url: string) => {
-    // URL에서 회사 ID와 탭 경로 추출
-    const urlCompanyId = url.startsWith('/companies/') ? url.split('/')[2] : null;
-    const urlPattern = url.replace(/\/companies\/[^\/]+/, ''); // 회사 ID를 제외한 URL 패턴
+  // 페이지 경로 변경 감지하여 확장된 회사 ID 업데이트
+  useEffect(() => {
+    // URL에서 회사 ID 추출
+    const companyIdFromUrl = pathname.startsWith('/companies/') ? pathname.split('/')[2] : null;
     
-    // 현재 진행 중인 내비게이션이 있는지 확인
-    if (navigationInProgress) {
-      // 정확히 같은 URL이거나, 같은 회사의 같은 패턴 URL인 경우 리턴
-      if (navigationInProgress === url) return;
-      
-      // 진행 중인 내비게이션에서도 회사 ID와 패턴 추출
-      const inProgressCompanyId = navigationInProgress.startsWith('/companies/') 
-        ? navigationInProgress.split('/')[2] 
-        : null;
-      const inProgressPattern = navigationInProgress.replace(/\/companies\/[^\/]+/, '');
-      
-      // 다른 회사로 같은 패턴의 탭으로 이동하는 경우 (A 회사 식단관리 → B 회사 식단관리)
-      // 이 경우는 블록하지 않고 진행
-      if (urlCompanyId !== inProgressCompanyId && urlPattern === inProgressPattern) {
-        // 내비게이션 진행 상태 초기화 (즉시)
-        setNavigationInProgress(null);
-        // 약간의 지연 후 새 내비게이션 설정 (포인터 이벤트가 정상화되도록)
-        setTimeout(() => {
-          setNavigationInProgress(url);
-          router.push(url);
-        }, 10);
-        return;
-      }
+    // URL의 회사 ID가 유효하면 항상 해당 회사의 아코디언을 펼침
+    if (companyIdFromUrl) {
+      setExpandedCompanyId(companyIdFromUrl);
     }
-    
-    // 포인터 이벤트 정상화 (추가 안전장치)
+  }, [pathname]);
+
+  // 회사 탭 페이지로 이동하는 함수
+  const navigateToTab = useCallback((url: string) => {
+    // 포인터 이벤트 문제 방지를 위한 처리
     if (typeof document !== 'undefined' && document.body.style.pointerEvents === 'none') {
       document.body.style.pointerEvents = '';
     }
     
-    // 낙관적 UI 업데이트를 위해 현재 이동 중인 URL 설정
+    // 이동 중임을 표시하여 UI 업데이트
     setNavigationInProgress(url);
     
-    // 실제 라우팅 수행
+    // URL에서 회사 ID 추출
+    const companyIdFromUrl = url.startsWith('/companies/') ? url.split('/')[2] : null;
+    
+    // 회사 ID가 있으면 확장 상태 업데이트
+    if (companyIdFromUrl) {
+      setExpandedCompanyId(companyIdFromUrl);
+    }
+    
+    // 페이지 이동
     router.push(url);
     
-    // 라우팅이 완료된 후 상태 초기화 (타이머 시간 단축)
+    // 약간의 지연 후 내비게이션 상태 초기화
     setTimeout(() => {
       setNavigationInProgress(null);
-      
-      // 포인터 이벤트 다시 한번 정상화 (추가 안전장치)
-      if (typeof document !== 'undefined' && document.body.style.pointerEvents === 'none') {
-        document.body.style.pointerEvents = '';
-      }
-    }, 300); // 500ms → 300ms로 단축
-  }, [router, navigationInProgress]);
+    }, 300);
+  }, [router]);
 
   const toggleCompany = (companyId: string) => {
+    // 현재 회사가 확장된 상태면 닫고, 아니면 펼침
     setExpandedCompanyId(expandedCompanyId === companyId ? null : companyId);
     
-    // 회사를 확장할 때 데이터 미리 가져오기
+    // 닫혀있던 회사를 펼칠 때만 기능 로드 및 데이터 미리 가져오기
     if (expandedCompanyId !== companyId) {
+      fetchCompanyFeatures(companyId);
       preloadCompanyData(companyId);
     }
   };
