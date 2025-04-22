@@ -18,7 +18,9 @@ import {
   RefreshCw, 
   Clock, 
   Check, 
-  MailQuestion
+  MailQuestion,
+  User,
+  Users
 } from 'lucide-react'
 import {
   Collapsible,
@@ -26,10 +28,12 @@ import {
   CollapsibleTrigger
 } from '@/components/ui/collapsible'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 interface FeedbackModalProps {
   isOpen: boolean
   onClose: () => void
+  onRepliesViewed?: () => void
 }
 
 interface Feedback {
@@ -44,7 +48,7 @@ interface Feedback {
   replied_by: string | null
 }
 
-export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
+export default function FeedbackModal({ isOpen, onClose, onRepliesViewed }: FeedbackModalProps) {
   const [content, setContent] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [activeTab, setActiveTab] = useState('new')
@@ -53,6 +57,27 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   const [error, setError] = useState<string | null>(null)
   const [expandedFeedback, setExpandedFeedback] = useState<string | null>(null)
   const { user } = useUser()
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  // 사용자 역할 확인
+  useEffect(() => {
+    if (user) {
+      checkIfAdmin();
+    }
+  }, [user]);
+
+  // 관리자 여부 확인
+  const checkIfAdmin = async () => {
+    try {
+      const response = await fetch('/api/auth/check-admin');
+      if (response.ok) {
+        const data = await response.json();
+        setIsAdmin(data.isAdmin);
+      }
+    } catch (error) {
+      console.error('관리자 확인 오류:', error);
+    }
+  };
 
   // 사용자의 피드백 목록 불러오기
   useEffect(() => {
@@ -74,7 +99,21 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
       }
       
       const data = await response.json()
-      setUserFeedbacks(data.data || [])
+      
+      // 관리자 여부와 상관없이 항상 자신의 피드백만 표시
+      const ownFeedbacks = (data.data || []).filter(
+        (feedback: Feedback) => feedback.user_id === user.id
+      );
+      setUserFeedbacks(ownFeedbacks);
+      
+      // 자신의 답변된 피드백이 있는지 확인
+      const hasRepliedFeedbacks = ownFeedbacks.some(
+        (feedback: Feedback) => feedback.status === 'replied'
+      );
+      
+      if (hasRepliedFeedbacks && onRepliesViewed) {
+        onRepliesViewed();
+      }
     } catch (err) {
       console.error('피드백 내역 로드 오류:', err)
       setError('피드백 내역을 불러오는데 실패했습니다')
@@ -186,6 +225,16 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
     }
   }
 
+  // 탭 변경 처리
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    
+    // 히스토리 탭으로 이동하면 답변 확인 처리
+    if (value === 'history') {
+      loadUserFeedbacks(); // 탭 변경 시 데이터 다시 로드
+    }
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-hidden">
@@ -196,7 +245,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
           </DialogDescription>
         </DialogHeader>
         
-        <Tabs defaultValue="new" value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs defaultValue="new" value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="new" className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />
@@ -245,6 +294,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
               <h3 className="text-sm font-medium">
                 총 {userFeedbacks.length}개의 피드백
               </h3>
+              
               <Button 
                 size="sm" 
                 variant="outline" 
@@ -285,10 +335,10 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
                           <div className="flex items-center gap-3">
                             <StatusIcon status={feedback.status} />
                             <div>
-                              <p className="text-sm font-medium flex items-center">
+                              <div className="text-sm font-medium flex items-center">
                                 {truncateText(feedback.content, 40)}
                                 <StatusBadge status={feedback.status} />
-                              </p>
+                              </div>
                               <p className="text-xs text-muted-foreground">{formatDate(feedback.created_at)}</p>
                             </div>
                           </div>

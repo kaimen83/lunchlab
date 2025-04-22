@@ -49,6 +49,10 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [ingredientToDelete, setIngredientToDelete] = useState<Ingredient | null>(null);
+  // 식재료 선택을 위한 상태 추가
+  const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
+  // 일괄 삭제 확인 모달 상태 추가
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   
   // 확장된 행 상태 관리
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -207,8 +211,17 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
 
   // 검색어 변경 시 첫 페이지로 데이터 로드
   useEffect(() => {
+    // 검색어가 변경되면 첫 페이지로 데이터 로드
     loadIngredients(1, debouncedSearchQuery);
   }, [debouncedSearchQuery, loadIngredients]);
+
+  // 페이지 변경 시 데이터 로드
+  useEffect(() => {
+    // 페이지가 변경되면 현재 검색어로 데이터 로드
+    if (pagination.page > 1) {
+      loadIngredients(pagination.page, debouncedSearchQuery);
+    }
+  }, [pagination.page, debouncedSearchQuery, loadIngredients]);
 
   // 컴포넌트 언마운트 시 타이머 정리
   useEffect(() => {
@@ -296,7 +309,8 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
 
   // 페이지 변경 핸들러
   const handlePageChange = (newPage: number) => {
-    loadIngredients(newPage, searchQuery);
+    setPagination(prev => ({ ...prev, page: newPage }));
+    setSelectedIngredients([]); // 페이지 변경 시 선택 초기화
   };
 
   // 식재료 삭제 처리
@@ -315,6 +329,13 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
       
       // 목록에서 해당 식재료 제거
       setIngredients(prev => prev.filter(i => i.id !== ingredientToDelete.id));
+      
+      // 페이지네이션 정보 업데이트
+      setPagination(prev => ({
+        ...prev,
+        total: prev.total - 1,
+        totalPages: Math.ceil((prev.total - 1) / prev.limit)
+      }));
       
       toast({
         title: '삭제 완료',
@@ -377,6 +398,131 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
     }));
   };
 
+  // 개별 식재료 선택/해제 토글 함수
+  const handleToggleSelect = (ingredientId: string) => {
+    setSelectedIngredients(prev => 
+      prev.includes(ingredientId) 
+        ? prev.filter(id => id !== ingredientId)
+        : [...prev, ingredientId]
+    );
+  };
+
+  // 현재 페이지의 모든 식재료 선택/해제 토글 함수
+  const handleToggleSelectAll = () => {
+    if (selectedIngredients.length === sortedIngredients.length) {
+      setSelectedIngredients([]);
+    } else {
+      setSelectedIngredients(sortedIngredients.map(i => i.id));
+    }
+  };
+
+  // 일괄 삭제 모달 열기
+  const handleOpenBulkDelete = () => {
+    if (selectedIngredients.length === 0) {
+      toast({
+        title: '식재료 미선택',
+        description: '삭제할 식재료를 선택해주세요.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setBulkDeleteConfirmOpen(true);
+  };
+
+  // 일괄 삭제 실행 (Promise.all을 사용한 병렬 요청)
+  const handleBulkDeleteIngredients = async () => {
+    if (selectedIngredients.length === 0) return;
+    
+    try {
+      setIsLoading(true);
+      
+      // 식재료 사용 여부 확인 용도의 변수들
+      const usedIngredients: {id: string, name: string}[] = [];
+      const deletedCount = {success: 0, failed: 0};
+      
+      // 각 식재료별로 삭제 요청을 보내고 Promise 배열 생성
+      const deletePromises = selectedIngredients.map(async (ingredientId) => {
+        try {
+          const response = await fetch(`/api/companies/${companyId}/ingredients/${ingredientId}`, {
+            method: 'DELETE',
+          });
+          
+          if (!response.ok) {
+            const data = await response.json();
+            
+            // 메뉴에서 사용 중인 식재료인 경우
+            if (data.menuIds && data.menuIds.length > 0) {
+              const ingredient = ingredients.find(i => i.id === ingredientId);
+              if (ingredient) {
+                usedIngredients.push({ id: ingredientId, name: ingredient.name });
+              }
+            }
+            
+            deletedCount.failed++;
+            return { success: false, ingredientId };
+          }
+          
+          deletedCount.success++;
+          return { success: true, ingredientId };
+        } catch (error) {
+          console.error(`식재료 ${ingredientId} 삭제 오류:`, error);
+          deletedCount.failed++;
+          return { success: false, ingredientId };
+        }
+      });
+      
+      // 모든 삭제 요청이 완료될 때까지 대기
+      const results = await Promise.all(deletePromises);
+      
+      // 삭제 성공한 식재료만 목록에서 제거
+      const successfullyDeletedIds = results
+        .filter(result => result.success)
+        .map(result => result.ingredientId);
+      
+      if (successfullyDeletedIds.length > 0) {
+        setIngredients(prev => prev.filter(i => !successfullyDeletedIds.includes(i.id)));
+        
+        // 페이지네이션 정보 업데이트
+        setPagination(prev => ({
+          ...prev,
+          total: prev.total - successfullyDeletedIds.length,
+          totalPages: Math.ceil((prev.total - successfullyDeletedIds.length) / prev.limit)
+        }));
+        
+        // 성공 메시지 표시
+        toast({
+          title: '삭제 완료',
+          description: `${successfullyDeletedIds.length}개의 식재료가 삭제되었습니다.`,
+          variant: 'default',
+        });
+      }
+      
+      // 일부 식재료가 사용 중인 경우 추가 메시지 표시
+      if (usedIngredients.length > 0) {
+        const usedNames = usedIngredients.map(i => i.name).join(', ');
+        toast({
+          title: '일부 식재료 삭제 실패',
+          description: `다음 식재료는 메뉴에서 사용 중이므로 삭제할 수 없습니다: ${usedNames}`,
+          variant: 'destructive',
+        });
+      }
+      
+      // 선택 초기화 및 모달 닫기
+      setSelectedIngredients([]);
+      setBulkDeleteConfirmOpen(false);
+    } catch (error) {
+      console.error('식재료 일괄 삭제 오류:', error);
+      toast({
+        title: '오류 발생',
+        description: error instanceof Error ? error.message : '식재료 일괄 삭제 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* 제목 및 설명 영역 */}
@@ -397,31 +543,44 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
         />
         
         <div className="flex gap-2 items-center">
-          {isOwnerOrAdmin && (
-            <Button onClick={handleAddIngredient} className="w-full sm:w-auto">
-              <Plus className="mr-2 h-4 w-4" />
-              식재료 추가
-            </Button>
+          {selectedIngredients.length > 0 && (
+            <span className="text-sm text-muted-foreground mr-2">
+              {selectedIngredients.length}개 선택됨
+            </span>
           )}
           
-          {/* 부가 기능 드롭다운 */}
-          {isOwnerOrAdmin && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="ml-2">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>관리 옵션</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setBulkImportModalOpen(true)}>
-                  <FileSpreadsheet className="mr-2 h-4 w-4" />
-                  <span>일괄 추가</span>
+          {/* 식재료 추가 버튼 - 모든 사용자에게 허용 */}
+          <Button onClick={handleAddIngredient} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            식재료 추가
+          </Button>
+          
+          {/* 부가 기능 드롭다운 - 모든 사용자에게 허용 */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="ml-2">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>관리 옵션</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setBulkImportModalOpen(true)}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                <span>일괄 추가</span>
+              </DropdownMenuItem>
+              {/* 일괄 삭제는 관리자/소유자만 허용 */}
+              {isOwnerOrAdmin && (
+                <DropdownMenuItem 
+                  onClick={handleOpenBulkDelete}
+                  className={selectedIngredients.length > 0 ? "text-destructive focus:text-destructive" : ""}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  <span>일괄 삭제{selectedIngredients.length > 0 ? ` (${selectedIngredients.length})` : ''}</span>
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -437,6 +596,8 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
             handleEditIngredient={handleEditIngredient}
             handleViewPriceHistory={handleViewPriceHistory}
             handleDeleteConfirm={handleDeleteConfirm}
+            selectedIngredients={selectedIngredients}
+            handleToggleSelect={handleToggleSelect}
             formatCurrency={formatCurrency}
             formatNumber={formatNumber}
           />
@@ -467,6 +628,9 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
             handleEditIngredient={handleEditIngredient}
             handleViewPriceHistory={handleViewPriceHistory}
             handleDeleteConfirm={handleDeleteConfirm}
+            selectedIngredients={selectedIngredients}
+            handleToggleSelect={handleToggleSelect}
+            handleToggleSelectAll={handleToggleSelectAll}
           />
           
           {/* 데스크톱 페이지네이션 */}
@@ -587,6 +751,48 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
               onClick={handleDeleteIngredient}
             >
               삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* 일괄 삭제 확인 모달 */}
+      <Dialog 
+        open={bulkDeleteConfirmOpen} 
+        onOpenChange={setBulkDeleteConfirmOpen}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">
+              식재료 일괄 삭제
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p>
+              선택한 <strong>{selectedIngredients.length}개</strong>의 식재료를 정말 삭제하시겠습니까?
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              이 작업은 되돌릴 수 없으며, 메뉴에 사용되지 않은 식재료만 삭제됩니다.
+            </p>
+          </div>
+          <DialogFooter className="flex items-center justify-end gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setBulkDeleteConfirmOpen(false)}
+            >
+              취소
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleBulkDeleteIngredients}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <span className="animate-spin mr-2">◌</span>
+                  처리 중...
+                </>
+              ) : '삭제'}
             </Button>
           </DialogFooter>
         </DialogContent>

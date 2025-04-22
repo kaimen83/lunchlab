@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Ingredient, VisibleColumns } from '../types';
 import { formatCurrency, formatNumber } from '../utils';
 
@@ -38,6 +39,9 @@ interface DesktopTableProps {
   handleEditIngredient: (ingredient: Ingredient) => void;
   handleViewPriceHistory: (ingredient: Ingredient) => void;
   handleDeleteConfirm: (ingredient: Ingredient) => void;
+  selectedIngredients: string[];
+  handleToggleSelect: (ingredientId: string) => void;
+  handleToggleSelectAll: () => void;
 }
 
 const DesktopTable: React.FC<DesktopTableProps> = ({
@@ -54,12 +58,31 @@ const DesktopTable: React.FC<DesktopTableProps> = ({
   toggleRowExpand,
   handleEditIngredient,
   handleViewPriceHistory,
-  handleDeleteConfirm
+  handleDeleteConfirm,
+  selectedIngredients,
+  handleToggleSelect,
+  handleToggleSelectAll
 }) => {
   // 테이블 헤더 렌더링 함수
   const renderTableHeader = () => (
     <TableHeader className="bg-muted/20">
       <TableRow>
+        {/* 체크박스 칼럼 추가 */}
+        <TableHead className="w-[40px] px-2">
+          {isOwnerOrAdmin && (
+            <Checkbox
+              checked={ingredients.length > 0 && selectedIngredients.length === ingredients.length}
+              onCheckedChange={handleToggleSelectAll}
+              aria-label="전체 선택"
+              className={
+                ingredients.length > 0 && selectedIngredients.length > 0 && selectedIngredients.length < ingredients.length
+                  ? "opacity-70"
+                  : ""
+              }
+            />
+          )}
+        </TableHead>
+        
         {/* 확장 버튼 칼럼 */}
         <TableHead className="w-[40px]">
           <span className="sr-only">확장</span>
@@ -367,6 +390,18 @@ const DesktopTable: React.FC<DesktopTableProps> = ({
             <React.Fragment key={ingredient.id}>
               {/* 기본 행 */}
               <TableRow className={isExpanded ? 'bg-muted/50' : ''}>
+                {/* 체크박스 셀 추가 */}
+                <TableCell className="p-2 w-10">
+                  {isOwnerOrAdmin && (
+                    <Checkbox
+                      checked={selectedIngredients.includes(ingredient.id)}
+                      onCheckedChange={() => handleToggleSelect(ingredient.id)}
+                      aria-label={`${ingredient.name} 선택`}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  )}
+                </TableCell>
+                
                 {/* 확장 버튼 */}
                 <TableCell className="p-2 w-10">
                   <Button 
@@ -468,7 +503,7 @@ const DesktopTable: React.FC<DesktopTableProps> = ({
               {/* 확장된 행 (상세 정보) */}
               {isExpanded && (
                 <TableRow className="bg-muted/25 border-0">
-                  <TableCell colSpan={12} className="px-4 py-3">
+                  <TableCell colSpan={13} className="px-4 py-3">
                     {isDetailLoading ? (
                       <div className="flex justify-center py-4">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>

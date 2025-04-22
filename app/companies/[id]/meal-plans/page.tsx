@@ -171,6 +171,16 @@ export default function MealPlansPage() {
     setSelectedMealTime(mealTime);
     setSelectedDate(date);
     setFormMode('create');
+    setSelectedMealPlan({
+      id: '',
+      company_id: companyId as string,
+      name: '',
+      date: format(date, 'yyyy-MM-dd'),
+      meal_time: mealTime,
+      created_at: '',
+      updated_at: '',
+      meal_plan_menus: []
+    });
     setShowMealPlanForm(true);
   };
 
@@ -404,7 +414,6 @@ export default function MealPlansPage() {
             onNextPeriod={handleNextPeriod}
             onToday={handleGoToToday}
             onExportToExcel={handleExportToExcel}
-            onAddMealPlan={handleAddMealPlan}
           />
           
           <Card className="shadow mt-4">
