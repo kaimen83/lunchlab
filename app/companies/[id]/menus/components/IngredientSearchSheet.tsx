@@ -85,7 +85,7 @@ export function IngredientSearchSheet({
             <SheetTitle className="text-xl font-bold text-gray-800">식재료 선택</SheetTitle>
             <SheetDescription className="text-gray-500">
               추가할 식재료를 검색하거나 목록에서 선택하세요. 식재료를 클릭하면 바로 추가됩니다.
-              <span className="block text-xs text-blue-500 mt-1">Tab 키로 리스트로 이동 후 화살표 키와 Enter 키로 선택할 수 있습니다.</span>
+              <span className="block text-xs text-blue-500 mt-1">검색어 입력 후 화살표 키와 Enter 키로 선택할 수 있습니다.</span>
             </SheetDescription>
           </SheetHeader>
           <div className="px-4 pb-3">

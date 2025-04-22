@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/form';
 // 타입 오류를 피하기 위해 바로 import 선언
 import MenuIngredientsSelector from './MenuIngredientsSelector';
-import { Package, ChevronRight, ChevronLeft, Info } from 'lucide-react';
+import { Package, ChevronRight, ChevronLeft, Info, AlertTriangle } from 'lucide-react';
 import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog';
 import ContainersList from './components/ContainersList';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,9 +62,18 @@ interface ContainerIngredient {
 
 // 변환 로직을 분리한 단순화된 zod 스키마
 const menuSchema = z.object({
-  name: z.string().min(1, { message: '메뉴 이름은 필수입니다.' }),
-  description: z.string().max(500, { message: '설명은 500자 이하여야 합니다.' }).optional(),
-  recipe: z.string().max(2000, { message: '조리법은 2000자 이하여야 합니다.' }).optional(),
+  name: z
+    .string()
+    .min(1, { message: '메뉴 이름을 입력해주세요.' })
+    .max(100, { message: '메뉴 이름은 100자를 초과할 수 없습니다.' }),
+  description: z
+    .string()
+    .max(500, { message: '설명은 500자를 초과할 수 없습니다.' })
+    .optional(),
+  recipe: z
+    .string()
+    .max(2000, { message: '조리법은 2000자를 초과할 수 없습니다.' })
+    .optional(),
 });
 
 // 스키마에서 자동으로 타입 추론
@@ -115,6 +124,24 @@ export default function MenuForm({
     },
   });
 
+  // 중복 체크를 위한 상태 추가
+  const [currentMenuName, setCurrentMenuName] = useState<string>('');
+  const [initialMenuName, setInitialMenuName] = useState<string>('');
+  const [menuNameExists, setMenuNameExists] = useState<boolean>(false);
+  const [isCheckingMenuName, setIsCheckingMenuName] = useState<boolean>(false);
+
+  // name 필드 값 변경 감지하여 currentMenuName 상태 업데이트
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'name') {
+        const menuName = value.name as string;
+        setCurrentMenuName(menuName || '');
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [form.watch]);
+
   // 컨테이너 목록 가져오기
   useEffect(() => {
     const fetchContainers = async () => {
@@ -146,6 +173,10 @@ export default function MenuForm({
         description: menu.description || '',
         recipe: menu.recipe || '',
       });
+      
+      // 초기 메뉴 이름 설정 (중복 체크에서 사용)
+      setInitialMenuName(menu.name);
+      setCurrentMenuName(menu.name);
       
       // 메뉴에 포함된 식재료 및 컨테이너 조회
       const loadMenuData = async () => {
@@ -233,6 +264,10 @@ export default function MenuForm({
       setSelectedContainers([]);
       setContainerIngredients({});
       setCost(0);
+      
+      // 초기화
+      setInitialMenuName('');
+      setCurrentMenuName('');
     }
   }, [mode, menu, form, companyId, toast]);
   
@@ -455,6 +490,71 @@ export default function MenuForm({
     setCurrentStep(1);
   };
 
+  // 실시간 메뉴 이름 중복 체크 함수
+  const checkMenuName = async (name: string) => {
+    if (!name || name.trim() === '') {
+      setMenuNameExists(false);
+      form.clearErrors('name');
+      return;
+    }
+    
+    // 수정 모드에서 이름이 변경되지 않았다면 중복 체크 필요 없음
+    if (mode === 'edit' && name === initialMenuName) {
+      setMenuNameExists(false);
+      form.clearErrors('name');
+      return;
+    }
+    
+    setIsCheckingMenuName(true);
+    try {
+      // excludeId 파라미터 추가 (편집 모드에서 현재 아이템 제외)
+      const excludeIdParam = mode === 'edit' && menu?.id ? `&excludeId=${menu.id}` : '';
+      
+      // fetch 요청으로 이름 중복 확인
+      const response = await fetch(
+        `/api/companies/${companyId}/menus/check-name?name=${encodeURIComponent(name)}${excludeIdParam}`
+      );
+      
+      if (!response.ok) {
+        console.error('[MenuForm] 메뉴 이름 중복 확인 요청 실패:', response.status);
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('[MenuForm] 메뉴 이름 중복 체크 결과:', data);
+      
+      // 중복 여부 설정 및 에러 표시
+      setMenuNameExists(data.exists);
+      
+      if (data.exists) {
+        form.setError('name', { 
+          type: 'manual', 
+          message: '이미 사용 중인 메뉴 이름입니다. 다른 이름을 사용해주세요.'
+        });
+      } else {
+        form.clearErrors('name');
+      }
+    } catch (error) {
+      console.error('[MenuForm] 메뉴 이름 체크 오류:', error);
+    } finally {
+      setIsCheckingMenuName(false);
+    }
+  };
+  
+  // 메뉴 이름 변경 시 중복 체크 실행 (디바운스 적용)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (currentMenuName) {
+        checkMenuName(currentMenuName);
+      } else {
+        setMenuNameExists(false);
+        form.clearErrors('name');
+      }
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [currentMenuName, companyId, initialMenuName, mode, menu?.id, form]);
+
   // 폼 제출 처리
   const onSubmit = (data: MenuFormValues) => {
     // 2단계에서 용기가 하나도 선택되지 않았다면 경고
@@ -464,6 +564,17 @@ export default function MenuForm({
         description: '최소 하나 이상의 용기를 선택해주세요.',
         variant: 'destructive',
       });
+      return;
+    }
+    
+    // 메뉴 이름 중복 확인
+    if (menuNameExists) {
+      toast({
+        title: '이름 중복 오류',
+        description: '이미 사용 중인 메뉴 이름입니다. 다른 이름을 사용해주세요.',
+        variant: 'destructive',
+      });
+      setCurrentStep(1); // 첫 단계로 돌아가기
       return;
     }
     
@@ -562,8 +673,26 @@ export default function MenuForm({
           <FormItem>
             <FormLabel>메뉴 이름</FormLabel>
             <FormControl>
-              <Input {...field} placeholder="메뉴 이름을 입력하세요" />
+              <div className="relative">
+                <Input 
+                  {...field} 
+                  placeholder="메뉴 이름을 입력하세요" 
+                  className={menuNameExists ? "border-red-500 pr-10" : ""}
+                  onChange={(e) => {
+                    field.onChange(e);
+                    console.log('[MenuForm] 메뉴 이름 변경:', e.target.value);
+                  }}
+                />
+                {menuNameExists && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500">
+                    <AlertTriangle className="h-5 w-5" />
+                  </div>
+                )}
+              </div>
             </FormControl>
+            <div className="mt-1 text-sm">
+              {isCheckingMenuName && <p className="text-muted-foreground">메뉴 이름 중복 확인 중...</p>}
+            </div>
             <FormMessage />
           </FormItem>
         )}
