@@ -39,7 +39,6 @@ export function IngredientList({
   handleListKeyDown
 }: IngredientListProps) {
   const listRef = useRef<HTMLDivElement>(null);
-  const focusedItemRef = useRef<HTMLDivElement>(null);
 
   return (
     <div 
@@ -71,7 +70,6 @@ export function IngredientList({
                 return (
                   <div
                     key={ingredient.id}
-                    ref={isFocused ? focusedItemRef : null}
                     onClick={() => onIngredientSelect(ingredient.id)}
                     className={cn(
                       "flex items-center px-3 py-2.5 rounded-lg hover:bg-blue-50 transition-colors duration-150 cursor-pointer",
@@ -80,6 +78,7 @@ export function IngredientList({
                     role="option"
                     aria-selected={isFocused}
                     data-focused={isFocused ? "true" : undefined}
+                    id={`ingredient-item-${ingredient.id}`}
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <Clock className="h-4 w-4 text-blue-500 flex-shrink-0" />
@@ -115,7 +114,6 @@ export function IngredientList({
                 return (
                   <div
                     key={ingredient.id}
-                    ref={isFocused ? focusedItemRef : null}
                     onClick={() => onIngredientSelect(ingredient.id)}
                     className={cn(
                       "flex items-center px-3 py-2.5 rounded-lg hover:bg-blue-50 transition-colors duration-150 cursor-pointer",
@@ -124,6 +122,7 @@ export function IngredientList({
                     role="option"
                     aria-selected={isFocused}
                     data-focused={isFocused ? "true" : undefined}
+                    id={`ingredient-item-${ingredient.id}`}
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <Tag className="h-4 w-4 text-green-500 flex-shrink-0" />

@@ -136,15 +136,29 @@ export default function MenuIngredientsSelector({
     setSheetOpen
   );
   
-  // 포커스된 아이템이 변경될 때 스크롤 처리
-  useEffect(() => {
-    if (focusedItemIndex >= 0 && focusedItemRef.current) {
-      focusedItemRef.current.scrollIntoView({
+  // 포커스된 요소를 보여주기 위한 함수
+  const scrollToFocusedItem = () => {
+    // 포커스된 요소 찾기
+    const focusedElement = document.querySelector('[data-focused="true"]');
+    
+    if (focusedElement) {
+      // 요소가 있는 경우 스크롤 처리
+      focusedElement.scrollIntoView({
         behavior: 'smooth',
         block: 'nearest'
       });
     }
-  }, [focusedItemIndex]);
+  };
+  
+  // 포커스된 아이템이 변경될 때 스크롤 처리
+  useEffect(() => {
+    if (focusedItemIndex >= 0 && sheetOpen) {
+      // setTimeout으로 DOM 업데이트 후 스크롤 처리를 보장
+      setTimeout(() => {
+        scrollToFocusedItem();
+      }, 10);
+    }
+  }, [focusedItemIndex, sheetOpen]);
 
   // 식재료 양 변경
   const handleAmountChange = (index: number, newAmount: number) => {
