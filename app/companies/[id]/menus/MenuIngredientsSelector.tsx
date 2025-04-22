@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -131,6 +131,13 @@ export default function MenuIngredientsSelector({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [recentIngredientIds, setRecentIngredientIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  // 키보드 탐색을 위한 상태 추가
+  const [focusedItemIndex, setFocusedItemIndex] = useState<number>(-1);
+  const [focusedGroupIndex, setFocusedGroupIndex] = useState<number>(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const commandListRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const focusedItemRef = useRef<HTMLDivElement>(null);
 
   // 식재료 목록 로드
   useEffect(() => {
@@ -209,6 +216,133 @@ export default function MenuIngredientsSelector({
     // 그룹 정렬
     return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0], 'ko'));
   }, [availableIngredients, searchQuery]);
+
+  // 포커스된 아이템 계산 - 완전히 새로운 접근 방식
+  const flattenedItems = useMemo(() => {
+    const items: { id: string; idx: number }[] = [];
+    
+    // 모든 아이템을 단순 배열로 펼침
+    if (!searchQuery && recentIngredients.length > 0) {
+      // 최근 사용 식재료
+      recentIngredients.forEach(ingredient => {
+        items.push({ id: ingredient.id, idx: items.length });
+      });
+    }
+    
+    // 일반 그룹화된 식재료
+    filteredAndGroupedIngredients.forEach(([_, groupItems]) => {
+      groupItems.forEach(ingredient => {
+        items.push({ id: ingredient.id, idx: items.length });
+      });
+    });
+    
+    return items;
+  }, [filteredAndGroupedIngredients, recentIngredients, searchQuery]);
+
+  // 리스트 아이템 키보드 이벤트 처리 - 완전히 수정
+  const handleListKeyDown = (e: ReactKeyboardEvent<HTMLDivElement> | KeyboardEvent) => {
+    if (flattenedItems.length === 0) return;
+    
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        if (focusedItemIndex < flattenedItems.length - 1) {
+          // 다음 아이템으로 이동
+          setFocusedItemIndex(focusedItemIndex + 1);
+        }
+        break;
+        
+      case 'ArrowUp':
+        e.preventDefault();
+        if (focusedItemIndex > 0) {
+          // 이전 아이템으로 이동
+          setFocusedItemIndex(focusedItemIndex - 1);
+        } else {
+          // 첫 번째 아이템에서 위로 이동 시 검색창으로 포커스 이동
+          setFocusedItemIndex(-1);
+          searchInputRef.current?.focus();
+        }
+        break;
+        
+      case 'Enter':
+        e.preventDefault();
+        if (focusedItemIndex >= 0 && focusedItemIndex < flattenedItems.length) {
+          // 선택한 아이템의 ID로 선택 처리
+          const selected = flattenedItems[focusedItemIndex];
+          handleIngredientSelect(selected.id);
+        }
+        break;
+        
+      case 'Tab':
+        if (e.shiftKey) {
+          e.preventDefault();
+          setFocusedItemIndex(-1);
+          searchInputRef.current?.focus();
+        }
+        break;
+        
+      case 'Escape':
+        setSheetOpen(false);
+        break;
+    }
+  };
+
+  // 글로벌 키보드 이벤트 리스너 설정 - 수정
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (!sheetOpen) return;
+      
+      // 다른 요소가 포커스 중일 때는 이벤트 무시
+      const activeElement = document.activeElement;
+      if (activeElement === searchInputRef.current) return;
+      
+      // 필요한 키 처리
+      if (['ArrowDown', 'ArrowUp', 'Enter', 'Tab', 'Escape'].includes(e.key)) {
+        e.preventDefault();
+        
+        // Enter 키를 눌렀을 때 직접 handleIngredientSelect 호출
+        if (e.key === 'Enter' && focusedItemIndex >= 0 && focusedItemIndex < flattenedItems.length) {
+          const selected = flattenedItems[focusedItemIndex];
+          handleIngredientSelect(selected.id);
+          return;
+        }
+        
+        // 다른 키는 handleListKeyDown으로 위임
+        handleListKeyDown(e);
+      }
+    };
+    
+    if (sheetOpen) {
+      window.addEventListener('keydown', handleGlobalKeyDown);
+    }
+    
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+    };
+  }, [sheetOpen, focusedItemIndex, flattenedItems]);
+
+  // 시트 닫힐 때 포커스 초기화
+  useEffect(() => {
+    if (!sheetOpen) {
+      setFocusedItemIndex(-1);
+      setFocusedGroupIndex(0);
+    } else {
+      // 시트가 열렸을 때 검색 필드에 포커스
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
+    }
+  }, [sheetOpen]);
+
+  // 포커스된 아이템이 변경될 때 스크롤 처리
+  useEffect(() => {
+    if (focusedItemIndex >= 0 && focusedItemRef.current) {
+      focusedItemRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest'
+      });
+    }
+  }, [focusedItemIndex]);
 
   // 식재료 선택 후 바로 추가
   const handleIngredientSelect = (id: string) => {
@@ -299,6 +433,8 @@ export default function MenuIngredientsSelector({
     // 시트가 닫힐 때 검색어 초기화
     if (!open) {
       setSearchQuery('');
+      setFocusedItemIndex(-1);
+      setFocusedGroupIndex(0);
     }
   };
 
@@ -332,6 +468,7 @@ export default function MenuIngredientsSelector({
                   <SheetTitle className="text-xl font-bold text-gray-800">식재료 선택</SheetTitle>
                   <SheetDescription className="text-gray-500">
                     추가할 식재료를 검색하거나 목록에서 선택하세요. 식재료를 클릭하면 바로 추가됩니다.
+                    <p className="text-xs text-blue-500 mt-1">Tab 키로 리스트로 이동 후 화살표 키와 Enter 키로 선택할 수 있습니다.</p>
                   </SheetDescription>
                 </SheetHeader>
                 <div className="px-4 pb-3">
@@ -340,10 +477,12 @@ export default function MenuIngredientsSelector({
                       <Search className="h-4 w-4 text-gray-400" />
                     </div>
                     <input
+                      ref={searchInputRef}
                       type="text"
                       placeholder="식재료 이름 검색..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={handleListKeyDown}
                       className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-100 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-200 placeholder:text-gray-400 border-none"
                     />
                     {searchQuery && (
@@ -363,81 +502,114 @@ export default function MenuIngredientsSelector({
               </div>
               
               <div className="px-4 pb-6">
-                <Command className="rounded-xl border-none shadow-none bg-transparent overflow-hidden">
-                  <CommandList className="max-h-[60vh] overflow-y-auto py-2 md:max-h-[400px]">
-                    <CommandEmpty className="py-6 text-center text-gray-500">
-                      <div className="flex flex-col items-center gap-2">
-                        <CircleSlash className="h-8 w-8 text-gray-300" />
-                        <p>검색 결과가 없습니다</p>
+                <div className="rounded-xl overflow-hidden">
+                  <div 
+                    ref={listRef}
+                    className="max-h-[60vh] overflow-y-auto py-2 md:max-h-[400px] outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-opacity-50 rounded-md"
+                    onKeyDown={handleListKeyDown}
+                    tabIndex={0}
+                    role="listbox"
+                    aria-labelledby="ingredients-list"
+                  >
+                    {flattenedItems.length === 0 && (
+                      <div className="py-6 text-center text-gray-500">
+                        <div className="flex flex-col items-center gap-2">
+                          <CircleSlash className="h-8 w-8 text-gray-300" />
+                          <p>검색 결과가 없습니다</p>
+                        </div>
                       </div>
-                    </CommandEmpty>
+                    )}
                     
-                    {/* 최근 사용 식재료 섹션 */}
                     {recentIngredients.length > 0 && !searchQuery && (
                       <>
-                        <CommandGroup heading="최근 사용" className="pb-1">
+                        <div className="pb-1">
+                          <div className="text-sm font-medium px-3 py-1 text-gray-500">최근 사용</div>
                           <div className="py-1 px-1 space-y-1">
-                            {recentIngredients.map(ingredient => (
-                              <CommandItem
-                                key={ingredient.id}
-                                value={ingredient.id}
-                                onSelect={handleIngredientSelect}
-                                className="flex items-center px-3 py-2.5 rounded-lg hover:bg-blue-50 transition-colors duration-150 cursor-pointer"
-                              >
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                  <Clock className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                                  <div className="flex-1 truncate">
-                                    <span className="font-medium">{ingredient.name}</span>
-                                    <Badge variant="outline" className="ml-2 bg-gray-50 text-xs font-normal">
-                                      {ingredient.package_amount} {ingredient.unit}
-                                    </Badge>
+                            {recentIngredients.map((ingredient, idx) => {
+                              // 이 아이템의 전체 인덱스 계산
+                              const currentIdx = flattenedItems.findIndex(item => item.id === ingredient.id);
+                              const isFocused = currentIdx === focusedItemIndex;
+                              
+                              return (
+                                <div
+                                  key={ingredient.id}
+                                  ref={isFocused ? focusedItemRef : null}
+                                  onClick={() => handleIngredientSelect(ingredient.id)}
+                                  className={cn(
+                                    "flex items-center px-3 py-2.5 rounded-lg hover:bg-blue-50 transition-colors duration-150 cursor-pointer",
+                                    isFocused ? "bg-blue-100 ring-2 ring-blue-500 ring-opacity-50" : ""
+                                  )}
+                                  role="option"
+                                  aria-selected={isFocused}
+                                  data-focused={isFocused ? "true" : undefined}
+                                >
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <Clock className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                                    <div className="flex-1 truncate">
+                                      <span className="font-medium">{ingredient.name}</span>
+                                      <Badge variant="outline" className="ml-2 bg-gray-50 text-xs font-normal">
+                                        {ingredient.package_amount} {ingredient.unit}
+                                      </Badge>
+                                    </div>
                                   </div>
+                                  <CheckCircle2 className={cn(
+                                    "h-4 w-4 flex-shrink-0",
+                                    isFocused ? "opacity-100 text-blue-500" : "opacity-0"
+                                  )} />
                                 </div>
-                                <CheckCircle2 className={cn(
-                                  "h-4 w-4 flex-shrink-0 transition-opacity",
-                                  "opacity-0"
-                                )} />
-                              </CommandItem>
-                            ))}
+                              );
+                            })}
                           </div>
-                        </CommandGroup>
-                        <CommandSeparator className="my-1 bg-gray-100" />
+                        </div>
+                        <div className="my-1 h-px bg-gray-100" />
                       </>
                     )}
                     
-                    {/* 그룹화된 식재료 목록 */}
                     <div className="py-2">
-                      {filteredAndGroupedIngredients.map(([group, items]) => (
-                        <CommandGroup key={group} heading={group} className="pb-1">
+                      {filteredAndGroupedIngredients.map(([group, items], groupIdx) => (
+                        <div key={group} className="pb-1">
+                          <div className="text-sm font-medium px-3 py-1 text-gray-500">{group}</div>
                           <div className="py-1 px-1 space-y-1">
-                            {items.map(ingredient => (
-                              <CommandItem
-                                key={ingredient.id}
-                                value={ingredient.id}
-                                onSelect={handleIngredientSelect}
-                                className="flex items-center px-3 py-2.5 rounded-lg hover:bg-blue-50 transition-colors duration-150 cursor-pointer"
-                              >
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                  <Tag className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                  <div className="flex-1 truncate">
-                                    <span className="font-medium">{ingredient.name}</span>
-                                    <Badge variant="outline" className="ml-2 bg-gray-50 text-xs font-normal">
-                                      {ingredient.package_amount} {ingredient.unit}
-                                    </Badge>
+                            {items.map((ingredient, itemIdx) => {
+                              // 이 아이템의 전체 인덱스 계산
+                              const currentIdx = flattenedItems.findIndex(item => item.id === ingredient.id);
+                              const isFocused = currentIdx === focusedItemIndex;
+                              
+                              return (
+                                <div
+                                  key={ingredient.id}
+                                  ref={isFocused ? focusedItemRef : null}
+                                  onClick={() => handleIngredientSelect(ingredient.id)}
+                                  className={cn(
+                                    "flex items-center px-3 py-2.5 rounded-lg hover:bg-blue-50 transition-colors duration-150 cursor-pointer",
+                                    isFocused ? "bg-blue-100 ring-2 ring-blue-500 ring-opacity-50" : ""
+                                  )}
+                                  role="option"
+                                  aria-selected={isFocused}
+                                  data-focused={isFocused ? "true" : undefined}
+                                >
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <Tag className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                    <div className="flex-1 truncate">
+                                      <span className="font-medium">{ingredient.name}</span>
+                                      <Badge variant="outline" className="ml-2 bg-gray-50 text-xs font-normal">
+                                        {ingredient.package_amount} {ingredient.unit}
+                                      </Badge>
+                                    </div>
                                   </div>
+                                  <CheckCircle2 className={cn(
+                                    "h-4 w-4 flex-shrink-0",
+                                    isFocused ? "opacity-100 text-blue-500" : "opacity-0"
+                                  )} />
                                 </div>
-                                <CheckCircle2 className={cn(
-                                  "h-4 w-4 flex-shrink-0 transition-opacity",
-                                  "opacity-0"
-                                )} />
-                              </CommandItem>
-                            ))}
+                              );
+                            })}
                           </div>
-                        </CommandGroup>
+                        </div>
                       ))}
                     </div>
-                  </CommandList>
-                </Command>
+                  </div>
+                </div>
               </div>
               
               <SheetFooter className="px-6 py-4 border-t border-gray-100 bg-white">
