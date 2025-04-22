@@ -85,6 +85,11 @@ export default function ContainerModal({
   // 코드명 상태 감시
   const currentCodeName = form.watch('code_name');
   const initialCodeName = container?.code_name || ''; // 초기 코드명 (편집 모드일 때 사용)
+  
+  // 가격 값 상태 관리를 위한 로컬 상태
+  const [priceInputValue, setPriceInputValue] = useState<string>(
+    container?.price !== undefined ? container.price.toString() : ''
+  );
 
   // container 값이 변경될 때마다 폼 값 재설정
   useEffect(() => {
@@ -95,6 +100,10 @@ export default function ContainerModal({
         description: container?.description || '',
         price: container?.price,
       });
+      
+      // 가격 입력 필드 값도 재설정
+      setPriceInputValue(container?.price !== undefined ? container.price.toString() : '');
+      
       // 모달이 열릴 때 코드명 중복 상태 초기화
       setCodeExists(false);
     }
@@ -325,14 +334,22 @@ export default function ContainerModal({
                   <FormControl>
                     <div className="relative">
                       <Input
-                        type="number"
-                        min="0"
-                        step="1"
+                        type="text"
                         placeholder="용기 가격"
-                        value={field.value === undefined ? '' : field.value}
+                        // 로컬 상태 사용하여 입력 값 제어
+                        value={priceInputValue}
                         onChange={(e) => {
                           const value = e.target.value;
-                          field.onChange(value === '' ? undefined : Number(value));
+                          // 숫자와 빈 문자열만 허용
+                          if (value === '' || /^\d*$/.test(value)) {
+                            setPriceInputValue(value);
+                            // 폼 상태 업데이트
+                            if (value === '') {
+                              field.onChange(undefined);
+                            } else {
+                              field.onChange(Number(value));
+                            }
+                          }
                         }}
                         className="pl-10"
                       />
