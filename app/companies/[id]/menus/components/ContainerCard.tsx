@@ -3,9 +3,9 @@
 import {
   ChevronDown,
   ChevronUp,
-  DollarSign,
   Loader2,
   Package,
+  Info,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ContainerCardProps } from "../types";
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 /**
  * 컨테이너 카드 컴포넌트
@@ -30,6 +37,7 @@ export default function ContainerCard({
   formatCurrency,
 }: ContainerCardProps) {
   const detail = containerDetails[container.id];
+  const [costDetailsOpen, setCostDetailsOpen] = useState(false);
   
   return (
     <div
@@ -55,49 +63,62 @@ export default function ContainerCard({
           ) : detail ? (
             <div className="flex items-center gap-3">
               {detail.calories > 0 && (
+                <Badge variant="outline" className="bg-slate-50">
+                  {Math.round(detail.calories)} kcal
+                </Badge>
+              )}
+              
+              {/* PC 환경에서는 툴팁 사용, 모바일에서는 보이지 않음 */}
+              <div className="hidden sm:block">
                 <TooltipProvider delayDuration={100}>
                   <Tooltip>
-                    <TooltipTrigger>
-                      <Badge variant="outline" className="bg-slate-50">
-                        {Math.round(detail.calories)} kcal
+                    <TooltipTrigger asChild>
+                      <Badge variant="secondary" className="flex items-center cursor-help">
+                        {formatCurrency(detail.total_cost || (detail.ingredients_cost + detail.container_price))}
                       </Badge>
                     </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="text-white">칼로리 합계</p>
+                    <TooltipContent 
+                      side="bottom" 
+                      align="end" 
+                      className="p-3 text-white max-w-[200px] sm:max-w-none"
+                      sideOffset={5}
+                    >
+                      <div className="text-xs space-y-2">
+                        <div className="flex justify-between gap-2">
+                          <span className="text-white opacity-80">식재료:</span> 
+                          <span className="text-white">{formatCurrency(detail.ingredients_cost)}</span>
+                        </div>
+                        <div className="flex justify-between gap-2 font-medium">
+                          <span className="text-white opacity-80">용기:</span> 
+                          <span className="text-white">{formatCurrency(detail.container_price)}</span>
+                        </div>
+                        <hr className="my-1 border-white border-opacity-20"/>
+                        <div className="flex justify-between gap-2 font-semibold">
+                          <span className="text-white">총 원가:</span>
+                          <span className="text-white">{formatCurrency(detail.total_cost || (detail.ingredients_cost + detail.container_price))}</span>
+                        </div>
+                        <p className="text-[10px] text-white opacity-70 mt-1 pt-1 border-t border-dashed border-white border-opacity-20">
+                          * 용기 가격이 포함된 총 원가입니다
+                        </p>
+                      </div>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-              )}
-              <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Badge variant="secondary" className="flex items-center">
-                      <DollarSign className="h-3 w-3 mr-1"/> 
-                      {formatCurrency(detail.total_cost || (detail.ingredients_cost + detail.container_price))}
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" align="end" className="p-3 text-white">
-                    <div className="text-xs space-y-2">
-                      <div className="flex justify-between gap-2">
-                        <span className="text-white opacity-80">식재료:</span> 
-                        <span className="text-white">{formatCurrency(detail.ingredients_cost)}</span>
-                      </div>
-                      <div className="flex justify-between gap-2 font-medium">
-                        <span className="text-white opacity-80">용기:</span> 
-                        <span className="text-white">{formatCurrency(detail.container_price)}</span>
-                      </div>
-                      <hr className="my-1 border-white border-opacity-20"/>
-                      <div className="flex justify-between gap-2 font-semibold">
-                        <span className="text-white">총 원가:</span>
-                        <span className="text-white">{formatCurrency(detail.total_cost || (detail.ingredients_cost + detail.container_price))}</span>
-                      </div>
-                      <p className="text-[10px] text-white opacity-70 mt-1 pt-1 border-t border-dashed border-white border-opacity-20">
-                        * 용기 가격이 포함된 총 원가입니다
-                      </p>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              </div>
+
+              {/* 모바일 환경에서는 클릭 가능한 뱃지 표시 */}
+              <div className="sm:hidden">
+                <Button 
+                  variant="ghost" 
+                  className="p-0 h-auto" 
+                  onClick={() => setCostDetailsOpen(true)}
+                >
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    {formatCurrency(detail.total_cost || (detail.ingredients_cost + detail.container_price))}
+                    <Info className="h-3 w-3 text-blue-600" />
+                  </Badge>
+                </Button>
+              </div>
             </div>
           ) : (
             <span className="text-slate-400">정보 없음</span>
@@ -169,6 +190,34 @@ export default function ContainerCard({
             )}
           </div>
         </div>
+      )}
+
+      {/* 모바일용 원가 정보 다이얼로그 */}
+      {detail && (
+        <Dialog open={costDetailsOpen} onOpenChange={setCostDetailsOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>원가 상세 정보</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-4">
+              <div className="flex justify-between items-center border-b pb-2">
+                <span className="text-muted-foreground">식재료:</span> 
+                <span className="font-medium">{formatCurrency(detail.ingredients_cost)}</span>
+              </div>
+              <div className="flex justify-between items-center border-b pb-2">
+                <span className="text-muted-foreground">용기:</span> 
+                <span className="font-medium">{formatCurrency(detail.container_price)}</span>
+              </div>
+              <div className="flex justify-between items-center pt-2">
+                <span className="font-semibold text-black">총 원가:</span>
+                <span className="font-semibold text-primary">{formatCurrency(detail.total_cost || (detail.ingredients_cost + detail.container_price))}</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-4">
+                * 용기 가격이 포함된 총 원가입니다
+              </p>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

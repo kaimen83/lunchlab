@@ -2,15 +2,15 @@ import { Container, TopIngredient } from "./types";
 
 /**
  * 금액을 한국어 통화 형식으로 포맷팅하는 함수
+ * 통화 기호 없이 숫자만 표시하고 마지막에 '원'을 추가합니다.
  * @param amount 포맷팅할 금액
  * @returns 포맷팅된 문자열
  */
 export const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat("ko-KR", {
-    style: "currency",
-    currency: "KRW",
-    maximumFractionDigits: 1
-  }).format(amount);
+    style: "decimal",
+    maximumFractionDigits: 0
+  }).format(amount) + "원";
 };
 
 /**
