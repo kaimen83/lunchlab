@@ -127,7 +127,6 @@ export default function MenuIngredientsSelector({
   const { toast } = useToast();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedIngredientId, setSelectedIngredientId] = useState<string>('');
   const [amount, setAmount] = useState<number>(1);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [recentIngredientIds, setRecentIngredientIds] = useState<string[]>([]);
@@ -211,20 +210,11 @@ export default function MenuIngredientsSelector({
     return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0], 'ko'));
   }, [availableIngredients, searchQuery]);
 
-  // 식재료 추가
-  const handleAddIngredient = () => {
-    if (!selectedIngredientId || amount <= 0) {
-      toast({
-        title: '입력 오류',
-        description: '식재료를 선택하고 유효한 양을 입력해주세요.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
+  // 식재료 선택 후 바로 추가
+  const handleIngredientSelect = (id: string) => {
     // 이미 추가된 식재료인지 확인
     const alreadyExists = selectedIngredients.some(item => 
-      item.ingredient_id === selectedIngredientId
+      item.ingredient_id === id
     );
 
     if (alreadyExists) {
@@ -233,11 +223,12 @@ export default function MenuIngredientsSelector({
         description: '이미 추가된 식재료입니다. 해당 항목의 양을 수정해주세요.',
         variant: 'destructive',
       });
+      setSheetOpen(false);
       return;
     }
 
     // 선택한 식재료 찾기
-    const selectedIngredient = ingredients.find(i => i.id === selectedIngredientId);
+    const selectedIngredient = ingredients.find(i => i.id === id);
     
     if (!selectedIngredient) {
       toast({
@@ -245,16 +236,17 @@ export default function MenuIngredientsSelector({
         description: '선택한 식재료를 찾을 수 없습니다.',
         variant: 'destructive',
       });
+      setSheetOpen(false);
       return;
     }
 
     // 최근 사용 식재료에 추가
-    addRecentIngredient(companyId, selectedIngredient.id);
+    addRecentIngredient(companyId, id);
     setRecentIngredientIds(getRecentIngredients(companyId));
 
     // 새 항목 추가
     const newItem: SelectedIngredient = {
-      ingredient_id: selectedIngredient.id,
+      ingredient_id: id,
       ingredient: selectedIngredient,
       amount: amount
     };
@@ -262,16 +254,8 @@ export default function MenuIngredientsSelector({
     onChange([...selectedIngredients, newItem]);
     
     // 입력 필드 초기화
-    setSelectedIngredientId('');
     setAmount(1);
-  };
-
-  // 식재료 선택
-  const handleIngredientSelect = (id: string) => {
-    setSelectedIngredientId(id);
     setSheetOpen(false);
-    addRecentIngredient(companyId, id);
-    setRecentIngredientIds(getRecentIngredients(companyId));
   };
 
   // 식재료 양 변경
@@ -319,9 +303,7 @@ export default function MenuIngredientsSelector({
                 disabled={isLoading || availableIngredients.length === 0}
               >
                 <Search className="h-4 w-4 mr-2 text-blue-500" />
-                {selectedIngredientId 
-                  ? ingredients.find(i => i.id === selectedIngredientId)?.name || '식재료 선택'
-                  : '식재료 선택'}
+                식재료 검색
               </Button>
             </SheetTrigger>
             <SheetContent 
@@ -336,7 +318,7 @@ export default function MenuIngredientsSelector({
                 <SheetHeader className="px-6 pt-2 pb-4">
                   <SheetTitle className="text-xl font-bold text-gray-800">식재료 선택</SheetTitle>
                   <SheetDescription className="text-gray-500">
-                    추가할 식재료를 검색하거나 목록에서 선택하세요
+                    추가할 식재료를 검색하거나 목록에서 선택하세요. 식재료를 클릭하면 바로 추가됩니다.
                   </SheetDescription>
                 </SheetHeader>
                 <div className="px-4 pb-3">
@@ -400,7 +382,7 @@ export default function MenuIngredientsSelector({
                                 </div>
                                 <CheckCircle2 className={cn(
                                   "h-4 w-4 flex-shrink-0 transition-opacity",
-                                  selectedIngredientId === ingredient.id ? "text-blue-500 opacity-100" : "opacity-0"
+                                  "opacity-0"
                                 )} />
                               </CommandItem>
                             ))}
@@ -433,7 +415,7 @@ export default function MenuIngredientsSelector({
                                 </div>
                                 <CheckCircle2 className={cn(
                                   "h-4 w-4 flex-shrink-0 transition-opacity",
-                                  selectedIngredientId === ingredient.id ? "text-blue-500 opacity-100" : "opacity-0"
+                                  "opacity-0"
                                 )} />
                               </CommandItem>
                             ))}
@@ -468,20 +450,10 @@ export default function MenuIngredientsSelector({
                 onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
               />
               <span className="text-sm font-medium text-gray-600">
-                {selectedIngredientId && 
-                  ingredients.find(i => i.id === selectedIngredientId)?.unit}
+                단위
               </span>
             </div>
           )}
-          
-          <Button 
-            type="button" 
-            onClick={handleAddIngredient}
-            className="shrink-0 bg-green-500 hover:bg-green-600 text-white shadow-md transition-all duration-200"
-            disabled={!selectedIngredientId}
-          >
-            <Plus className="h-4 w-4 mr-1" /> 추가
-          </Button>
         </div>
       </div>
 
