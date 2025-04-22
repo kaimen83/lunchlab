@@ -224,6 +224,7 @@ export default function MenuIngredientsSelector({
         variant: 'destructive',
       });
       setSheetOpen(false);
+      setSearchQuery(''); // 검색어 초기화
       return;
     }
 
@@ -237,6 +238,7 @@ export default function MenuIngredientsSelector({
         variant: 'destructive',
       });
       setSheetOpen(false);
+      setSearchQuery(''); // 검색어 초기화
       return;
     }
 
@@ -256,6 +258,7 @@ export default function MenuIngredientsSelector({
     // 입력 필드 초기화
     setAmount(1);
     setSheetOpen(false);
+    setSearchQuery(''); // 검색어 초기화
   };
 
   // 식재료 양 변경
@@ -289,12 +292,22 @@ export default function MenuIngredientsSelector({
     return amount.toFixed(1);
   };
 
+  // 시트 오픈 상태 변경 처리
+  const handleSheetOpenChange = (open: boolean) => {
+    setSheetOpen(open);
+    
+    // 시트가 닫힐 때 검색어 초기화
+    if (!open) {
+      setSearchQuery('');
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-2">
         <Label htmlFor="ingredient-select" className="text-sm font-medium text-gray-700">식재료 추가</Label>
         <div className="flex gap-3">
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <Sheet open={sheetOpen} onOpenChange={handleSheetOpenChange}>
             <SheetTrigger asChild>
               <Button 
                 variant="outline" 
