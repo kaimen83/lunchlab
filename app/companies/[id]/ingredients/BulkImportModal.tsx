@@ -255,7 +255,7 @@ export default function BulkImportModal({
                 disabled={isLoading}
               />
               <p className="text-xs text-amber-700">
-                대용량 데이터의 경우 처리 시간이 오래 걸릴 수 있습니다. 데이터를 더 작은 단위로 나누어 시도하는 것이 좋습니다.
+                대용량 데이터의 경우 처리 시간이 오래 걸릴 수 있습니다.
               </p>
             </div>
           </div>
