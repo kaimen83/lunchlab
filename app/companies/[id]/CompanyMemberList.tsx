@@ -48,6 +48,7 @@ interface UserInfo {
   imageUrl: string | null;
   profileCompleted?: boolean;
   profile?: UserProfile;
+  metadataName?: string;
 }
 
 export function CompanyMemberList({ 
@@ -71,12 +72,17 @@ export function CompanyMemberList({
   
   // 사용자 표시 이름을 가져오는 함수
   const getUserDisplayName = (userInfo: UserInfo): string => {
-    // 프로젝트 사용자 프로필이 있는 경우 우선 사용
+    // Clerk metadata에 name이 있는 경우 우선 사용
+    if (userInfo.metadataName) {
+      return userInfo.metadataName;
+    }
+    
+    // 다음으로 프로젝트 사용자 프로필에 이름이 있는 경우 사용
     if (userInfo.profileCompleted && userInfo.profile?.name) {
       return userInfo.profile.name;
     }
     
-    // 없으면 Clerk 이름 사용
+    // Clerk 이름 사용
     if (userInfo.firstName || userInfo.lastName) {
       return `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim();
     }
@@ -123,7 +129,7 @@ export function CompanyMemberList({
         
         // 멤버십과 사용자 정보 결합
         const membersWithUserInfo = members.map((membership) => {
-          const userInfo = data.users.find((u: UserInfo) => u.id === membership.user_id);
+          const userInfo = data.users.find((u: any) => u.id === membership.user_id);
           
           if (!userInfo) {
             return {
@@ -134,9 +140,21 @@ export function CompanyMemberList({
             };
           }
           
+          // API 응답에서 받은 형식을 UserInfo 형태로 변환
+          const userInfoFormatted: UserInfo = {
+            id: userInfo.id,
+            firstName: userInfo.firstName,
+            lastName: userInfo.lastName,
+            email: userInfo.email || '',
+            imageUrl: userInfo.imageUrl,
+            profileCompleted: userInfo.profileCompleted,
+            profile: userInfo.profile,
+            metadataName: userInfo.metadataName
+          };
+          
           return {
             membership,
-            displayName: getUserDisplayName(userInfo),
+            displayName: getUserDisplayName(userInfoFormatted),
             email: userInfo.email || '',
             imageUrl: userInfo.imageUrl,
           };

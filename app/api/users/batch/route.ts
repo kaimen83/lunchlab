@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { clerkClient } from '@clerk/nextjs/server';
 import { isHeadAdmin } from '@/lib/clerk';
+import { UserProfile } from '@/lib/types';
 
 /**
  * 여러 사용자 정보를 한 번에 가져오는 API
@@ -54,15 +55,25 @@ export async function POST(req: Request) {
     });
 
     // 응답 데이터 구성 - Clerk API는 PaginatedResourceResponse 타입을 반환
-    const userData = response.data.map(user => ({
-      id: user.id,
-      email: user.emailAddresses[0]?.emailAddress,
-      name: user.firstName && user.lastName 
-        ? `${user.firstName} ${user.lastName}` 
-        : (user.firstName || user.username || user.emailAddresses[0]?.emailAddress),
-      username: user.username,
-      imageUrl: user.imageUrl,
-    }));
+    const userData = response.data.map(user => {
+      // publicMetadata에서 프로필 정보 추출
+      const publicMetadata = user.publicMetadata || {};
+      const profileCompleted = publicMetadata.profileCompleted as boolean | undefined;
+      const profile = publicMetadata.profile as UserProfile | undefined;
+      const metadataName = publicMetadata.name as string | undefined;
+
+      return {
+        id: user.id,
+        email: user.emailAddresses[0]?.emailAddress,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        username: user.username,
+        imageUrl: user.imageUrl,
+        profileCompleted,
+        profile,
+        metadataName
+      };
+    });
     console.log('변환된 사용자 데이터:', userData.length);
 
     return NextResponse.json({ users: userData });
