@@ -230,6 +230,30 @@ export async function PATCH(request: Request, context: RouteContext) {
     
     // 4. 컨테이너 처리
     if (containers && containers.length > 0) {
+      // 선택된 식재료 ID만 추출
+      const selectedIngredientIds = ingredients?.map((ingredient: any) => ingredient.id) || [];
+      
+      // 기존 컨테이너 모두 삭제 전에 먼저 기존 컨테이너-식재료 연결 삭제
+      const { data: existingMenuContainers } = await supabase
+        .from('menu_containers')
+        .select('id')
+        .eq('menu_id', menuId);
+      
+      if (existingMenuContainers && existingMenuContainers.length > 0) {
+        const menuContainerIds = existingMenuContainers.map(mc => mc.id);
+        
+        // 모든 컨테이너-식재료 연결 삭제
+        const { error: deleteContainerIngredientsError } = await supabase
+          .from('menu_container_ingredients')
+          .delete()
+          .in('menu_container_id', menuContainerIds);
+        
+        if (deleteContainerIngredientsError) {
+          console.error('메뉴 컨테이너 식재료 삭제 오류:', deleteContainerIngredientsError);
+          return NextResponse.json({ error: '메뉴 컨테이너 식재료 업데이트 중 오류가 발생했습니다.' }, { status: 500 });
+        }
+      }
+      
       // 기존 컨테이너 모두 삭제
       const { error: deleteContainerError } = await supabase
         .from('menu_containers')
@@ -260,52 +284,59 @@ export async function PATCH(request: Request, context: RouteContext) {
           continue;
         }
         
-        // 컨테이너별 식재료 추가
+        // 컨테이너별 식재료 추가 (선택된 식재료만 포함)
         if (container.ingredients && Array.isArray(container.ingredients)) {
-          const containerIngredients = container.ingredients.map((ing: any) => ({
-            menu_container_id: menuContainer.id,
-            ingredient_id: ing.ingredient_id,
-            amount: ing.amount
-          }));
+          // 현재 선택된 식재료 ID 목록에 포함된 식재료만 필터링
+          const filteredIngredients = container.ingredients.filter((ing: any) => 
+            selectedIngredientIds.includes(ing.ingredient_id)
+          );
           
-          const { error: containerIngredientsError } = await supabase
-            .from('menu_container_ingredients')
-            .insert(containerIngredients);
-          
-          if (containerIngredientsError) {
-            console.error('컨테이너 식재료 추가 오류:', containerIngredientsError);
-            return NextResponse.json({ 
-              error: '컨테이너 식재료 추가 중 오류가 발생했습니다. 식재료 양 필드를 확인해주세요.' 
-            }, { status: 500 });
-          }
-          
-          // 원가 계산을 위해 식재료 정보 조회
-          let containerIngredientsCost = 0;
-          for (const ing of container.ingredients) {
-            const { data: ingredientData } = await supabase
-              .from('ingredients')
-              .select('price, package_amount')
-              .eq('id', ing.ingredient_id)
-              .single();
+          if (filteredIngredients.length > 0) {
+            const containerIngredients = filteredIngredients.map((ing: any) => ({
+              menu_container_id: menuContainer.id,
+              ingredient_id: ing.ingredient_id,
+              amount: ing.amount
+            }));
             
-            if (ingredientData) {
-              // 원가 계산
-              const ingCost = ing.amount * ingredientData.price / ingredientData.package_amount;
-              totalCost += ingCost;
-              containerIngredientsCost += ingCost;
+            const { error: containerIngredientsError } = await supabase
+              .from('menu_container_ingredients')
+              .insert(containerIngredients);
+            
+            if (containerIngredientsError) {
+              console.error('컨테이너 식재료 추가 오류:', containerIngredientsError);
+              return NextResponse.json({ 
+                error: '컨테이너 식재료 추가 중 오류가 발생했습니다. 식재료 양 필드를 확인해주세요.' 
+              }, { status: 500 });
             }
-          }
-          
-          // 컨테이너별 원가 업데이트
-          const { error: updateContainerCostError } = await supabase
-            .from('menu_containers')
-            .update({ 
-              ingredients_cost: containerIngredientsCost 
-            })
-            .eq('id', menuContainer.id);
             
-          if (updateContainerCostError) {
-            console.error('메뉴 컨테이너 원가 업데이트 오류:', updateContainerCostError);
+            // 원가 계산을 위해 식재료 정보 조회
+            let containerIngredientsCost = 0;
+            for (const ing of filteredIngredients) {
+              const { data: ingredientData } = await supabase
+                .from('ingredients')
+                .select('price, package_amount')
+                .eq('id', ing.ingredient_id)
+                .single();
+              
+              if (ingredientData) {
+                // 원가 계산
+                const ingCost = ing.amount * ingredientData.price / ingredientData.package_amount;
+                totalCost += ingCost;
+                containerIngredientsCost += ingCost;
+              }
+            }
+            
+            // 컨테이너별 원가 업데이트
+            const { error: updateContainerCostError } = await supabase
+              .from('menu_containers')
+              .update({ 
+                ingredients_cost: containerIngredientsCost 
+              })
+              .eq('id', menuContainer.id);
+            
+            if (updateContainerCostError) {
+              console.error('메뉴 컨테이너 원가 업데이트 오류:', updateContainerCostError);
+            }
           }
         }
       }
