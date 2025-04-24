@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Plus, FilePen, Trash2, Search, PackageOpen, 
@@ -97,7 +97,9 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
   // 식재료 목록 로드 - useCallback으로 메모이제이션
   const loadIngredients = useCallback(async (page: number = 1, search: string = '') => {
     setIsLoading(true);
+    
     try {
+      // 이전 검색 결과는 유지하여 깜빡임 방지 (모바일용 최적화)
       // 모든 공급업체 목록을 먼저 가져옵니다
       const suppliersResponse = await fetch(`/api/companies/${companyId}/ingredients/suppliers`);
       let suppliersList: {id: string, name: string}[] = [];
@@ -193,25 +195,37 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
     }
   }, [companyId, loadingDetails, detailedIngredients, toast]);
 
+  // 검색 입력값 변경 핸들러
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    
+    // 디바운스 처리를 여기서만 수행 (중복 상태 변경 방지)
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearchQuery(value);
+    }, 300);
+  }, []);
+
   // 검색 실행 (버튼 클릭 또는 엔터 키)
   const executeSearch = useCallback(() => {
-    setDebouncedSearchQuery(searchQuery);
-    
+    // 진행 중인 디바운스 타이머 취소
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
       searchTimeoutRef.current = null;
     }
+    
+    // 검색어를 즉시 적용
+    setDebouncedSearchQuery(searchQuery);
   }, [searchQuery]);
-
-  // 검색 입력값 변경 핸들러
-  const handleSearchChange = useCallback((value: string) => {
-    setSearchQuery(value);
-    setDebouncedSearchQuery(value);
-  }, []);
 
   // 검색어 변경 시 첫 페이지로 데이터 로드
   useEffect(() => {
     // 검색어가 변경되면 첫 페이지로 데이터 로드
+    // 페이지 번호 상태도 업데이트하여 UI와 동기화
+    setPagination(prev => ({ ...prev, page: 1 }));
     loadIngredients(1, debouncedSearchQuery);
   }, [debouncedSearchQuery, loadIngredients]);
 
@@ -248,22 +262,24 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
   };
 
   // 정렬된 식재료 목록 (클라이언트 측 정렬만 적용)
-  const sortedIngredients = [...ingredients].sort((a, b) => {
-    const aValue = a[sortField];
-    const bValue = b[sortField];
-    
-    if (typeof aValue === 'string' && typeof bValue === 'string') {
-      return sortDirection === 'asc' 
-        ? aValue.localeCompare(bValue)
-        : bValue.localeCompare(aValue);
-    }
-    
-    if (typeof aValue === 'number' && typeof bValue === 'number') {
-      return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
-    }
-    
-    return 0;
-  });
+  const sortedIngredients = useMemo(() => {
+    return [...ingredients].sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+      
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortDirection === 'asc' 
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+      
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+      
+      return 0;
+    });
+  }, [ingredients, sortField, sortDirection]);
 
   // 식재료 추가 모달 열기
   const handleAddIngredient = () => {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   ChevronDown, 
   ChevronUp, 
@@ -41,9 +41,21 @@ const MobileTable: React.FC<MobileTableProps> = ({
   // 모바일에서 확장된 행 상태 관리 (한 번에 하나만 열림)
   const [expandedId, setExpandedId] = useState<string | null>(null);
   
-  const toggleExpand = (id: string) => {
+  // 확장/축소 토글 처리 함수 - 모바일 터치 이벤트 최적화
+  const toggleExpand = useCallback((id: string, e?: React.MouseEvent) => {
+    // 이벤트가 있다면 이벤트 전파 방지
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    
     setExpandedId(prev => prev === id ? null : id);
-  };
+  }, []);
+  
+  // 행 클릭 처리 함수
+  const handleRowClick = useCallback((id: string) => {
+    toggleExpand(id);
+  }, [toggleExpand]);
   
   if (isLoading) {
     return (
@@ -64,6 +76,7 @@ const MobileTable: React.FC<MobileTableProps> = ({
             <>
               <Search className="h-12 w-12 mb-3 opacity-20" />
               <p className="text-base">'{searchQuery}'에 대한 검색 결과가 없습니다.</p>
+              <p className="text-sm mt-1">다른 검색어로 다시 시도해보세요.</p>
             </>
           ) : (
             <>
@@ -105,7 +118,7 @@ const MobileTable: React.FC<MobileTableProps> = ({
             <React.Fragment key={ingredient.id}>
               <tr 
                 className={`hover:bg-muted/20 transition-colors ${expandedId === ingredient.id ? 'bg-muted/10' : ''}`}
-                onClick={() => toggleExpand(ingredient.id)}
+                onClick={() => handleRowClick(ingredient.id)}
               >
                 {isOwnerOrAdmin && (
                   <td className="px-2 py-2.5 w-8" onClick={(e) => e.stopPropagation()}>
@@ -140,7 +153,7 @@ const MobileTable: React.FC<MobileTableProps> = ({
                       className="h-7 w-7"
                       onClick={(e) => {
                         e.stopPropagation();
-                        toggleExpand(ingredient.id);
+                        toggleExpand(ingredient.id, e);
                       }}
                     >
                       {expandedId === ingredient.id ? (

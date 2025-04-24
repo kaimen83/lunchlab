@@ -32,14 +32,17 @@ const SearchInput = React.memo(({
       clearTimeout(inputTimeoutRef.current);
     }
     
+    // 디바운스 시간을 300ms로 줄여 반응성 개선 (모바일 환경에서 더 부드러운 경험)
     inputTimeoutRef.current = setTimeout(() => {
+      // 부모 컴포넌트로 값 변경 전달
       onChange(newValue);
-    }, 500);
+    }, 300);
   };
   
   // 엔터 키 핸들러
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
+      e.preventDefault(); // 기본 동작 방지 (모바일에서 더 안정적)
       if (inputTimeoutRef.current) {
         clearTimeout(inputTimeoutRef.current);
         inputTimeoutRef.current = null;
@@ -47,6 +50,16 @@ const SearchInput = React.memo(({
       onChange(inputValue);
       onSearch();
     }
+  };
+  
+  // 검색 버튼 핸들러 - 명시적으로 분리하여 모바일 터치 이벤트 안정화
+  const handleSearchClick = () => {
+    if (inputTimeoutRef.current) {
+      clearTimeout(inputTimeoutRef.current);
+      inputTimeoutRef.current = null;
+    }
+    onChange(inputValue);
+    onSearch();
   };
   
   // 컴포넌트 언마운트 시 타이머 정리
@@ -58,9 +71,25 @@ const SearchInput = React.memo(({
     };
   }, []);
   
+  // 입력창 지우기 핸들러
+  const handleClearInput = () => {
+    setInputValue('');
+    if (inputTimeoutRef.current) {
+      clearTimeout(inputTimeoutRef.current);
+    }
+    // 바로 부모에게 변경 알림
+    onChange('');
+  };
+  
   return (
     <div className="relative flex-1 sm:max-w-md">
-      <div className="flex">
+      <form 
+        className="flex" 
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSearchClick();
+        }}
+      >
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
@@ -69,16 +98,15 @@ const SearchInput = React.memo(({
             value={inputValue}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
+            autoComplete="off"
           />
           {inputValue && (
             <Button
               variant="ghost"
               size="icon"
               className="absolute right-10 top-0 h-full"
-              onClick={() => {
-                setInputValue('');
-                onChange('');
-              }}
+              onClick={handleClearInput}
+              type="button"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -87,13 +115,14 @@ const SearchInput = React.memo(({
         <Button 
           variant="secondary"
           className="ml-2"
-          onClick={onSearch}
+          onClick={handleSearchClick}
+          type="submit"
         >
           검색
         </Button>
-      </div>
+      </form>
       <div className="mt-1 text-xs text-muted-foreground ml-1">
-        {totalCount !== undefined && totalCount > 0 && (
+        {totalCount !== undefined && (
           <span>전체 {totalCount}건</span>
         )}
       </div>
