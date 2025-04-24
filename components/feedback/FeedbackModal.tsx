@@ -20,7 +20,8 @@ import {
   Check, 
   MailQuestion,
   User,
-  Users
+  Users,
+  Send
 } from 'lucide-react'
 import {
   Collapsible,
@@ -29,6 +30,7 @@ import {
 } from '@/components/ui/collapsible'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface FeedbackModalProps {
   isOpen: boolean
@@ -175,12 +177,19 @@ export default function FeedbackModal({ isOpen, onClose, onRepliesViewed }: Feed
 
   // 날짜 포맷팅 함수
   const formatDate = (dateString: string) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
-    return date.toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    // 오늘인 경우 시간만 표시
+    const today = new Date();
+    if (date.toDateString() === today.toDateString()) {
+      return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    }
+    // 올해인 경우 월/일만 표시
+    if (date.getFullYear() === today.getFullYear()) {
+      return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+    }
+    // 그 외는 년/월/일 표시
+    return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
   // 피드백 내용 축약 함수
@@ -188,6 +197,74 @@ export default function FeedbackModal({ isOpen, onClose, onRepliesViewed }: Feed
     if (text.length <= maxLength) return text;
     return text.slice(0, maxLength) + '...';
   }
+
+  // 메시지 UI 컴포넌트
+  const FeedbackMessage = ({ isUser, content, timestamp, showAvatar = true }: { 
+    isUser: boolean, 
+    content: string, 
+    timestamp: string,
+    showAvatar?: boolean
+  }) => {
+    return (
+      <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3 gap-2 items-end`}>
+        {!isUser && showAvatar && (
+          <Avatar className="h-6 w-6">
+            <AvatarFallback className="bg-primary text-primary-foreground text-xs">운영</AvatarFallback>
+          </Avatar>
+        )}
+        <div>
+          <div className={`max-w-[280px] ${isUser ? 'bg-primary text-primary-foreground' : 'bg-muted'} rounded-lg px-3 py-2`}>
+            <p className="text-sm whitespace-pre-wrap">{content}</p>
+          </div>
+          <div className="text-xs mt-1 text-muted-foreground">
+            {new Date(timestamp).toLocaleString('ko-KR', {
+              hour: '2-digit',
+              minute: '2-digit',
+              month: 'short',
+              day: 'numeric'
+            })}
+          </div>
+        </div>
+        {isUser && showAvatar && (
+          <Avatar className="h-6 w-6">
+            <AvatarFallback className="bg-accent text-accent-foreground text-xs">
+              {user?.firstName?.charAt(0) || user?.lastName?.charAt(0) || 'U'}
+            </AvatarFallback>
+            <AvatarImage src={user?.imageUrl || ''} />
+          </Avatar>
+        )}
+      </div>
+    );
+  };
+
+  // 피드백 미리보기 컴포넌트
+  const FeedbackPreview = ({ feedback }: { feedback: Feedback }) => {
+    const messagePreview = feedback.reply 
+      ? truncateText(feedback.reply, 30)
+      : feedback.status === 'read' 
+        ? '관리자가 검토 중입니다' 
+        : '아직 확인되지 않았습니다';
+
+    return (
+      <div className="flex items-center gap-3 w-full overflow-hidden">
+        <div className={`flex-shrink-0 w-2 h-2 rounded-full ${
+          feedback.status === 'replied' ? 'bg-primary' : 
+          feedback.status === 'read' ? 'bg-amber-500' : 'bg-destructive'
+        }`} />
+        <div className="overflow-hidden flex-grow">
+          <p className="text-sm font-medium truncate">{truncateText(feedback.content, 40)}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-muted-foreground truncate flex-grow">
+              {feedback.status === 'replied' ? '답변: ' : ''}{messagePreview}
+            </p>
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              {formatDate(feedback.reply ? feedback.replied_at || feedback.created_at : feedback.created_at)}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // 상태에 따른 배지 컴포넌트
   function StatusBadge({ status }: { status: string }) {
@@ -328,21 +405,12 @@ export default function FeedbackModal({ isOpen, onClose, onRepliesViewed }: Feed
                       key={feedback.id}
                       open={expandedFeedback === feedback.id}
                       onOpenChange={() => toggleFeedback(feedback.id)}
-                      className="border rounded-lg overflow-hidden transition-all"
+                      className="border rounded-lg overflow-hidden transition-all hover:bg-accent/20"
                     >
                       <CollapsibleTrigger asChild>
-                        <div className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-accent">
-                          <div className="flex items-center gap-3">
-                            <StatusIcon status={feedback.status} />
-                            <div>
-                              <div className="text-sm font-medium flex items-center">
-                                {truncateText(feedback.content, 40)}
-                                <StatusBadge status={feedback.status} />
-                              </div>
-                              <p className="text-xs text-muted-foreground">{formatDate(feedback.created_at)}</p>
-                            </div>
-                          </div>
-                          <div className="flex-shrink-0">
+                        <div className="px-4 py-3 flex items-center justify-between cursor-pointer w-full">
+                          <FeedbackPreview feedback={feedback} />
+                          <div className="flex-shrink-0 ml-2">
                             {expandedFeedback === feedback.id ? 
                               <ChevronDown className="h-4 w-4 text-muted-foreground" /> : 
                               <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -351,27 +419,31 @@ export default function FeedbackModal({ isOpen, onClose, onRepliesViewed }: Feed
                         </div>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
-                        <div className="px-4 py-3 border-t bg-muted/30">
-                          {feedback.reply ? (
-                            <div>
-                              <h4 className="text-xs uppercase text-muted-foreground mb-1">관리자 답변</h4>
-                              <div className="bg-primary/5 p-3 rounded-lg">
-                                <p className="text-sm whitespace-pre-wrap">{feedback.reply}</p>
-                                {feedback.replied_at && (
-                                  <div className="text-xs text-muted-foreground mt-2">
-                                    답변 시간: {new Date(feedback.replied_at).toLocaleString('ko-KR')}
-                                  </div>
-                                )}
+                        <div className="px-4 py-3 border-t bg-card">
+                          <div className="chat-container space-y-2">
+                            {/* 사용자 피드백 메시지 */}
+                            <FeedbackMessage 
+                              isUser={true}
+                              content={feedback.content}
+                              timestamp={feedback.created_at}
+                            />
+                            
+                            {/* 관리자 답변 (있는 경우) */}
+                            {feedback.reply ? (
+                              <FeedbackMessage 
+                                isUser={false}
+                                content={feedback.reply}
+                                timestamp={feedback.replied_at || feedback.created_at}
+                              />
+                            ) : (
+                              <div className="text-center text-xs text-muted-foreground py-2 italic">
+                                {feedback.status === 'read' ? 
+                                  '관리자가 검토 중입니다.' : 
+                                  '아직 확인되지 않았습니다.'
+                                }
                               </div>
-                            </div>
-                          ) : (
-                            <div className="text-sm text-muted-foreground">
-                              {feedback.status === 'read' ? 
-                                '관리자가 검토 중입니다.' : 
-                                '아직 확인되지 않았습니다.'
-                              }
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
                       </CollapsibleContent>
                     </Collapsible>

@@ -55,6 +55,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { clerkClient } from '@clerk/nextjs/server';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface Feedback {
   id: string
@@ -356,6 +357,44 @@ export default function FeedbackPanel() {
     replied: feedbacks.filter(f => f.status === 'replied').length
   };
 
+  // 피드백 메시지 컴포넌트
+  const FeedbackMessage = ({ isAdmin, content, timestamp, user }: { 
+    isAdmin: boolean, 
+    content: string, 
+    timestamp: string,
+    user?: { name?: string | null, email?: string | null }
+  }) => {
+    return (
+      <div className={`flex ${isAdmin ? 'justify-end' : 'justify-start'} mb-3 gap-2 items-end`}>
+        {!isAdmin && (
+          <Avatar className="h-6 w-6">
+            <AvatarFallback className="bg-accent text-accent-foreground text-xs">
+              {user?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
+            </AvatarFallback>
+          </Avatar>
+        )}
+        <div>
+          <div className={`max-w-[280px] ${isAdmin ? 'bg-primary text-primary-foreground' : 'bg-muted'} rounded-lg px-3 py-2`}>
+            <p className="text-sm whitespace-pre-wrap">{content}</p>
+          </div>
+          <div className="text-xs mt-1 text-muted-foreground">
+            {new Date(timestamp).toLocaleString('ko-KR', {
+              hour: '2-digit',
+              minute: '2-digit',
+              month: 'short',
+              day: 'numeric'
+            })}
+          </div>
+        </div>
+        {isAdmin && (
+          <Avatar className="h-6 w-6">
+            <AvatarFallback className="bg-primary text-primary-foreground text-xs">관리자</AvatarFallback>
+          </Avatar>
+        )}
+      </div>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -560,35 +599,35 @@ export default function FeedbackPanel() {
 
                   <CollapsibleContent>
                     <div className="px-4 py-3 border-t bg-muted/10 space-y-3">
-                      <div>
-                        <h4 className="text-xs uppercase text-muted-foreground mb-1.5">피드백 내용</h4>
-                        <p className="text-sm whitespace-pre-wrap">{feedback.content}</p>
-                      </div>
-                      
-                      {feedback.reply ? (
-                        <div className="pt-2 border-t border-border/50">
-                          <h4 className="text-xs uppercase text-muted-foreground mb-1.5">답변</h4>
-                          <div className="bg-primary/5 p-3 rounded-lg">
-                            <p className="text-sm whitespace-pre-wrap">{feedback.reply}</p>
-                            {feedback.replied_at && (
-                              <div className="text-xs text-muted-foreground mt-2">
-                                답변 시간: {new Date(feedback.replied_at).toLocaleString('ko-KR')}
-                              </div>
-                            )}
+                      <div className="chat-container space-y-2">
+                        {/* 사용자 피드백 메시지 */}
+                        <FeedbackMessage 
+                          isAdmin={false}
+                          content={feedback.content}
+                          timestamp={feedback.created_at}
+                          user={{ name: feedback.user_name, email: feedback.user_email }}
+                        />
+                        
+                        {/* 관리자 답변 (있는 경우) */}
+                        {feedback.reply ? (
+                          <FeedbackMessage 
+                            isAdmin={true}
+                            content={feedback.reply}
+                            timestamp={feedback.replied_at || feedback.created_at}
+                          />
+                        ) : (
+                          <div className="flex justify-end mt-3">
+                            <Button 
+                              size="sm" 
+                              onClick={() => openFeedbackDetail(feedback)}
+                              className="flex items-center gap-1.5"
+                            >
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              답변하기
+                            </Button>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="flex justify-end">
-                          <Button 
-                            size="sm" 
-                            onClick={() => openFeedbackDetail(feedback)}
-                            className="flex items-center gap-1.5"
-                          >
-                            <MessageSquare className="h-3.5 w-3.5" />
-                            답변하기
-                          </Button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </CollapsibleContent>
                 </Collapsible>
@@ -611,7 +650,7 @@ export default function FeedbackPanel() {
           {selectedFeedback && (
             <div className="space-y-4">
               <div className="bg-muted/10 p-4 rounded-lg border">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mb-3">
                   <div className="flex items-center">
                     <div className="flex items-center">
                       <User className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -629,14 +668,23 @@ export default function FeedbackPanel() {
                   </Badge>
                 </div>
                 
-                <div className="text-sm text-muted-foreground mt-1">
-                  {new Date(selectedFeedback.created_at).toLocaleString('ko-KR')}
-                </div>
-                
-                <Separator className="my-3" />
-                
-                <div className="whitespace-pre-wrap text-sm">
-                  {selectedFeedback.content}
+                <div className="chat-container">
+                  {/* 사용자 피드백 메시지 */}
+                  <FeedbackMessage 
+                    isAdmin={false}
+                    content={selectedFeedback.content}
+                    timestamp={selectedFeedback.created_at}
+                    user={{ name: selectedFeedback.user_name, email: selectedFeedback.user_email }}
+                  />
+                  
+                  {/* 관리자 답변 (있는 경우) */}
+                  {selectedFeedback.reply && (
+                    <FeedbackMessage 
+                      isAdmin={true}
+                      content={selectedFeedback.reply}
+                      timestamp={selectedFeedback.replied_at || selectedFeedback.created_at}
+                    />
+                  )}
                 </div>
               </div>
               
