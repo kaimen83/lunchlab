@@ -90,6 +90,7 @@ export default function FeedbackPanel() {
 
   const loadFeedbacks = async () => {
     setIsLoading(true)
+    
     try {
       const response = await fetch('/api/feedback')
       if (!response.ok) {
@@ -98,25 +99,64 @@ export default function FeedbackPanel() {
       
       const data = await response.json()
       
-      // 사용자 ID가 있는 피드백들의 사용자 이름 가져오기
-      const feedbacksWithUserInfo = await Promise.all(
-        (data.data || []).map(async (feedback: Feedback) => {
-          if (feedback.user_id) {
-            try {
-              // feedback.user_id로부터 사용자 정보 조회 로직
-              const userInfo = await fetchUserInfo(feedback.user_id);
-              return {
-                ...feedback,
-                user_name: userInfo?.name || feedback.user_email,
-              };
-            } catch (error) {
-              console.error('사용자 정보 조회 오류:', error);
-              return feedback;
+      // 모든 고유 사용자 ID 목록 생성
+      const userIds = [...new Set((data.data || [])
+        .filter((feedback: Feedback) => feedback.user_id)
+        .map((feedback: Feedback) => feedback.user_id)
+      )];
+      
+      console.log('사용자 ID 목록:', userIds);
+      
+      // 사용자 ID가 있는 경우에만 사용자 정보 일괄 조회
+      let userMap: Record<string, any> = {};
+      
+      if (userIds.length > 0) {
+        try {
+          // 모든 사용자 정보를 한 번에 가져옴
+          console.log('사용자 정보 일괄 요청 시작:', userIds);
+          const userResponse = await fetch('/api/users/batch', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ userIds }),
+          });
+          
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            console.log('사용자 정보 응답:', userData);
+            
+            // users 속성이 있고 배열인지 확인
+            if (userData && userData.users && Array.isArray(userData.users)) {
+              // 사용자 ID를 키로 하는 맵 생성
+              userMap = userData.users.reduce((acc: Record<string, any>, user: any) => {
+                if (user && user.id) {
+                  acc[user.id] = user;
+                }
+                return acc;
+              }, {});
+              console.log('사용자 정보 맵 생성 완료:', Object.keys(userMap).length);
+            } else {
+              console.error('사용자 정보 응답 형식이 예상과 다릅니다:', userData);
             }
+          } else {
+            console.error('사용자 정보 일괄 조회 응답 오류:', await userResponse.json());
           }
-          return feedback;
-        })
-      );
+        } catch (error) {
+          console.error('사용자 정보 일괄 조회 오류:', error);
+        }
+      }
+      
+      // 피드백에 사용자 정보 추가
+      const feedbacksWithUserInfo = (data.data || []).map((feedback: Feedback) => {
+        if (feedback.user_id && userMap[feedback.user_id]) {
+          return {
+            ...feedback,
+            user_name: userMap[feedback.user_id].name || feedback.user_email,
+          };
+        }
+        return feedback;
+      });
       
       setFeedbacks(feedbacksWithUserInfo);
     } catch (err) {
@@ -126,23 +166,6 @@ export default function FeedbackPanel() {
       setIsLoading(false)
     }
   }
-
-  // 사용자 정보 조회 함수
-  const fetchUserInfo = async (userId: string) => {
-    try {
-      // userId를 사용하여 사용자 정보를 가져오는 API 호출
-      const response = await fetch(`/api/users/${userId}`);
-      if (!response.ok) {
-        throw new Error('사용자 정보를 불러오는데 실패했습니다.');
-      }
-      
-      const data = await response.json();
-      return data.user;
-    } catch (error) {
-      console.error('사용자 정보 조회 오류:', error);
-      return null;
-    }
-  };
 
   // 피드백 상세 보기
   const openFeedbackDetail = async (feedback: Feedback) => {

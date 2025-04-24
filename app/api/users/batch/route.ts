@@ -1,84 +1,76 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { clerkClient } from '@clerk/nextjs/server';
-import { UserProfile } from '@/lib/types';
+import { isHeadAdmin } from '@/lib/clerk';
 
-// 간단한 메모리 캐시 구현
-// 실제 프로덕션에서는 Redis 등의 외부 캐시 시스템을 사용하는 것이 좋음
-const userCache = new Map<string, any>();
-const CACHE_TTL = 300000; // 5분 캐시 유효시간 (ms)
-
+/**
+ * 여러 사용자 정보를 한 번에 가져오는 API
+ * POST 요청에 userIds 배열을 받아 해당하는 모든 사용자 정보를 반환
+ */
 export async function POST(req: Request) {
   try {
-    // 현재 로그인한 사용자 확인
+    // 요청자 인증 확인
     const { userId } = await auth();
+    console.log('인증된 사용자 ID:', userId);
     
     if (!userId) {
-      return NextResponse.json({ error: '인증되지 않은 요청입니다.' }, { status: 401 });
-    }
-    
-    // 요청 바디에서 사용자 ID 배열 추출
-    const { userIds } = await req.json();
-    
-    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-      return NextResponse.json({ error: '유효하지 않은 요청입니다.' }, { status: 400 });
+      return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
     }
 
-    // 캐시에서 사용자 정보 조회 및 누락된 ID 찾기
-    const cacheResults: Record<string, any> = {};
-    const missingIds: string[] = [];
+    // 권한 확인 (관리자만 접근 가능)
+    const isAdmin = await isHeadAdmin(userId);
+    console.log('사용자 권한:', isAdmin ? 'headAdmin' : 'not admin');
     
-    // 캐시 확인
-    userIds.forEach(id => {
-      const cacheEntry = userCache.get(id);
-      if (cacheEntry && cacheEntry.expiry > Date.now()) {
-        cacheResults[id] = cacheEntry.data;
-      } else {
-        // 캐시에 없거나 만료된 경우
-        if (cacheEntry) userCache.delete(id); // 만료된 항목 삭제
-        missingIds.push(id);
-      }
-    });
-    
-    // 누락된 ID가 있는 경우에만 API 호출
-    let apiUsers: any[] = [];
-    if (missingIds.length > 0) {
-      // Clerk API를 통해 사용자 정보 조회
-      const client = await clerkClient();
-      
-      // getUserList API는 한 번에 최대 100명까지 조회 가능
-      const users = await client.users.getUserList({
-        userId: missingIds,  // string[] 타입의 missingIds 사용
-        limit: 100
-      });
-      
-      // 가공된 사용자 정보
-      apiUsers = users.data.map(user => ({
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        imageUrl: user.imageUrl,
-        email: user.emailAddresses[0]?.emailAddress,
-        profileCompleted: !!user.publicMetadata.profileCompleted,
-        profile: user.publicMetadata.profile as UserProfile || null
-      }));
-      
-      // 새로 조회한 사용자 정보를 캐시에 저장
-      apiUsers.forEach(user => {
-        userCache.set(user.id, {
-          data: user,
-          expiry: Date.now() + CACHE_TTL
-        });
-        cacheResults[user.id] = user;
-      });
+    if (!isAdmin) {
+      return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
     }
+
+    // 요청 본문에서 사용자 ID 목록 가져오기
+    const body = await req.json();
+    const { userIds } = body;
+    console.log('요청된 사용자 ID 목록:', userIds);
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return NextResponse.json({ error: '유효한 사용자 ID 목록이 필요합니다.' }, { status: 400 });
+    }
+
+    // 중복 제거 및 유효성 검사
+    const uniqueUserIds = [...new Set(userIds)];
+    console.log('중복 제거된 사용자 ID 목록:', uniqueUserIds);
     
-    // 캐시 결과와 API 결과 통합
-    const combinedUsers = userIds.map(id => cacheResults[id]).filter(Boolean);
+    // Clerk API를 통해 사용자 정보 일괄 조회
+    const client = await clerkClient();
+    console.log('클라이언트 생성 완료');
     
-    return NextResponse.json({ users: combinedUsers });
+    const response = await client.users.getUserList({
+      userId: uniqueUserIds
+    });
+    console.log('Clerk API 응답 구조:', {
+      responseType: typeof response,
+      hasData: !!response.data,
+      dataType: typeof response.data,
+      isArray: Array.isArray(response.data),
+      dataLength: Array.isArray(response.data) ? response.data.length : 'not an array'
+    });
+
+    // 응답 데이터 구성 - Clerk API는 PaginatedResourceResponse 타입을 반환
+    const userData = response.data.map(user => ({
+      id: user.id,
+      email: user.emailAddresses[0]?.emailAddress,
+      name: user.firstName && user.lastName 
+        ? `${user.firstName} ${user.lastName}` 
+        : (user.firstName || user.username || user.emailAddresses[0]?.emailAddress),
+      username: user.username,
+      imageUrl: user.imageUrl,
+    }));
+    console.log('변환된 사용자 데이터:', userData.length);
+
+    return NextResponse.json({ users: userData });
   } catch (error) {
-    console.error('사용자 정보 조회 중 오류 발생:', error);
-    return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
+    console.error('사용자 정보 일괄 조회 오류:', error);
+    return NextResponse.json({ 
+      error: '사용자 정보를 조회하는 중 오류가 발생했습니다.',
+      details: error instanceof Error ? error.message : '알 수 없는 오류'
+    }, { status: 500 });
   }
 } 

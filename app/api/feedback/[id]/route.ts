@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { auth } from '@clerk/nextjs/server'
+import { clerkClient } from '@clerk/nextjs/server'
 import { isHeadAdmin } from '@/lib/clerk'
 
 // 특정 피드백 조회
@@ -42,6 +43,30 @@ export async function GET(
     // 서비스 관리자가 아니고, 본인의 피드백이 아니면 접근 거부
     if (!isAdmin && data.user_id !== userId) {
       return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 })
+    }
+    
+    // 사용자 정보 조회 (사용자 ID가 있는 경우에만)
+    if (data.user_id) {
+      try {
+        // 클라이언트 생성
+        const client = await clerkClient()
+        // 사용자 정보 조회
+        const user = await client.users.getUser(data.user_id)
+        
+        // 피드백 데이터에 사용자 정보 추가
+        data.user_info = {
+          id: user.id,
+          email: user.emailAddresses[0]?.emailAddress,
+          name: user.firstName && user.lastName 
+            ? `${user.firstName} ${user.lastName}` 
+            : (user.firstName || user.username || user.emailAddresses[0]?.emailAddress),
+          username: user.username,
+          imageUrl: user.imageUrl,
+        }
+      } catch (error) {
+        console.error('사용자 정보 조회 오류:', error)
+        // 사용자 정보 조회 실패해도 피드백 데이터는 반환
+      }
     }
 
     return NextResponse.json({ data })
@@ -153,7 +178,7 @@ export async function PATCH(
       .from('feedbacks')
       .update(updateData)
       .eq('id', feedbackId)
-      .select()
+      .select('*')
       .maybeSingle()
 
     if (error) {
@@ -166,6 +191,30 @@ export async function PATCH(
     
     if (!data) {
       return NextResponse.json({ error: '업데이트할 피드백을 찾을 수 없습니다.' }, { status: 404 })
+    }
+    
+    // 사용자 정보 조회 (사용자 ID가 있는 경우에만)
+    if (data.user_id) {
+      try {
+        // 클라이언트 생성
+        const client = await clerkClient()
+        // 사용자 정보 조회
+        const user = await client.users.getUser(data.user_id)
+        
+        // 피드백 데이터에 사용자 정보 추가
+        data.user_info = {
+          id: user.id,
+          email: user.emailAddresses[0]?.emailAddress,
+          name: user.firstName && user.lastName 
+            ? `${user.firstName} ${user.lastName}` 
+            : (user.firstName || user.username || user.emailAddresses[0]?.emailAddress),
+          username: user.username,
+          imageUrl: user.imageUrl,
+        }
+      } catch (error) {
+        console.error('사용자 정보 조회 오류:', error)
+        // 사용자 정보 조회 실패해도 피드백 데이터는 반환
+      }
     }
 
     console.log('피드백 업데이트 성공:', data)

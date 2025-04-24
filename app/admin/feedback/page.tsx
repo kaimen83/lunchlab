@@ -58,31 +58,23 @@ export default function AdminFeedbackPage() {
       setIsLoading(true)
       setError(null)
       
-      const supabase = createClientSupabaseClient()
+      // 피드백 데이터와 사용자 정보를 한 번에 가져오는 최적화된 API 호출
+      const response = await fetch('/api/feedback/admin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          dateFilter: dateFilter ? dateFilter.toISOString() : null,
+        })
+      })
       
-      let query = supabase
-        .from('feedbacks')
-        .select('*')
-        .order('created_at', { ascending: false })
-      
-      // 날짜 필터 적용
-      if (dateFilter) {
-        const startOfDay = new Date(dateFilter)
-        startOfDay.setHours(0, 0, 0, 0)
-        
-        const endOfDay = new Date(dateFilter)
-        endOfDay.setHours(23, 59, 59, 999)
-        
-        query = query
-          .gte('created_at', startOfDay.toISOString())
-          .lte('created_at', endOfDay.toISOString())
+      if (!response.ok) {
+        throw new Error('피드백 목록을 불러오는데 실패했습니다.')
       }
       
-      const { data, error } = await query
-      
-      if (error) throw error
-      
-      setFeedbacks(data || [])
+      const data = await response.json()
+      setFeedbacks(data.data || [])
     } catch (err) {
       console.error('피드백 로드 오류:', err)
       setError('피드백 목록을 불러오는데 실패했습니다. 잠시 후 다시 시도해주세요.')
