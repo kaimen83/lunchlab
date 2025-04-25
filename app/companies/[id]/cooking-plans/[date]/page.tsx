@@ -189,7 +189,7 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
                 ingredient_name: ingredient.name,
                 unit: ingredient.unit,
                 total_amount: 0,
-                unit_price: ingredient.price / ingredient.package_amount,
+                unit_price: ingredient.price,
                 total_price: 0,
                 package_amount: ingredient.package_amount,
                 code_name: ingredient.code_name,
@@ -256,7 +256,16 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
     // 각 식재료별 총 가격 계산
     Object.keys(ingredientRequirements).forEach(id => {
       const item = ingredientRequirements[id];
-      item.total_price = item.total_amount * item.unit_price;
+      // package_amount가 있는 경우에만 패키지 단위로 계산
+      if (item.package_amount && item.package_amount > 0) {
+        // 필요한 포장 개수 계산 (올림 처리 대신 부동 소수점으로 계산)
+        const packages = item.total_amount / item.package_amount;
+        // 총 가격 = 필요한 포장 개수 * 포장단위 가격
+        item.total_price = packages * item.unit_price;
+      } else {
+        // 포장단위 정보가 없는 경우, 예상치를 계산할 수 없으므로 0으로 처리
+        item.total_price = 0;
+      }
     });
     
     // 결과 데이터 구성

@@ -348,11 +348,11 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
       style: 'currency',
       currency: 'KRW',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 0,
     }).format(unitPrice).replace('₩', '');
     
-    // 단위 추가 (예: "1,000원/g")
-    return `${formattedPrice}/${unit}`;
+    // 포장단위 가격 표시
+    return `${formattedPrice}`;
   };
 
   // 수량 포맷
@@ -374,6 +374,26 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
     }
     // 그 외 단위는 그대로 표시하되 소수점 첫째자리까지
     return `${formatAmount(amount)} ${unit}`;
+  };
+
+  // 1인당 식재료 양 포맷 (인원수 고려)
+  const formatPerPersonAmount = (amount: number, headcount: number | undefined, unit: string) => {
+    // 식수가 없거나 0인 경우 "-" 반환
+    if (!headcount || headcount === 0) return "-";
+    
+    // 1인당 수량 계산
+    const perPersonAmount = amount / headcount;
+    
+    // g 단위일 경우 g으로 유지 (1인당 소량이므로 kg으로 변환하지 않음)
+    if (unit === 'g') {
+      return `${perPersonAmount.toFixed(1)}g`;
+    }
+    // ml 단위일 경우 ml로 유지 (1인당 소량이므로 l로 변환하지 않음)
+    else if (unit === 'ml') {
+      return `${perPersonAmount.toFixed(1)}ml`;
+    }
+    // 그 외 단위는 그대로 표시하되 소수점 첫째자리까지
+    return `${perPersonAmount.toFixed(1)} ${unit}`;
   };
 
   // 포장 단위 포맷 (g -> kg 변환, ml -> l 변환)
@@ -407,10 +427,19 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
     return mealPlanNames.join(', ');
   };
 
-  // 총 식재료 원가 계산
-  const totalIngredientsCost = cookingPlan.ingredient_requirements.reduce(
-    (sum, item) => sum + item.total_price, 0
-  );
+  // 총 식재료 원가 계산 - 투입량과 포장단위 가격 기준
+  const totalIngredientsCost = cookingPlan.ingredient_requirements.reduce((sum, item) => {
+    // 포장단위가 없는 경우 원가 계산 불가
+    if (!item.package_amount || item.package_amount <= 0) return sum;
+    
+    // 투입량 계산
+    const unitsRequired = item.total_amount / item.package_amount;
+    
+    // 투입량과 포장단위 가격으로 총 원가 계산
+    const itemTotalPrice = unitsRequired * item.unit_price;
+    
+    return sum + itemTotalPrice;
+  }, 0);
 
   // 총 용기 비용 계산
   const totalContainerCost = cookingPlan.container_requirements?.reduce(
@@ -479,15 +508,16 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                   <Table className="w-full border-collapse">
                     <TableHeader>
                       <TableRow className="bg-slate-50">
-                        <TableHead className="font-semibold text-sm w-[14%]">메뉴명</TableHead>
-                        <TableHead className="font-semibold text-sm w-[14%]">사용 식단</TableHead>
-                        <TableHead className="font-semibold text-sm w-[10%]">용기</TableHead>
-                        <TableHead className="font-semibold text-sm w-[8%]">식수</TableHead>
-                        <TableHead className="font-semibold text-sm w-[10%]">품목코드</TableHead>
-                        <TableHead className="font-semibold text-sm w-[10%]">식재료</TableHead>
-                        <TableHead className="font-semibold text-sm text-right w-[10%]">포장단위</TableHead>
-                        <TableHead className="font-semibold text-sm text-right w-[14%]">투입량(pac)</TableHead>
-                        <TableHead className="font-semibold text-sm text-right w-[10%]">식재료 양</TableHead>
+                        <TableHead className="font-semibold text-sm w-[13%]">메뉴명</TableHead>
+                        <TableHead className="font-semibold text-sm w-[13%]">사용 식단</TableHead>
+                        <TableHead className="font-semibold text-sm w-[9%]">용기</TableHead>
+                        <TableHead className="font-semibold text-sm w-[7%]">식수</TableHead>
+                        <TableHead className="font-semibold text-sm w-[9%]">품목코드</TableHead>
+                        <TableHead className="font-semibold text-sm w-[9%]">식재료</TableHead>
+                        <TableHead className="font-semibold text-sm text-right w-[9%]">포장단위</TableHead>
+                        <TableHead className="font-semibold text-sm text-right w-[13%]">투입량(pac)</TableHead>
+                        <TableHead className="font-semibold text-sm text-right w-[9%]">총 식재료 양</TableHead>
+                        <TableHead className="font-semibold text-sm text-right w-[9%]">1인당 식재료 양</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -557,6 +587,9 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                                 <TableCell className="text-right font-medium text-sm">
                                   {formatIngredientAmount(ingredient.amount, ingredient.unit)}
                                 </TableCell>
+                                <TableCell className="text-right font-medium text-sm">
+                                  {formatPerPersonAmount(ingredient.amount, ingredient.headcount || menuPortion.headcount, ingredient.unit)}
+                                </TableCell>
                               </TableRow>
                             );
                           });
@@ -588,7 +621,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                                   {formatHeadcounts(menuPortion.containers_info)}
                                 </Badge>
                               </TableCell>
-                              <TableCell colSpan={5} className="text-center text-gray-500 text-sm italic">
+                              <TableCell colSpan={6} className="text-center text-gray-500 text-sm italic">
                                 등록된 식재료 정보가 없습니다.
                               </TableCell>
                             </TableRow>
@@ -597,7 +630,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                       })}
                       {menus.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                          <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
                             등록된 메뉴가 없습니다.
                           </TableCell>
                         </TableRow>
@@ -607,6 +640,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                 </div>
                 <div className="mt-3 text-xs text-gray-500 space-y-1">
                   <p>* 식재료 수량은 각 메뉴의 식수에 맞게 계산된 값입니다.</p>
+                  <p>* 1인당 식재료 양은 총 식재료 양을 식수로 나눈 값입니다.</p>
                   <p>* 포장단위는 식재료 마스터에 등록된 정보입니다. 정보가 없는 경우 "-"로 표시됩니다.</p>
                   <p>* 투입량은 필요 수량을 포장단위로 나눈 값입니다. 포장단위가 없으면 계산할 수 없습니다.</p>
                 </div>
@@ -635,7 +669,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                     <TableHead className="text-right">필요 수량</TableHead>
                     <TableHead className="text-right">포장단위</TableHead>
                     <TableHead className="text-right">투입량</TableHead>
-                    <TableHead className="text-right">단가 (원)</TableHead>
+                    <TableHead className="text-right">포장당 가격 (원)</TableHead>
                     <TableHead className="text-right">총 원가 (원)</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -649,6 +683,12 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                     const unitsRequired = packageAmount ? 
                       (item.total_amount / packageAmount).toFixed(1) : 
                       "포장단위 정보 없음";
+                    
+                    // 투입량과 포장단위 가격으로 총 원가 직접 계산
+                    let calculatedTotalPrice = item.total_price;
+                    if (packageAmount && unitsRequired !== "포장단위 정보 없음") {
+                      calculatedTotalPrice = parseFloat(unitsRequired) * item.unit_price;
+                    }
                     
                     return (
                       <TableRow key={index}>
@@ -665,7 +705,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                           {unitsRequired}
                         </TableCell>
                         <TableCell className="text-right">{formatUnitPrice(item.unit_price, item.unit)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.total_price)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(calculatedTotalPrice)}</TableCell>
                       </TableRow>
                     );
                   })}
@@ -676,6 +716,12 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
               </p>
               <p className="text-xs text-gray-500">
                 * 투입량은 필요 수량을 포장단위로 나눈 값입니다. 포장단위가 없으면 계산할 수 없습니다.
+              </p>
+              <p className="text-xs text-gray-500">
+                * 포장단위 가격은 식재료 마스터에 등록된 식재료의 포장 단위당 가격입니다.
+              </p>
+              <p className="text-xs text-gray-500">
+                * 총 원가는 투입량과 포장단위 가격을 곱한 값입니다.
               </p>
               <p className="text-xs text-gray-500">
                 * 식재료 업체는 식재료 마스터에 등록된 공급업체 정보입니다.
