@@ -5,6 +5,7 @@ import { getServerCompany } from '@/actions/companies-actions';
 import { getUserMembership } from '@/actions/membership-actions';
 import { isFeatureEnabled } from '@/lib/feature-flags';
 import { NextRequest } from 'next/server';
+import { updateMenuContainersForIngredient } from '@/app/lib/ingredient-price-utils';
 
 interface RouteContext {
   params: Promise<{
@@ -141,7 +142,7 @@ export async function PUT(request: Request, context: RouteContext) {
     // 식재료 업데이트 전 현재 데이터 조회 (가격 변동 확인용)
     const { data: currentIngredient, error: currentError } = await supabase
       .from('ingredients')
-      .select('price')
+      .select('price, package_amount')
       .eq('id', ingredientId)
       .eq('company_id', companyId)
       .single();
@@ -182,7 +183,42 @@ export async function PUT(request: Request, context: RouteContext) {
       return NextResponse.json({ error: '식재료 정보 업데이트 중 오류가 발생했습니다.' }, { status: 500 });
     }
     
-    return NextResponse.json(updatedIngredient);
+    // 가격 이력 추가
+    const { error: historyError } = await supabase
+      .from('ingredient_price_history')
+      .insert({
+        ingredient_id: ingredientId,
+        price: price,
+        recorded_at: new Date().toISOString()
+      });
+
+    if (historyError) {
+      console.error('가격 이력 추가 오류:', historyError);
+      // 이력 추가 실패는 심각한 오류가 아니므로 계속 진행
+    }
+    
+    // 가격이 변경된 경우 관련 메뉴 컨테이너 원가 업데이트
+    let costUpdateResult = null;
+    if (currentIngredient && currentIngredient.price !== price) {
+      try {
+        costUpdateResult = await updateMenuContainersForIngredient(
+          ingredientId,
+          currentIngredient.price,
+          price,
+          package_amount
+        );
+        
+        console.log(`식재료 가격 변경으로 인한 원가 업데이트 결과:`, costUpdateResult);
+      } catch (updateError) {
+        console.error('메뉴 컨테이너 원가 업데이트 오류:', updateError);
+        // 원가 업데이트 실패는 식재료 업데이트 자체의 실패로 간주하지 않음
+      }
+    }
+    
+    return NextResponse.json({
+      ...updatedIngredient,
+      cost_update: costUpdateResult
+    });
   } catch (error) {
     console.error('식재료 업데이트 중 오류 발생:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });

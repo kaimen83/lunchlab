@@ -5,11 +5,29 @@ import { getServerCompany } from '@/actions/companies-actions';
 import { getUserMembership } from '@/actions/membership-actions';
 import { isFeatureEnabled } from '@/lib/feature-flags';
 import { parse } from 'csv-parse/sync';
+import { updateMenuContainersForIngredient } from '@/app/lib/ingredient-price-utils';
 
 interface RouteContext {
   params: Promise<{
     id: string;
   }>;
+}
+
+// 결과 인터페이스 정의
+interface ImportResult {
+  success: number;
+  failed: number;
+  errors: string[];
+  costUpdates?: {
+    success: number;
+    failed: number;
+    details: Array<{
+      ingredient_id: string;
+      updated?: number;
+      message?: string;
+      error?: string;
+    }>;
+  };
 }
 
 // CSV로 내보낸 구글 스프레드시트 데이터 처리
@@ -141,10 +159,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
 
       // 결과 추적
-      const results = {
+      const results: ImportResult = {
         success: 0,
         failed: 0,
-        errors: [] as string[],
+        errors: [],
+        costUpdates: { 
+          success: 0, 
+          failed: 0, 
+          details: []
+        }
       };
       
       // Supabase 클라이언트 생성
@@ -168,11 +191,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
       const newSuppliers = new Map();
       
       // 일괄 추가를 위한 배열
-      const ingredientsToInsert = [];
-      const ingredientsToUpdate = [];
+      const ingredientsToInsert: any[] = [];
+      const ingredientsToUpdate: any[] = [];
       
       // 가격 이력을 위한 배열
-      const priceHistoryToInsert = [];
+      const priceHistoryToInsert: any[] = [];
+      
+      // 기존 식재료의 가격을 저장하기 위한 객체
+      const existingIngredientsPrice: Record<string, number> = {};
       
       // 천단위 구분자(콤마)를 제거하고 숫자를 파싱하는 유틸리티 함수
       const parseNumericValue = (value: string | null | undefined): number | null => {
@@ -182,6 +208,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
         const result = parseFloat(cleanedValue);
         return isNaN(result) ? null : result;
       };
+      
+      // 가격이 변경된 식재료의 정보를 저장할 배열
+      interface PriceChangedIngredient {
+        id: string;
+        oldPrice: number;
+        newPrice: number;
+        packageAmount: number;
+      }
+      
+      const priceChangedIngredientsArray: PriceChangedIngredient[] = [];
       
       // 각 행 처리
       for (const [index, record] of records.entries()) {
@@ -376,6 +412,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
           if (existingIngredient) {
             // 가격이 변경된 경우에만 가격 이력에 추가할 것인지 확인
             const priceChanged = existingIngredient.price !== price;
+            // 기존 가격 기록
+            existingIngredientsPrice[existingIngredient.id] = existingIngredient.price;
             ingredientsToUpdate.push({
               id: existingIngredient.id,
               data: ingredient,
@@ -453,6 +491,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       // 업데이트 처리도 청크 단위로 수행
       const updateChunks = chunkArray(ingredientsToUpdate, 20);
       
+      // 가격이 변경된 식재료 정보 추적
       for (const chunk of updateChunks) {
         for (const item of chunk) {
           try {
@@ -473,6 +512,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
                   ingredient_id: item.id,
                   price: item.data.price,
                   recorded_at: new Date().toISOString()
+                });
+                
+                // 원가 업데이트를 위해 식재료 정보 저장
+                priceChangedIngredientsArray.push({
+                  id: item.id,
+                  oldPrice: existingIngredientsPrice[item.id] || 0,
+                  newPrice: item.data.price,
+                  packageAmount: item.data.package_amount
                 });
               }
             }
@@ -503,6 +550,50 @@ export async function POST(request: NextRequest, context: RouteContext) {
           console.error('가격 이력 청크 추가 오류:', error);
           // 이력 추가 실패는 심각한 오류가 아니므로 결과에 영향을 주지 않음
           results.errors.push(`가격 이력 추가 중 오류 발생 (식재료 추가/업데이트는 성공): ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+        }
+      }
+      
+      // 4. 가격이 변경된 식재료의 메뉴 컨테이너 원가 업데이트
+      results.costUpdates = { 
+        success: 0, 
+        failed: 0, 
+        details: [] 
+      };
+      
+      if (priceChangedIngredientsArray.length > 0) {
+        console.log(`가격이 변경된 식재료 수: ${priceChangedIngredientsArray.length}`);
+        
+        // 각 식재료에 대해 메뉴 컨테이너 원가 업데이트 수행
+        for (const ingredient of priceChangedIngredientsArray) {
+          try {
+            const updateResult = await updateMenuContainersForIngredient(
+              ingredient.id,
+              ingredient.oldPrice,
+              ingredient.newPrice,
+              ingredient.packageAmount
+            );
+            
+            if (updateResult.success) {
+              results.costUpdates.success++;
+              results.costUpdates.details.push({
+                ingredient_id: ingredient.id,
+                updated: updateResult.updated,
+                message: `${updateResult.updated}개의 메뉴 컨테이너 원가가 업데이트되었습니다.`
+              });
+            } else {
+              results.costUpdates.failed++;
+              results.costUpdates.details.push({
+                ingredient_id: ingredient.id,
+                error: updateResult.error || '알 수 없는 오류'
+              });
+            }
+          } catch (error) {
+            results.costUpdates.failed++;
+            results.costUpdates.details.push({
+              ingredient_id: ingredient.id,
+              error: error instanceof Error ? error.message : '알 수 없는 오류'
+            });
+          }
         }
       }
       
