@@ -588,7 +588,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                                   {formatIngredientAmount(ingredient.amount, ingredient.unit)}
                                 </TableCell>
                                 <TableCell className="text-right font-medium text-sm">
-                                  {formatPerPersonAmount(ingredient.amount, ingredient.headcount || menuPortion.headcount, ingredient.unit)}
+                                  {formatPerPersonAmount(ingredient.amount, menuPortion.headcount, ingredient.unit)}
                                 </TableCell>
                               </TableRow>
                             );
