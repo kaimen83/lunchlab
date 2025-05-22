@@ -106,6 +106,7 @@ export function useSidebarState(companies: Array<Company & { role: string }>) {
         const hasMenusFeature = data.some((feature: any) => feature.feature_name === 'menus');
         const hasMealPlanningFeature = data.some((feature: any) => feature.feature_name === 'mealPlanning');
         const hasCookingPlanFeature = data.some((feature: any) => feature.feature_name === 'cookingPlan');
+        const hasInventoryFeature = data.some((feature: any) => feature.feature_name === 'inventory');
         
         if (!hasIngredientsFeature) {
           console.warn(`회사 ID ${companyId}에 ingredients 기능이 누락되어 있습니다.`);
@@ -184,6 +185,42 @@ export function useSidebarState(companies: Array<Company & { role: string }>) {
             }
           } catch (error) {
             console.error('cookingPlan 기능 자동 추가 실패:', error);
+          }
+        }
+        
+        if (!hasInventoryFeature) {
+          console.warn(`회사 ID ${companyId}에 inventory 기능이 누락되어 있습니다.`);
+          
+          // inventory 기능이 누락된 경우 자동 추가 시도
+          try {
+            console.log('inventory 기능 자동 추가 시도');
+            await fetch(`/api/companies/${companyId}/features`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                featureName: 'inventory',
+                isEnabled: true
+              })
+            });
+            
+            // 성공 시 다시 기능 목록 불러오기
+            const refreshResponse = await fetch(`/api/companies/${companyId}/features`);
+            if (refreshResponse.ok) {
+              const refreshData = await refreshResponse.json();
+              const enabledFeatures = refreshData
+                .filter((feature: any) => feature.is_enabled)
+                .map((feature: any) => feature.feature_name);
+              
+              setCompanyFeatures(prev => ({
+                ...prev,
+                [companyId]: enabledFeatures
+              }));
+              return; // 재호출했으므로 여기서 종료
+            }
+          } catch (error) {
+            console.error('inventory 기능 자동 추가 실패:', error);
           }
         }
         

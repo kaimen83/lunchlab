@@ -82,6 +82,11 @@ export async function POST(req: Request) {
         company_id: company.id,
         feature_name: 'mealPlanning',
         is_enabled: true,
+      },
+      {
+        company_id: company.id,
+        feature_name: 'inventory',
+        is_enabled: true,
       }
     ];
     

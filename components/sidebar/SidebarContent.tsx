@@ -66,6 +66,7 @@ export function SidebarContent({ companies, isMobile = false, isSheetOpen, setIs
                 hasMenusFeature: isFeatureEnabled(company.id, 'menus'),
                 hasMealPlanningFeature: isFeatureEnabled(company.id, 'mealPlanning'),
                 hasCookingPlanFeature: isFeatureEnabled(company.id, 'cookingPlan'),
+                hasInventoryFeature: isFeatureEnabled(company.id, 'inventory'),
                 navigationInProgress,
                 navigateToTab: handleNavigateToTab
               };

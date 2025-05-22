@@ -10,7 +10,7 @@ export interface CompanySidebarProps {
 }
 
 // 회사 기능 관련 타입
-export type CompanyFeature = 'ingredients' | 'menus' | 'settings' | 'mealPlanning' | 'cookingPlan';
+export type CompanyFeature = 'ingredients' | 'menus' | 'settings' | 'mealPlanning' | 'cookingPlan' | 'inventory';
 
 // 사이드바 메뉴 항목 타입
 export interface SidebarMenuItem {
@@ -34,6 +34,7 @@ export interface CompanyWithFeatures {
   hasMenusFeature: boolean;
   hasMealPlanningFeature: boolean;
   hasCookingPlanFeature: boolean;
+  hasInventoryFeature: boolean;
   // 낙관적 UI 업데이트를 위한 추가 속성
   navigationInProgress?: string | null;
   navigateToTab?: (url: string) => void;

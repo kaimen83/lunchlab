@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building, ChevronDown, ChevronRight, Users, ClipboardList, Settings, CalendarDays, FileText } from 'lucide-react';
+import { Building, ChevronDown, ChevronRight, Users, ClipboardList, Settings, CalendarDays, FileText, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { CompanyWithFeatures } from './types';
@@ -44,6 +44,7 @@ export function CompanyItem({ company, toggleCompany, handleLinkClick }: Company
     hasMenusFeature,
     hasMealPlanningFeature,
     hasCookingPlanFeature,
+    hasInventoryFeature,
     navigationInProgress
   } = company;
   
@@ -159,6 +160,7 @@ export function CompanyItem({ company, toggleCompany, handleLinkClick }: Company
               "flex items-center px-2 py-1.5 text-sm rounded relative",
               isTabActive(`/companies/${id}`) && !pathname.includes('/members') && !pathname.includes('/inventory') 
                 && !pathname.includes('/meal-plans') && !pathname.includes('/cooking-plans') && !pathname.includes('/settings')
+                && !pathname.includes('/stock')
                 ? "bg-[#1164A3] text-white" 
                 : "hover:bg-gray-700"
             )}
@@ -215,6 +217,27 @@ export function CompanyItem({ company, toggleCompany, handleLinkClick }: Company
               <span>식자재/메뉴</span>
               {/* 로딩 인디케이터 */}
               {navigationInProgress === `/companies/${id}/inventory` && (
+                <div className="absolute right-2 w-3 h-3 rounded-full border-2 border-t-transparent border-white animate-spin"></div>
+              )}
+            </a>
+          )}
+          
+          {/* 재고관리 메뉴 - 모든 회원에게 표시 */}
+          {hasInventoryFeature && (
+            <a 
+              href={`/companies/${id}/stock`} 
+              className={cn(
+                "flex items-center px-2 py-1.5 text-sm rounded relative",
+                isTabActive(`/companies/${id}/stock`)
+                  ? "bg-[#1164A3] text-white" 
+                  : "hover:bg-gray-700"
+              )}
+              onClick={(e) => handleTabClick(`/companies/${id}/stock`, e)}
+            >
+              <Package className="h-3.5 w-3.5 mr-2 text-gray-400" />
+              <span>재고 관리</span>
+              {/* 로딩 인디케이터 */}
+              {navigationInProgress === `/companies/${id}/stock` && (
                 <div className="absolute right-2 w-3 h-3 rounded-full border-2 border-t-transparent border-white animate-spin"></div>
               )}
             </a>

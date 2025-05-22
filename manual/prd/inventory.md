@@ -74,23 +74,7 @@
   - reference_id (varchar, nullable) - 연관 문서 ID (조리계획서 등)
 ```
 
-#### 2.1.3 유통기한 관리 테이블
-```
-- expiry_tracking
-  - id (PK)
-  - company_id (FK)
-  - ingredient_id (FK) - 기존 ingredients 테이블 참조
-  - transaction_id (FK)
-  - batch_identifier (varchar)
-  - quantity (decimal)
-  - expiry_date (date)
-  - remaining_quantity (decimal)
-  - status (enum: 'active', 'consumed', 'expired', 'discarded')
-  - created_at (timestamp)
-  - updated_at (timestamp)
-```
-
-#### 2.1.4 재고 실사 관리 테이블
+#### 2.1.3 재고 실사 관리 테이블
 ```
 - inventory_audits
   - id (PK)
@@ -160,7 +144,6 @@
 #### 2.2.4 기타 API
 - `GET /api/companies/{companyId}/inventory/dashboard` - 재고 대시보드 데이터
 - `GET /api/companies/{companyId}/inventory/low-stock` - 재고 부족 항목 조회
-- `GET /api/companies/{companyId}/inventory/expiring` - 유통기한 임박 항목 조회
 - `POST /api/companies/{companyId}/inventory/batch-transactions` - 대량 트랜잭션 처리
 - `GET /api/companies/{companyId}/inventory/reports` - 재고 보고서 생성
 
@@ -187,7 +170,6 @@
 #### 3.1.2 재고 트랜잭션 관리
 - 사용자는 입고, 출고, 재고 조정 트랜잭션을 기록할 수 있어야 함
 - 각 트랜잭션에는 날짜, 수량, 단위(식재료의 경우), 메모, 담당자 정보가 포함되어야 함
-- 식재료 입고 시 유통기한 정보를 기록할 수 있어야 함
 - 트랜잭션 기록 시 자동으로 현재 재고량이 업데이트되어야 함
 
 #### 3.1.3 재고 검색 및 필터링
@@ -213,7 +195,6 @@
 - 현재 재고 상태 보고서
 - 트랜잭션 내역 보고서
 - 재고 변동 추이 보고서
-- 유통기한 관리 보고서
 
 #### 3.3.2 재고 분석
 - 재고 회전율 분석
@@ -254,7 +235,6 @@
 ### 4.2 대시보드 페이지
 - 재고 요약 정보
 - 재고 부족 항목 알림
-- 유통기한 임박 항목 알림
 - 최근 트랜잭션 내역
 - 빠른 액션 버튼 (입고, 출고, 재고 조정)
 
@@ -276,7 +256,6 @@
 - 트랜잭션 유형 선택 (입고, 출고, 조정)
 - 수량 및 단위 입력
 - 날짜 선택
-- 유통기한 입력 (식재료 입고 시)
 - 메모 입력
 - 다중 항목 트랜잭션 옵션
 
