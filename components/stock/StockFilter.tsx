@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface StockFilterProps {
   onFilterChange: (filters: StockFilterValues) => void;
@@ -20,6 +21,8 @@ interface StockFilterProps {
 export interface StockFilterValues {
   query?: string;
   itemType?: string;
+  category?: string;
+  stockGrade?: string;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
 }
@@ -30,6 +33,28 @@ export function StockFilter({
 }: StockFilterProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [filters, setFilters] = useState<StockFilterValues>(defaultValues);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+
+  // 선택된 항목 유형에 따라 카테고리 옵션 업데이트
+  useEffect(() => {
+    // 식자재일 경우의 카테고리
+    if (filters.itemType === 'ingredient') {
+      setAvailableCategories(['육류', '해산물', '채소', '양념', '가공식품', '기타']);
+    } 
+    // 용기일 경우의 카테고리
+    else if (filters.itemType === 'container') {
+      setAvailableCategories(['1회용', '다회용', '포장재', '기타']);
+    }
+    // 기본 카테고리 (모든 항목 선택 시)
+    else {
+      setAvailableCategories([]);
+    }
+
+    // 항목 유형이 변경되면 카테고리 필터 초기화
+    if (filters.category) {
+      setFilters(prev => ({ ...prev, category: '' }));
+    }
+  }, [filters.itemType]);
 
   const handleChange = (name: string, value: string) => {
     const newFilters = { ...filters, [name]: value };
@@ -45,6 +70,8 @@ export function StockFilter({
     const resetFilters: StockFilterValues = {
       query: "",
       itemType: "",
+      category: "",
+      stockGrade: "",
       sortBy: "name",
       sortOrder: "asc",
     };
@@ -79,24 +106,67 @@ export function StockFilter({
           </Button>
         </div>
 
+        {/* 상단에 항목 유형 필터 탭 추가 */}
+        <div className="mt-4">
+          <Tabs 
+            value={filters.itemType || ""} 
+            onValueChange={(value) => handleChange("itemType", value)}
+            className="w-full"
+          >
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="">전체 항목</TabsTrigger>
+              <TabsTrigger value="container">용기</TabsTrigger>
+              <TabsTrigger value="ingredient">식자재</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
         {isExpanded && (
           <div className="grid gap-4 mt-4 md:grid-cols-3">
+            {/* 항목 유형 필터 (탭으로 대체되어 삭제) */}
+
+            {/* 카테고리 필터 (항목 유형에 따라 동적으로 변경) */}
             <div className="space-y-2">
-              <Label htmlFor="itemType">항목 유형</Label>
+              <Label htmlFor="category">카테고리</Label>
               <Select
-                value={filters.itemType || ""}
-                onValueChange={(value) => handleChange("itemType", value)}
+                value={filters.category || ""}
+                onValueChange={(value) => handleChange("category", value)}
+                disabled={availableCategories.length === 0}
               >
-                <SelectTrigger id="itemType">
-                  <SelectValue placeholder="모든 유형" />
+                <SelectTrigger id="category">
+                  <SelectValue placeholder="모든 카테고리" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">모든 유형</SelectItem>
-                  <SelectItem value="ingredient">식자재</SelectItem>
-                  <SelectItem value="container">용기</SelectItem>
+                  <SelectItem value="">모든 카테고리</SelectItem>
+                  {availableCategories.map((category) => (
+                    <SelectItem key={category} value={category.toLowerCase()}>
+                      {category}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
+
+            {/* 식자재 선택 시 재고 등급 필터 표시 */}
+            {filters.itemType === 'ingredient' && (
+              <div className="space-y-2">
+                <Label htmlFor="stockGrade">재고 등급</Label>
+                <Select
+                  value={filters.stockGrade || ""}
+                  onValueChange={(value) => handleChange("stockGrade", value)}
+                >
+                  <SelectTrigger id="stockGrade">
+                    <SelectValue placeholder="모든 등급" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">모든 등급</SelectItem>
+                    <SelectItem value="A">A 등급</SelectItem>
+                    <SelectItem value="B">B 등급</SelectItem>
+                    <SelectItem value="C">C 등급</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="sortBy">정렬 기준</Label>

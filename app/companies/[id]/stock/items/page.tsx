@@ -23,7 +23,9 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
   });
   const [filters, setFilters] = useState<StockFilterValues>({
     query: "",
-    itemType: "",
+    itemType: "", // 초기값을 비워두어 API에서 기본 조건(B등급 식자재와 모든 용기)이 적용되도록 함
+    category: "",
+    stockGrade: "",
     sortBy: "name",
     sortOrder: "asc",
   });
@@ -39,6 +41,8 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
 
       if (filters.query) queryParams.set("query", filters.query);
       if (filters.itemType) queryParams.set("itemType", filters.itemType);
+      if (filters.category) queryParams.set("category", filters.category);
+      if (filters.stockGrade) queryParams.set("stockGrade", filters.stockGrade);
       if (filters.sortBy) queryParams.set("sortBy", filters.sortBy);
       if (filters.sortOrder) queryParams.set("sortOrder", filters.sortOrder);
 
@@ -97,10 +101,11 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            stockItemId: data.stockItemId,
-            transactionType: data.transactionType,
-            quantity: data.quantity,
-            notes: data.notes,
+            stockItemIds: [data.stockItemId],  // 배열로 변환
+            quantities: [data.quantity],       // 배열로 변환
+            requestType: data.transactionType === "in" ? "incoming" : "outgoing", // 이름 변환
+            notes: data.notes || "",
+            directProcess: true  // 직접 처리 플래그 추가
           }),
         }
       );
