@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, Trash2, Package, Search, AlertTriangle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Package, Search, AlertTriangle, LayoutGrid, List } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +25,15 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { CompanyMemberRole } from '@/lib/types';
 import ContainerModal, { Container } from './ContainerModal';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import {
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow
+} from '@/components/ui/table';
 
 interface ContainersListProps {
   companyId: string;
@@ -40,6 +49,7 @@ export default function ContainersList({ companyId, userRole }: ContainersListPr
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [containerToDelete, setContainerToDelete] = useState<Container | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   
   // 권한 체크: 소유자 또는 관리자인지 확인
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin';
@@ -154,10 +164,17 @@ export default function ContainersList({ companyId, userRole }: ContainersListPr
     (container.code_name && container.code_name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  // 보기 모드 변경 핸들러
+  const handleViewModeChange = (value: string) => {
+    if (value === 'grid' || value === 'list') {
+      setViewMode(value);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* 상단 검색 및 추가 버튼 영역 */}
-      <div className="flex flex-col sm:flex-row gap-3 justify-between">
+      <div className="flex flex-col sm:flex-row gap-3 justify-between items-center">
         <div className="relative flex-1 sm:w-64">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
@@ -168,71 +185,152 @@ export default function ContainersList({ companyId, userRole }: ContainersListPr
           />
         </div>
         
-        <Button onClick={handleAddClick} className="w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          용기 추가
-        </Button>
+        <div className="flex items-center gap-2">
+          <ToggleGroup type="single" value={viewMode} onValueChange={handleViewModeChange} className="border rounded-md">
+            <ToggleGroupItem value="grid" aria-label="그리드 보기" className="data-[state=on]:bg-primary/10">
+              <LayoutGrid className="h-4 w-4" />
+            </ToggleGroupItem>
+            <ToggleGroupItem value="list" aria-label="리스트 보기" className="data-[state=on]:bg-primary/10">
+              <List className="h-4 w-4" />
+            </ToggleGroupItem>
+          </ToggleGroup>
+          
+          <Button onClick={handleAddClick} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            용기 추가
+          </Button>
+        </div>
       </div>
 
       {/* 컨테이너 목록 */}
       {loading ? (
         <div className="py-12 text-center text-muted-foreground">로딩 중...</div>
       ) : filteredContainers.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {filteredContainers.map((container) => (
-            <Card key={container.id} className="overflow-hidden border border-slate-200 hover:border-slate-300 transition-colors">
-              <CardHeader className="pb-2 bg-gradient-to-r from-slate-50 to-white">
-                <div className="flex justify-between items-start">
-                  <div className="space-y-1">
-                    <CardTitle className="text-lg flex items-center">
-                      <Package className="h-4 w-4 mr-2 text-primary" />
-                      {container.name}
-                    </CardTitle>
-                    <div className="flex flex-wrap gap-2 items-center">
-                      {container.code_name && (
+        viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {filteredContainers.map((container) => (
+              <Card key={container.id} className="overflow-hidden border border-slate-200 hover:border-slate-300 transition-colors">
+                <CardHeader className="pb-2 bg-gradient-to-r from-slate-50 to-white">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-1">
+                      <CardTitle className="text-lg flex items-center">
+                        <Package className="h-4 w-4 mr-2 text-primary" />
+                        {container.name}
+                      </CardTitle>
+                      <div className="flex flex-wrap gap-2 items-center">
+                        {container.code_name && (
+                          <Badge variant="secondary" className="bg-purple-50 text-purple-700 hover:bg-purple-50">
+                            {container.code_name}
+                          </Badge>
+                        )}
+                        {container.price !== null && container.price !== undefined && (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-50">
+                            {container.price.toLocaleString()}원
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex space-x-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditClick(container)}
+                        className="h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteClick(container)}
+                        className={`h-8 w-8 ${isOwnerOrAdmin 
+                          ? "text-red-500 hover:text-red-700 hover:bg-red-50" 
+                          : "text-gray-300 cursor-not-allowed"}`}
+                        disabled={!isOwnerOrAdmin}
+                        title={isOwnerOrAdmin ? '용기 삭제' : '용기 삭제는 관리자 이상 권한이 필요합니다'}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                {container.description && (
+                  <CardContent className="py-3">
+                    <p className="text-sm text-slate-600">{container.description}</p>
+                  </CardContent>
+                )}
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="border rounded-md overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>용기명</TableHead>
+                  <TableHead>코드명</TableHead>
+                  <TableHead>가격</TableHead>
+                  <TableHead>설명</TableHead>
+                  <TableHead className="w-[100px] text-right">관리</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredContainers.map((container) => (
+                  <TableRow key={container.id} className="hover:bg-muted/50">
+                    <TableCell className="font-medium">
+                      <div className="flex items-center">
+                        <Package className="h-4 w-4 mr-2 text-primary" />
+                        {container.name}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {container.code_name ? (
                         <Badge variant="secondary" className="bg-purple-50 text-purple-700 hover:bg-purple-50">
                           {container.code_name}
                         </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">-</span>
                       )}
-                      {container.price !== null && container.price !== undefined && (
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-50">
-                          {container.price.toLocaleString()}원
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex space-x-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEditClick(container)}
-                      className="h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteClick(container)}
-                      className={`h-8 w-8 ${isOwnerOrAdmin 
-                        ? "text-red-500 hover:text-red-700 hover:bg-red-50" 
-                        : "text-gray-300 cursor-not-allowed"}`}
-                      disabled={!isOwnerOrAdmin}
-                      title={isOwnerOrAdmin ? '용기 삭제' : '용기 삭제는 관리자 이상 권한이 필요합니다'}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              {container.description && (
-                <CardContent className="py-3">
-                  <p className="text-sm text-slate-600">{container.description}</p>
-                </CardContent>
-              )}
-            </Card>
-          ))}
-        </div>
+                    </TableCell>
+                    <TableCell>
+                      {container.price !== null && container.price !== undefined ? 
+                        `${container.price.toLocaleString()}원` : 
+                        <span className="text-muted-foreground text-xs">-</span>
+                      }
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate">
+                      {container.description || <span className="text-muted-foreground text-xs">-</span>}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEditClick(container)}
+                          className="h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteClick(container)}
+                          className={`h-8 w-8 ${isOwnerOrAdmin 
+                            ? "text-red-500 hover:text-red-700 hover:bg-red-50" 
+                            : "text-gray-300 cursor-not-allowed"}`}
+                          disabled={!isOwnerOrAdmin}
+                          title={isOwnerOrAdmin ? '용기 삭제' : '용기 삭제는 관리자 이상 권한이 필요합니다'}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )
       ) : (
         <div className="py-12 text-center border rounded-md bg-slate-50">
           <Package className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
