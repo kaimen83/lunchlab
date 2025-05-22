@@ -1,327 +1,241 @@
-# 재고관리 시스템 PRD (Product Requirements Document)
+# 재고 관리 시스템 PRD (Product Requirements Document)
 
 ## 1. 개요
 
 ### 1.1 목적
-본 문서는 LunchLab의 재고관리 시스템에 대한 요구사항과 기능을 정의합니다. 이 시스템은 식당 운영에 필요한 식재료와 용기의 재고를 효율적으로 관리하기 위한 것입니다.
+LunchLab 재고 관리 시스템은 식자재와 용기의 재고를 효율적으로 관리하기 위한 솔루션입니다. 이 시스템은 입고, 출고, 폐기 작업을 추적하고, 실제 재고 수량을 시스템에 반영하여 정확한 재고 관리를 가능하게 합니다.
 
-### 1.2 범위
-이 시스템은 다음을 포함합니다:
-- 기존 등록된 식재료 및 용기의 재고 관리
-- 입출고 관리
-- 조리계획서와의 연동
-- 재고 보고서 및 분석
+### 1.2 목표
+- 식자재와 용기의 재고 현황을 실시간으로 파악
+- 모든 재고 변동 사항(입고, 출고, 폐기)을 관리자/소유자 승인 후 기록
+- 발주서와 연동하여 자동 출고 프로세스 지원
+- 실사를 통한 재고 수량 보정 기능 제공
 
-### 1.3 용어 정의
-- **재고 항목**: 기존 시스템에 등록된 식재료 또는 용기
-- **트랜잭션**: 재고 변화를 기록하는 입고, 출고, 재고조정 등의 활동
-- **최소 재고량**: 재고 알림이 발생하는 기준점
-- **조리계획서**: 특정 날짜에 제공될 메뉴와 식수 정보를 담은 문서
+### 1.3 대상 사용자
+- 회사 소유자/관리자: 재고 변동 승인 및 전체 재고 현황 모니터링
+- 일반 사용자: 재고 조회 및 재고 변동 요청 생성
 
-## 2. 시스템 아키텍처
+## 2. 기능 요구사항
 
-### 2.1 데이터베이스 구조
+### 2.1 재고 항목 관리
 
-#### 2.1.1 재고 관리 테이블
-```
-- ingredient_inventory
-  - id (PK)
-  - company_id (FK)
-  - ingredient_id (FK) - 기존 ingredients 테이블 참조
-  - current_stock (decimal)
-  - minimum_stock (decimal)
-  - unit (varchar)
-  - created_at (timestamp)
-  - updated_at (timestamp)
+#### 2.1.1 재고 관리 대상 선정
+- **식재료**: 재고 관리 등급이 "나"인 품목만 재고 관리 대상 (관리자나 소유자가 재고 관리 대상 그룹을 설정할 수 있음)
+- **용기**: 모든 용기 항목이 재고 관리 대상
 
-- container_inventory
-  - id (PK)
-  - company_id (FK)
-  - container_id (FK) - 기존 containers 테이블 참조
-  - current_stock (integer)
-  - minimum_stock (integer)
-  - created_at (timestamp)
-  - updated_at (timestamp)
-```
+#### 2.1.2 재고 항목 조회
+- 재고 항목 목록 표시: 품목명, 현재 수량, 단위, 마지막 업데이트 시간
+- 필터링 기능: 식재료/용기 구분, 검색어 기반 필터링
+- 정렬 기능: 품목명, 수량, 업데이트 시간 기준 정렬
 
-#### 2.1.2 트랜잭션 관리 테이블
-```
-- ingredient_transactions
-  - id (PK)
-  - company_id (FK)
-  - ingredient_id (FK) - 기존 ingredients 테이블 참조
-  - transaction_type (enum: 'in', 'out', 'adjust')
-  - quantity (decimal)
-  - unit (varchar)
-  - transaction_date (date)
-  - notes (text)
-  - user_id (FK)
-  - created_at (timestamp)
-  - expiry_date (date, nullable)
-  - lot_number (varchar, nullable)
-  - reference_id (varchar, nullable) - 연관 문서 ID (조리계획서 등)
+### 2.2 재고 거래 관리
 
-- container_transactions
-  - id (PK)
-  - company_id (FK)
-  - container_id (FK) - 기존 containers 테이블 참조
-  - transaction_type (enum: 'in', 'out', 'adjust')
-  - quantity (integer)
-  - transaction_date (date)
-  - notes (text)
-  - user_id (FK)
-  - created_at (timestamp)
-  - reference_id (varchar, nullable) - 연관 문서 ID (조리계획서 등)
-```
+#### 2.2.1 거래 요청 생성
+- **입고 요청**: 품목, 수량, 메모 입력하여 요청 생성
+- **출고 요청**: 품목, 수량, 메모 입력하여 요청 생성
+- **폐기 요청**: 품목, 수량, 메모 입력하여 요청 생성
+- 모든 요청은 관리자/소유자의 승인 필요
 
-#### 2.1.3 재고 실사 관리 테이블
-```
-- inventory_audits
-  - id (PK)
-  - company_id (FK)
-  - audit_name (varchar)
-  - scheduled_date (date)
-  - completed_date (date, nullable)
-  - status (enum: 'planned', 'in_progress', 'completed', 'cancelled')
-  - notes (text)
-  - created_by (FK - user_id)
-  - created_at (timestamp)
-  - updated_at (timestamp)
+#### 2.2.2 거래 승인 프로세스
+- 관리자/소유자만 승인/거부 권한 보유
+- 승인 시 실제 재고에 반영 및 거래 내역 생성
+- 거부 시 요청 상태만 업데이트 (재고 변동 없음)
 
-- inventory_audit_items
-  - id (PK)
-  - audit_id (FK)
-  - company_id (FK)
-  - item_type (enum: 'ingredient', 'container')
-  - item_id (FK - 아이템 타입에 따라 ingredient_id 또는 container_id)
-  - expected_quantity (decimal)
-  - actual_quantity (decimal, nullable)
-  - unit (varchar)
-  - variance (decimal, nullable)
-  - variance_percentage (decimal, nullable)
-  - status (enum: 'pending', 'counted', 'reconciled')
-  - notes (text)
-  - counted_by (FK - user_id, nullable)
-  - counted_at (timestamp, nullable)
+#### 2.2.3 거래 내역 조회
+- 모든 거래 내역 표시: 날짜, 품목, 거래 유형, 수량, 사용자
+- 필터링 기능: 거래 유형, 날짜 범위, 품목 기준 필터링
+- 정렬 기능: 날짜, 품목, 수량 기준 정렬
 
-- inventory_audit_reconciliations
-  - id (PK)
-  - audit_id (FK)
-  - company_id (FK)
-  - item_type (enum: 'ingredient', 'container')
-  - item_id (FK)
-  - previous_quantity (decimal)
-  - new_quantity (decimal)
-  - adjustment_quantity (decimal)
-  - reason (text)
-  - transaction_id (FK - 생성된 트랜잭션 참조)
-  - reconciled_by (FK - user_id)
-  - reconciled_at (timestamp)
-```
+### 2.3 발주서 연동 출고
 
-### 2.2 API 구조
+#### 2.3.1 발주서 기반 출고 요청
+- 발주서 탭의 발주서 목록에서 투입량, 필요 용기 목록 테이블의 필요 수량 기반 출고 요청 자동 생성
+- 출고 요청에 발주서 참조 정보 포함
 
-#### 2.2.1 재고 관리 API
-- `GET /api/companies/{companyId}/inventory/ingredients` - 모든 식재료 재고 조회
-- `GET /api/companies/{companyId}/inventory/ingredients/{ingredientId}` - 특정 식재료 재고 조회
-- `POST /api/companies/{companyId}/inventory/ingredients` - 식재료 재고 항목 생성
-- `PUT /api/companies/{companyId}/inventory/ingredients/{ingredientId}` - 식재료 재고 정보 업데이트
-- `DELETE /api/companies/{companyId}/inventory/ingredients/{ingredientId}` - 식재료 재고 항목 삭제
+#### 2.3.2 발주서 출고 승인
+- 관리자/소유자가 발주서 기반 출고 요청 검토 및 승인
+- 승인 시 식재료 및 용기 일괄 출고 처리
 
-#### 2.2.2 용기 관리 API
-- `GET /api/companies/{companyId}/inventory/containers` - 모든 용기 재고 조회
-- `GET /api/companies/{companyId}/inventory/containers/{containerId}` - 특정 용기 재고 조회
-- `POST /api/companies/{companyId}/inventory/containers` - 용기 재고 항목 생성
-- `PUT /api/companies/{companyId}/inventory/containers/{containerId}` - 용기 재고 정보 업데이트
-- `DELETE /api/companies/{companyId}/inventory/containers/{containerId}` - 용기 재고 항목 삭제
+### 2.4 재고 실사 및 보정
 
-#### 2.2.3 트랜잭션 관리 API
-- `GET /api/companies/{companyId}/inventory/ingredients/transactions` - 식재료 트랜잭션 내역 조회
-- `GET /api/companies/{companyId}/inventory/containers/transactions` - 용기 트랜잭션 내역 조회
-- `POST /api/companies/{companyId}/inventory/ingredients/transactions` - 식재료 트랜잭션 생성
-- `POST /api/companies/{companyId}/inventory/containers/transactions` - 용기 트랜잭션 생성
+#### 2.4.1 재고 실사 수행
+- 품목별 실제 재고 수량 입력 기능
+- 시스템 예상 수량과 실제 수량 비교 표시
+- 차이 자동 계산 및 표시
 
-#### 2.2.4 기타 API
-- `GET /api/companies/{companyId}/inventory/dashboard` - 재고 대시보드 데이터
-- `GET /api/companies/{companyId}/inventory/low-stock` - 재고 부족 항목 조회
-- `POST /api/companies/{companyId}/inventory/batch-transactions` - 대량 트랜잭션 처리
-- `GET /api/companies/{companyId}/inventory/reports` - 재고 보고서 생성
+#### 2.4.2 수량 보정
+- 실사 결과에 따른 재고 수량 자동 보정
+- 보정 내역 기록 및 추적 가능
+- 보정 사유 및 메모 입력 기능
 
-#### 2.2.5 재고 실사 API
-- `GET /api/companies/{companyId}/inventory/audits` - 재고 실사 내역 조회
-- `POST /api/companies/{companyId}/inventory/audits` - 새 재고 실사 계획 생성
-- `GET /api/companies/{companyId}/inventory/audits/{auditId}` - 특정 실사 상세 조회
-- `PUT /api/companies/{companyId}/inventory/audits/{auditId}` - 실사 정보 업데이트
-- `POST /api/companies/{companyId}/inventory/audits/{auditId}/items` - 실사 항목 추가
-- `GET /api/companies/{companyId}/inventory/audits/{auditId}/items` - 실사 항목 조회
-- `PUT /api/companies/{companyId}/inventory/audits/{auditId}/items/{itemId}` - 실사 항목 결과 업데이트
-- `POST /api/companies/{companyId}/inventory/audits/{auditId}/reconcile` - 실사 결과에 따른 재고 보정
-- `GET /api/companies/{companyId}/inventory/audits/analytics` - 실사 분석 데이터 조회
+## 3. 데이터 구조
 
-## 3. 기능 요구사항
+### 3.1 테이블 설계
 
-### 3.1 재고 관리 기본 기능
+#### 3.1.1 stock_items (재고 항목)
+- `id`: UUID (PK)
+- `company_id`: UUID (FK to companies)
+- `item_type`: ENUM ('ingredient', 'container')
+- `item_id`: UUID (FK to ingredients 또는 containers)
+- `current_quantity`: DECIMAL
+- `unit`: VARCHAR
+- `last_updated`: TIMESTAMP
+- `created_at`: TIMESTAMP
 
-#### 3.1.1 재고 항목 관리
-- 사용자는 기존에 등록된 식재료 및 용기에 대한 재고 정보를 생성, 조회, 수정, 삭제할 수 있어야 함
-- 각 재고 항목에는 현재 재고량, 최소 재고량, 단위(식재료의 경우) 정보가 포함되어야 함
-- 시스템은 새로운 식재료나 용기가 추가될 때 자동으로 재고 항목을 생성할 수 있어야 함
+#### 3.1.2 stock_transactions (재고 거래 내역)
+- `id`: UUID (PK)
+- `stock_item_id`: UUID (FK to stock_items)
+- `transaction_type`: ENUM ('incoming', 'outgoing', 'disposal', 'adjustment')
+- `quantity`: DECIMAL
+- `transaction_date`: TIMESTAMP
+- `user_id`: UUID
+- `reference_id`: UUID (nullable)
+- `reference_type`: VARCHAR (nullable)
+- `notes`: TEXT
+- `created_at`: TIMESTAMP
 
-#### 3.1.2 재고 트랜잭션 관리
-- 사용자는 입고, 출고, 재고 조정 트랜잭션을 기록할 수 있어야 함
-- 각 트랜잭션에는 날짜, 수량, 단위(식재료의 경우), 메모, 담당자 정보가 포함되어야 함
-- 트랜잭션 기록 시 자동으로 현재 재고량이 업데이트되어야 함
+#### 3.1.3 stock_verifications (재고 실사)
+- `id`: UUID (PK)
+- `stock_item_id`: UUID (FK to stock_items)
+- `expected_quantity`: DECIMAL
+- `actual_quantity`: DECIMAL
+- `adjustment_quantity`: DECIMAL
+- `verification_date`: TIMESTAMP
+- `verified_by`: UUID
+- `notes`: TEXT
+- `created_at`: TIMESTAMP
 
-#### 3.1.3 재고 검색 및 필터링
-- 사용자는 이름, 코드, 카테고리, 재고 상태 등으로 재고 항목을 검색하고 필터링할 수 있어야 함
-- 테이블과 카드 형식의 다양한 뷰 옵션을 제공해야 함
-- 정렬 기능을 통해 다양한 기준으로 재고 목록을 정렬할 수 있어야 함
+#### 3.1.4 stock_approval_requests (재고 승인 요청)
+- `id`: UUID (PK)
+- `company_id`: UUID (FK to companies)
+- `request_type`: ENUM ('incoming', 'outgoing', 'disposal')
+- `status`: ENUM ('pending', 'approved', 'rejected')
+- `requested_by`: UUID
+- `approved_by`: UUID (nullable)
+- `requested_at`: TIMESTAMP
+- `processed_at`: TIMESTAMP (nullable)
+- `notes`: TEXT
 
-### 3.2 조리계획서 연동
+#### 3.1.5 stock_approval_items (승인 요청 항목)
+- `id`: UUID (PK)
+- `approval_request_id`: UUID (FK to stock_approval_requests)
+- `stock_item_id`: UUID (FK to stock_items)
+- `quantity`: DECIMAL
+- `notes`: TEXT
 
-#### 3.2.1 자동 재고 계산
-- 조리계획서 정보를 기반으로 필요한 식재료('투입량')와 용기('필요 수량') 수량을 자동으로 계산해야 함
-- 현재 재고와 비교하여 부족한 항목을 식별해야 함
-- 조리계획서에서 직접 출고 처리를 할 수 있어야 함
+## 4. UI 컴포넌트
 
-#### 3.2.2 자동 출고 처리
-- 조리계획서 확정 시 필요한 식재료와 용기를 자동으로 출고 처리할 수 있는 옵션을 제공해야 함
-- 출고 처리 전 확인 단계를 포함해야 함
-- 출고 후 실제 사용량과의 차이를 조정할 수 있는 기능을 제공해야 함
+### 4.1 재고 관리 페이지 레이아웃
+- 네비게이션 바에 "재고 관리" 탭 추가
+- 페이지 내에 4개의 탭 구성:
+  - 재고 항목 탭
+  - 거래 내역 탭
+  - 재고 실사 탭
+  - 승인 요청 탭
 
-### 3.3 보고서 및 분석
-
-#### 3.3.1 재고 보고서
-- 현재 재고 상태 보고서
-- 트랜잭션 내역 보고서
-- 재고 변동 추이 보고서
-
-#### 3.3.2 재고 분석
-- 재고 회전율 분석
-- 재고 비용 분석
-- 낭비/손실 분석
-- 사용 패턴 분석
-
-### 3.4 재고 실사 관리
-
-#### 3.4.1 정기 재고 실사
-- 정기적(주간, 월간, 분기별 등)으로 실제 재고량을 조사하여 시스템에 기록할 수 있어야 함
-- 실사 일정을 설정하고 알림을 받을 수 있어야 함
-- 실사 담당자를 지정할 수 있어야 함
-- 실사 결과를 CSV나 엑셀 형식으로 내보내거나 가져올 수 있어야 함
-
-#### 3.4.2 재고 보정 기능
-- 실사 결과와 시스템 재고량의 차이를 비교하여 표시해야 함
-- 차이가 있는 항목에 대해 일괄 보정 또는 개별 보정을 수행할 수 있어야 함
-- 보정 사유를 입력하고 기록할 수 있어야 함
-- 보정 내역은 별도의 트랜잭션('adjust' 유형)으로 기록되어야 함
-
-#### 3.4.3 재고 실사 이력 관리
-- 과거 실사 기록을 조회하고 분석할 수 있어야 함
-- 실사별 차이 분석 보고서를 생성할 수 있어야 함
-- 반복적으로 차이가 발생하는 항목을 식별하여 관리 개선에 활용할 수 있어야 함
-
-#### 3.4.4 재고 불일치 원인 분석
-- 시스템은 재고 불일치 패턴을 분석하고 가능한 원인을 제안해야 함
-- 불일치가 자주 발생하는 항목에 대한 특별 관리 기능을 제공해야 함
-- 재고 관리 프로세스 개선을 위한 인사이트를 제공해야 함
-
-## 4. 사용자 인터페이스 요구사항
-
-### 4.1 네비게이션 구조
-- '식자재/메뉴 관리' 메뉴 내에 "재고 관리" 탭 추가
-- 하위 메뉴: 대시보드, 식재료 재고, 용기 재고, 트랜잭션 내역, 보고서
-
-### 4.2 대시보드 페이지
-- 재고 요약 정보
-- 재고 부족 항목 알림
-- 최근 트랜잭션 내역
-- 빠른 액션 버튼 (입고, 출고, 재고 조정)
-
-### 4.3 재고 목록 페이지
-- 테이블/카드 뷰 전환 옵션
+### 4.2 재고 항목 탭
+- 재고 항목 목록 표시
 - 검색 및 필터링 컨트롤
-- 정렬 옵션
-- 항목별 액션 버튼 (상세보기, 입고, 출고, 조정)
-- 상태별 시각적 표시 (정상, 부족, 과잉)
+- 항목별 입고/출고/폐기 버튼
 
-### 4.4 재고 상세 페이지
-- 재고 항목 기본 정보
-- 현재 재고 상태 시각화
-- 트랜잭션 히스토리
-- 재고 추이 그래프
-- 연관 메뉴/조리계획서 목록
+### 4.3 거래 내역 탭
+- 거래 내역 목록 표시
+- 날짜 범위, 거래 유형 필터
+- 거래 상세 정보 표시
 
-### 4.5 트랜잭션 입력 모달
-- 트랜잭션 유형 선택 (입고, 출고, 조정)
-- 수량 및 단위 입력
-- 날짜 선택
-- 메모 입력
-- 다중 항목 트랜잭션 옵션
+### 4.4 재고 실사 탭
+- 실사 수행 폼: 품목 선택, 실제 수량 입력
+- 실사 내역 목록
+- 일괄 실사 기능
 
-### 4.6 재고 실사 인터페이스
+### 4.5 승인 요청 탭
+- 승인 대기 요청 목록
+- 요청 상세 정보 표시
+- 관리자/소유자용 승인/거부 버튼
 
-#### 4.6.1 실사 계획 페이지
-- 실사 일정 설정 및 관리
-- 담당자 지정 기능
-- 실사 대상 항목 선택 (전체, 카테고리별, 개별 항목)
-- 과거 실사 내역 조회
+### 4.6 거래 다이얼로그
+- 거래 유형에 따른 입력 폼
+- 수량 및 메모 입력 필드
+- 제출/취소 버튼
 
-#### 4.6.2 재고 실사 수행 페이지
-- 모바일 친화적인 입력 인터페이스
-- 바코드/QR 코드 스캔 지원 (가능한 경우)
-- 실측 수량 입력 폼
-- 현재 시스템 재고량 표시
-- 메모 및 특이사항 입력 필드
+## 5. API 엔드포인트
 
-#### 4.6.3 재고 보정 페이지
-- 실사 결과와 시스템 재고의 차이 표시
-- 색상 코드를 통한 차이 심각도 표시 (예: 빨간색=심각한 차이, 노란색=경미한 차이)
-- 일괄 보정 및 개별 보정 옵션
-- 보정 사유 입력 필드
-- 보정 내역 미리보기 및 확인
+### 5.1 재고 항목 API
+- `GET /api/companies/[id]/stock/items`: 재고 항목 목록 조회
+- `GET /api/companies/[id]/stock/items/[itemId]`: 특정 재고 항목 상세 조회
 
-#### 4.6.4 실사 분석 대시보드
-- 실사 결과 요약 시각화
-- 시간에 따른 재고 정확도 추이 그래프
-- 가장 빈번하게 차이가 발생하는 항목 순위
-- 재고 관리 개선을 위한 제안 표시
+### 5.2 거래 API
+- `POST /api/companies/[id]/stock/transactions`: 거래 요청 생성
+- `GET /api/companies/[id]/stock/transactions`: 거래 내역 목록 조회
+- `GET /api/companies/[id]/stock/transactions/[transactionId]`: 특정 거래 상세 조회
 
-## 5. 비기능적 요구사항
+### 5.3 실사 API
+- `POST /api/companies/[id]/stock/verifications`: 재고 실사 기록 생성
+- `GET /api/companies/[id]/stock/verifications`: 실사 내역 목록 조회
 
-### 5.1 보안 요구사항
-- 역할 기반 접근 제어 (RBAC)
-- 트랜잭션 기록의 무결성 보장
-- 중요 재고 변경에 대한 감사 추적
-- 데이터 백업 및 복구 계획
+### 5.4 승인 API
+- `GET /api/companies/[id]/stock/approvals`: 승인 요청 목록 조회
+- `PATCH /api/companies/[id]/stock/approvals/[requestId]`: 승인 요청 처리(승인/거부)
 
-### 5.2 확장성 요구사항
-- 다양한 식재료 및 용기 유형 지원
+## 6. 권한 관리
 
-### 5.3 사용성 요구사항
-- 직관적인 사용자 인터페이스
-- 모바일 장치에서의 사용성 보장
-- 사용자 가이드 및 도움말 제공
-- 오류 메시지의 명확성
+### 6.1 역할별 권한
+- **일반 사용자**:
+  - 재고 항목 조회
+  - 입고/출고/폐기 요청 생성 (직접 처리 불가)
+  - 재고 실사 수행
+  - 자신이 생성한 요청 조회
 
-## 6. 기술 스택
-- 프론트엔드: Next.js, React, Tailwind CSS, ShadCN
-- 백엔드: Next.js API Routes
-- 데이터베이스: Supabase
-- 상태 관리: React Context API / Zustand
-- 차트 및 시각화: Chart.js / Recharts
-- 인증: Clerk
+- **관리자/소유자**:
+  - 모든 일반 사용자 권한
+  - 승인 요청 처리(승인/거부)
+  - 모든 요청 및 거래 내역 조회
+  - 재고 관리 설정 변경
 
-## 7. 위험 요소 및 대응 방안
+### 6.2 권한 검증
+- 각 API 엔드포인트에서 사용자 역할 확인
+- 승인 관련 작업은 관리자/소유자 역할 검증 후 처리
+- 회사 소속 여부 검증하여 타 회사 데이터 접근 방지
 
-### 7.1 식별된 위험 요소
-- 데이터 마이그레이션 복잡성
-- 사용자 적응 기간
-- 성능 이슈 (대량 트랜잭션 처리)
-- 기존 시스템과의 통합 문제
+## 7. 구현 계획
 
-### 7.2 대응 방안
-- 상세한 마이그레이션 계획 수립
-- 충분한 사용자 교육 및 가이드 제공
-- 성능 테스트 및 최적화
-- 단계적 통합 접근 방식
+### 7.1 데이터베이스 구축
+1. 필요한 테이블 및 관계 생성
+2. 초기 데이터 마이그레이션
+
+### 7.2 백엔드 구현
+1. API 엔드포인트 구현
+2. 권한 검증 로직 구현
+3. 데이터 처리 및 비즈니스 로직 구현
+
+### 7.3 프론트엔드 구현
+1. 재고 관리 페이지 및 탭 구조 구현
+2. 재고 항목 목록 및 상세 화면 구현
+3. 거래 요청 및 승인 기능 구현
+4. 실사 및 보정 기능 구현
+
+### 7.4 통합 및 테스트
+1. 백엔드-프론트엔드 통합
+2. 기능 테스트 및 버그 수정
+3. 사용자 피드백 수집 및 반영
+
+## 8. 확장 가능성
+
+### 8.1 향후 기능 추가 고려사항
+- 재고 예측 및 알림 기능
+- 바코드/QR 코드 스캔을 통한 재고 관리
+- 발주 자동화 및 최적화
+- 재고 보고서 및 분석 기능
+- 공급업체 관리 연동
+
+## 9. 기술적 고려사항
+
+### 9.1 성능 및 확장성
+- 대량의 재고 항목 및 거래 내역 처리를 위한 페이지네이션
+- 실시간 업데이트를 위한 효율적인 쿼리 최적화
+- 동시 접근 시 데이터 일관성 유지
+
+### 9.2 보안
+- 모든 API 요청에 대한 권한 검증
+- 민감한 재고 데이터 보호
+- 작업 이력 및 감사 추적 기능
