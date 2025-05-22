@@ -29,7 +29,8 @@ export interface StockItem {
   unit: string;
   last_updated: string;
   created_at: string;
-  details: {
+  name: string; // API 응답에서 직접 제공하는 이름 필드
+  details?: {
     id: string;
     name: string;
     code_name?: string;
@@ -251,8 +252,8 @@ export function StockTable({
                 <TableRow key={item.id}>
                   <TableCell>{getItemTypeBadge(item.item_type)}</TableCell>
                   <TableCell className="font-medium">
-                    {item.details.name}
-                    {item.details.code_name && (
+                    {item.name || item.details?.name || '알 수 없음'}
+                    {item.details?.code_name && (
                       <span className="text-xs text-muted-foreground ml-2">
                         ({item.details.code_name})
                       </span>

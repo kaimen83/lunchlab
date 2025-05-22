@@ -1,13 +1,8 @@
 import { auth } from '@clerk/nextjs/server';
 import { notFound, redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, ClipboardList } from 'lucide-react';
-import dynamic from 'next/dynamic';
-
-// 클라이언트 컴포넌트 동적 임포트
-const StockItemsPage = dynamic(() => import('./items/page'), { ssr: false });
-const StockTransactionsPage = dynamic(() => import('./transactions/page'), { ssr: false });
+import { Package } from 'lucide-react';
+import StockClient from './client';
 
 // Next.js 15에서 페이지 컴포넌트 Props에 대한 타입 정의
 interface StockPageProps {
@@ -72,26 +67,7 @@ export default async function StockPage({ params }: StockPageProps) {
       {/* 페이지 콘텐츠 */}
       <main className="flex-1 overflow-y-auto py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Tabs defaultValue="items" className="space-y-4">
-            <TabsList className="grid w-full md:w-[400px] grid-cols-2">
-              <TabsTrigger value="items" className="flex items-center gap-2">
-                <Package className="h-4 w-4" />
-                <span>재고 항목</span>
-              </TabsTrigger>
-              <TabsTrigger value="transactions" className="flex items-center gap-2">
-                <ClipboardList className="h-4 w-4" />
-                <span>거래 내역</span>
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="items" className="space-y-4">
-              <StockItemsPage companyId={id} />
-            </TabsContent>
-            
-            <TabsContent value="transactions" className="space-y-4">
-              <StockTransactionsPage companyId={id} />
-            </TabsContent>
-          </Tabs>
+          <StockClient companyId={id} />
         </div>
       </main>
     </div>

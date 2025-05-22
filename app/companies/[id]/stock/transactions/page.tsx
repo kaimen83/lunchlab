@@ -38,7 +38,7 @@ export default function StockTransactionsPage({ companyId }: StockTransactionsPa
     pageCount: 0,
   });
   const [filters, setFilters] = useState({
-    transactionType: "",
+    transactionType: "all",
     stockItemId: "",
     startDate: "",
     endDate: "",
@@ -53,7 +53,7 @@ export default function StockTransactionsPage({ companyId }: StockTransactionsPa
         pageSize: pagination.pageSize.toString(),
       });
 
-      if (filters.transactionType) queryParams.set("transactionType", filters.transactionType);
+      if (filters.transactionType && filters.transactionType !== "all") queryParams.set("transactionType", filters.transactionType);
       if (filters.stockItemId) queryParams.set("stockItemId", filters.stockItemId);
       if (filters.startDate) queryParams.set("startDate", filters.startDate);
       if (filters.endDate) queryParams.set("endDate", filters.endDate);
@@ -101,7 +101,7 @@ export default function StockTransactionsPage({ companyId }: StockTransactionsPa
   // 필터 초기화 핸들러
   const handleResetFilters = () => {
     setFilters({
-      transactionType: "",
+      transactionType: "all",
       stockItemId: "",
       startDate: "",
       endDate: "",
@@ -132,7 +132,7 @@ export default function StockTransactionsPage({ companyId }: StockTransactionsPa
                 <SelectValue placeholder="모든 유형" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">모든 유형</SelectItem>
+                <SelectItem value="all">모든 유형</SelectItem>
                 <SelectItem value="in">입고</SelectItem>
                 <SelectItem value="out">출고</SelectItem>
                 <SelectItem value="adjustment">조정</SelectItem>

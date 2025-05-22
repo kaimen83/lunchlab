@@ -12,10 +12,10 @@ import { auth } from '@clerk/nextjs/server';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: companyId } = params;
+    const { id: companyId } = await params;
     const { userId } = await auth();
 
     // 로그인하지 않은 경우 권한 없음
@@ -179,10 +179,10 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: companyId } = params;
+    const { id: companyId } = await params;
     const { userId } = await auth();
 
     // 로그인하지 않은 경우 권한 없음

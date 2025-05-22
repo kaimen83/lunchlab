@@ -12,10 +12,11 @@ import { auth } from '@clerk/nextjs/server';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: companyId } = params;
+    // Next.js 15에서는 params가 Promise이므로 await로 처리
+    const { id: companyId } = await params;
     const { userId } = await auth();
 
     // 로그인하지 않은 경우 권한 없음
@@ -63,8 +64,7 @@ export async function GET(
         current_quantity,
         unit,
         last_updated,
-        created_at,
-        items:item_id(id, name)
+        created_at
       `, { count: 'exact' })
       .eq('company_id', companyId);
 
@@ -111,7 +111,8 @@ export async function GET(
           
           return {
             ...item,
-            details: ingredient
+            details: ingredient,
+            name: ingredient?.name || '알 수 없음'
           };
         } else if (item.item_type === 'container') {
           const { data: container } = await supabase
@@ -122,11 +123,15 @@ export async function GET(
           
           return {
             ...item,
-            details: container
+            details: container,
+            name: container?.name || '알 수 없음'
           };
         }
         
-        return item;
+        return {
+          ...item,
+          name: '알 수 없음'
+        };
       })
     );
 
