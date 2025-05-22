@@ -91,6 +91,51 @@
   - updated_at (timestamp)
 ```
 
+#### 2.1.4 재고 실사 관리 테이블
+```
+- inventory_audits
+  - id (PK)
+  - company_id (FK)
+  - audit_name (varchar)
+  - scheduled_date (date)
+  - completed_date (date, nullable)
+  - status (enum: 'planned', 'in_progress', 'completed', 'cancelled')
+  - notes (text)
+  - created_by (FK - user_id)
+  - created_at (timestamp)
+  - updated_at (timestamp)
+
+- inventory_audit_items
+  - id (PK)
+  - audit_id (FK)
+  - company_id (FK)
+  - item_type (enum: 'ingredient', 'container')
+  - item_id (FK - 아이템 타입에 따라 ingredient_id 또는 container_id)
+  - expected_quantity (decimal)
+  - actual_quantity (decimal, nullable)
+  - unit (varchar)
+  - variance (decimal, nullable)
+  - variance_percentage (decimal, nullable)
+  - status (enum: 'pending', 'counted', 'reconciled')
+  - notes (text)
+  - counted_by (FK - user_id, nullable)
+  - counted_at (timestamp, nullable)
+
+- inventory_audit_reconciliations
+  - id (PK)
+  - audit_id (FK)
+  - company_id (FK)
+  - item_type (enum: 'ingredient', 'container')
+  - item_id (FK)
+  - previous_quantity (decimal)
+  - new_quantity (decimal)
+  - adjustment_quantity (decimal)
+  - reason (text)
+  - transaction_id (FK - 생성된 트랜잭션 참조)
+  - reconciled_by (FK - user_id)
+  - reconciled_at (timestamp)
+```
+
 ### 2.2 API 구조
 
 #### 2.2.1 재고 관리 API
@@ -119,6 +164,17 @@
 - `GET /api/companies/{companyId}/inventory/expiring` - 유통기한 임박 항목 조회
 - `POST /api/companies/{companyId}/inventory/batch-transactions` - 대량 트랜잭션 처리
 - `GET /api/companies/{companyId}/inventory/reports` - 재고 보고서 생성
+
+#### 2.2.5 재고 실사 API
+- `GET /api/companies/{companyId}/inventory/audits` - 재고 실사 내역 조회
+- `POST /api/companies/{companyId}/inventory/audits` - 새 재고 실사 계획 생성
+- `GET /api/companies/{companyId}/inventory/audits/{auditId}` - 특정 실사 상세 조회
+- `PUT /api/companies/{companyId}/inventory/audits/{auditId}` - 실사 정보 업데이트
+- `POST /api/companies/{companyId}/inventory/audits/{auditId}/items` - 실사 항목 추가
+- `GET /api/companies/{companyId}/inventory/audits/{auditId}/items` - 실사 항목 조회
+- `PUT /api/companies/{companyId}/inventory/audits/{auditId}/items/{itemId}` - 실사 항목 결과 업데이트
+- `POST /api/companies/{companyId}/inventory/audits/{auditId}/reconcile` - 실사 결과에 따른 재고 보정
+- `GET /api/companies/{companyId}/inventory/audits/analytics` - 실사 분석 데이터 조회
 
 ## 3. 기능 요구사항
 
@@ -189,6 +245,30 @@
 - 낭비/손실 분석
 - 사용 패턴 분석
 
+### 3.6 재고 실사 관리
+
+#### 3.6.1 정기 재고 실사
+- 정기적(주간, 월간, 분기별 등)으로 실제 재고량을 조사하여 시스템에 기록할 수 있어야 함
+- 실사 일정을 설정하고 알림을 받을 수 있어야 함
+- 실사 담당자를 지정할 수 있어야 함
+- 실사 결과를 CSV나 엑셀 형식으로 내보내거나 가져올 수 있어야 함
+
+#### 3.6.2 재고 보정 기능
+- 실사 결과와 시스템 재고량의 차이를 비교하여 표시해야 함
+- 차이가 있는 항목에 대해 일괄 보정 또는 개별 보정을 수행할 수 있어야 함
+- 보정 사유를 입력하고 기록할 수 있어야 함
+- 보정 내역은 별도의 트랜잭션('adjust' 유형)으로 기록되어야 함
+
+#### 3.6.3 재고 실사 이력 관리
+- 과거 실사 기록을 조회하고 분석할 수 있어야 함
+- 실사별 차이 분석 보고서를 생성할 수 있어야 함
+- 반복적으로 차이가 발생하는 항목을 식별하여 관리 개선에 활용할 수 있어야 함
+
+#### 3.6.4 재고 불일치 원인 분석
+- 시스템은 재고 불일치 패턴을 분석하고 가능한 원인을 제안해야 함
+- 불일치가 자주 발생하는 항목에 대한 특별 관리 기능을 제공해야 함
+- 재고 관리 프로세스 개선을 위한 인사이트를 제공해야 함
+
 ## 4. 사용자 인터페이스 요구사항
 
 ### 4.1 네비게이션 구조
@@ -223,6 +303,34 @@
 - 유통기한 입력 (식재료 입고 시)
 - 메모 입력
 - 다중 항목 트랜잭션 옵션
+
+### 4.6 재고 실사 인터페이스
+
+#### 4.6.1 실사 계획 페이지
+- 실사 일정 설정 및 관리
+- 담당자 지정 기능
+- 실사 대상 항목 선택 (전체, 카테고리별, 개별 항목)
+- 과거 실사 내역 조회
+
+#### 4.6.2 재고 실사 수행 페이지
+- 모바일 친화적인 입력 인터페이스
+- 바코드/QR 코드 스캔 지원 (가능한 경우)
+- 실측 수량 입력 폼
+- 현재 시스템 재고량 표시
+- 메모 및 특이사항 입력 필드
+
+#### 4.6.3 재고 보정 페이지
+- 실사 결과와 시스템 재고의 차이 표시
+- 색상 코드를 통한 차이 심각도 표시 (예: 빨간색=심각한 차이, 노란색=경미한 차이)
+- 일괄 보정 및 개별 보정 옵션
+- 보정 사유 입력 필드
+- 보정 내역 미리보기 및 확인
+
+#### 4.6.4 실사 분석 대시보드
+- 실사 결과 요약 시각화
+- 시간에 따른 재고 정확도 추이 그래프
+- 가장 빈번하게 차이가 발생하는 항목 순위
+- 재고 관리 개선을 위한 제안 표시
 
 ## 5. 비기능적 요구사항
 
@@ -269,11 +377,13 @@
 - 유통기한 관리 기능
 - 재고 알림 시스템
 - 조리계획서 연동
+- 재고 실사 기본 기능 구현 (실사 계획, 수행, 보정)
 
 #### 6.1.4 4단계: 보고서 및 분석 기능 (2-3주)
 - 재고 보고서 생성
 - 재고 분석 기능
 - 데이터 시각화
+- 재고 실사 분석 대시보드 구현
 
 #### 6.1.5 5단계: 최적화 및 테스트 (1-2주)
 - 성능 최적화
