@@ -9,6 +9,7 @@ export interface CartItem {
   current_quantity: number;
   unit: string;
   quantity: number; // 입고/출고할 수량
+  itemType: "ingredient" | "container"; // 항목 유형 추가
 }
 
 // 장바구니 컨텍스트 인터페이스
@@ -56,6 +57,7 @@ export function StockCartProvider({ children }: { children: ReactNode }) {
         current_quantity: item.current_quantity,
         unit: item.unit,
         quantity: 1, // 기본 수량
+        itemType: item.item_type, // 항목 유형 추가
       },
     ]);
 
