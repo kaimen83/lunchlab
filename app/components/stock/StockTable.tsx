@@ -80,6 +80,19 @@ export function StockTable({
         return <Badge variant="outline">기타</Badge>;
     }
   };
+  
+  // 재고 상태에 따른 배지 렌더링
+  const getQuantityBadge = (quantity: number) => {
+    if (quantity < 0) {
+      return <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200">초과출고</Badge>;
+    } else if (quantity === 0) {
+      return <Badge variant="destructive">품절</Badge>;
+    } else if (quantity < 10) {
+      return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">부족</Badge>;
+    } else {
+      return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">충분</Badge>;
+    }
+  };
 
   // 정렬 아이콘 렌더링
   const getSortIcon = (field: string) => {
@@ -250,12 +263,13 @@ export function StockTable({
                   {getSortIcon("last_updated")}
                 </div>
               </TableHead>
+              <TableHead>상태</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-10">
+                <TableCell colSpan={6} className="text-center py-10">
                   <div className="flex flex-col items-center justify-center text-muted-foreground">
                     <Package className="h-12 w-12 mb-2 text-muted-foreground/50" />
                     <p>재고 항목이 없습니다.</p>
@@ -286,6 +300,7 @@ export function StockTable({
                       ? formatDate(item.last_updated)
                       : formatDate(item.created_at)}
                   </TableCell>
+                  <TableCell>{getQuantityBadge(item.current_quantity)}</TableCell>
                 </TableRow>
               ))
             )}

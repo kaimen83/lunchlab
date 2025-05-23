@@ -215,7 +215,6 @@ function CartItemRow({ item, onRemove, onQuantityChange }: CartItemRowProps) {
         <div className="w-20">
           <Input
             type="number"
-            min="0.01"
             step="0.01"
             value={item.quantity}
             onChange={(e) =>

@@ -438,7 +438,7 @@ export async function POST(
         if (requestType === 'incoming') {
           newQuantity = Number(stockItem.current_quantity) + Number(quantity);
         } else if (requestType === 'outgoing' || requestType === 'disposal') {
-          newQuantity = Math.max(0, Number(stockItem.current_quantity) - Number(quantity));
+          newQuantity = Number(stockItem.current_quantity) - Number(quantity);
         }
 
         const { error: updateError } = await supabase

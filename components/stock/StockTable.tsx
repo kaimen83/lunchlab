@@ -91,7 +91,9 @@ export function StockTable({
   const getQuantityBadge = (item: StockItem) => {
     const quantity = item.current_quantity;
     
-    if (quantity <= 0) {
+    if (quantity < 0) {
+      return <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200">초과출고</Badge>;
+    } else if (quantity === 0) {
       return <Badge variant="destructive">품절</Badge>;
     } else if (quantity < 10) {
       return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">부족</Badge>;
@@ -151,9 +153,6 @@ export function StockTable({
                 <TableHead className="w-[60px] text-right">
                   <Skeleton className="h-4 w-20 ml-auto" />
                 </TableHead>
-                <TableHead className="w-[60px] text-right">
-                  <Skeleton className="h-4 w-20 ml-auto" />
-                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -178,9 +177,6 @@ export function StockTable({
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-6 w-24" />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Skeleton className="h-8 w-8 ml-auto" />
                     </TableCell>
                     <TableCell className="text-right">
                       <Skeleton className="h-8 w-8 ml-auto" />
@@ -263,14 +259,13 @@ export function StockTable({
                 </button>
               </TableHead>
               <TableHead className="w-[80px]">상태</TableHead>
-              <TableHead className="w-[60px] text-right">더보기</TableHead>
               <TableHead className="w-[60px] text-right">장바구니</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-10">
+                <TableCell colSpan={7} className="text-center py-10">
                   <div className="flex flex-col items-center justify-center text-muted-foreground">
                     <Package className="h-12 w-12 mb-2 text-muted-foreground/50" />
                     <p>등록된 재고 항목이 없습니다.</p>
@@ -287,7 +282,18 @@ export function StockTable({
                 <TableRow key={item.id}>
                   <TableCell>{getItemTypeBadge(item.item_type)}</TableCell>
                   <TableCell className="font-medium">
-                    {item.name || item.details?.name || '알 수 없음'}
+                    {item.id.startsWith('temp_') ? (
+                      <span className="cursor-not-allowed" title="등록이 필요한 항목입니다">
+                        {item.name || item.details?.name || '알 수 없음'}
+                      </span>
+                    ) : (
+                      <Link 
+                        href={`/companies/${companyId}/stock/items/${item.id}`}
+                        className="hover:underline hover:text-primary cursor-pointer"
+                      >
+                        {item.name || item.details?.name || '알 수 없음'}
+                      </Link>
+                    )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {item.details?.code_name || '없음'}
@@ -297,31 +303,6 @@ export function StockTable({
                   </TableCell>
                   <TableCell>{formatDate(item.last_updated)}</TableCell>
                   <TableCell>{getQuantityBadge(item)}</TableCell>
-                  <TableCell className="text-right">
-                    {item.id.startsWith('temp_') ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 cursor-not-allowed opacity-50"
-                        title="등록이 필요한 항목입니다"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                        <span className="sr-only">등록 필요</span>
-                      </Button>
-                    ) : (
-                      <Button
-                        asChild
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                      >
-                        <Link href={`/companies/${companyId}/stock/items/${item.id}`}>
-                          <ExternalLink className="h-4 w-4" />
-                          <span className="sr-only">상세 보기</span>
-                        </Link>
-                      </Button>
-                    )}
-                  </TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
