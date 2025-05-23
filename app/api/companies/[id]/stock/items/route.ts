@@ -294,10 +294,8 @@ export async function GET(
       });
     }
 
-    // 페이지네이션 적용
-    const startIndex = (page - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    const paginatedItems = allItems.slice(startIndex, endIndex);
+    // 이미 각 쿼리에서 페이지네이션이 적용되어 있으므로 다시 슬라이싱하지 않음
+    const paginatedItems = allItems;
 
     // 응답 반환
     return NextResponse.json({
