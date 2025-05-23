@@ -26,8 +26,8 @@ export default function StockItemsPage({ companyId, selectedItemType = "ingredie
   const [filters, setFilters] = useState<StockFilterValues>({
     query: "",
     itemType: selectedItemType,
-    category: "",
-    stockGrade: "",
+    category: "all",
+    stockGrade: "all",
     sortBy: "name",
     sortOrder: "asc",
   });
@@ -70,7 +70,10 @@ export default function StockItemsPage({ companyId, selectedItemType = "ingredie
             const itemType = selectedItemType || parsedState.filters.itemType || "ingredient";
             setFilters({
               ...parsedState.filters,
-              itemType
+              itemType,
+              // 빈 문자열을 'all'로 변환
+              category: parsedState.filters.category === '' ? 'all' : parsedState.filters.category || 'all',
+              stockGrade: parsedState.filters.stockGrade === '' ? 'all' : parsedState.filters.stockGrade || 'all'
             });
           }
           if (parsedState.pagination) {
@@ -100,8 +103,8 @@ export default function StockItemsPage({ companyId, selectedItemType = "ingredie
 
       if (filters.query) queryParams.set("query", filters.query);
       if (filters.itemType) queryParams.set("itemType", filters.itemType);
-      if (filters.category) queryParams.set("category", filters.category);
-      if (filters.stockGrade) queryParams.set("stockGrade", filters.stockGrade);
+      if (filters.category && filters.category !== 'all') queryParams.set("category", filters.category);
+      if (filters.stockGrade && filters.stockGrade !== 'all') queryParams.set("stockGrade", filters.stockGrade);
       if (filters.sortBy) queryParams.set("sortBy", filters.sortBy);
       if (filters.sortOrder) queryParams.set("sortOrder", filters.sortOrder);
 

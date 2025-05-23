@@ -70,8 +70,8 @@ export function StockFilter({
     }
 
     // 항목 유형이 변경되었고, 이전에 카테고리가 설정되어 있었다면 카테고리 초기화
-    if (prevItemType.current !== filters.itemType && filters.category) {
-      setFilters(prev => ({ ...prev, category: '' }));
+    if (prevItemType.current !== filters.itemType && filters.category && filters.category !== 'all') {
+      setFilters(prev => ({ ...prev, category: 'all' }));
     }
 
     // 현재 항목 유형을 저장
@@ -79,11 +79,17 @@ export function StockFilter({
   }, [filters.itemType, filters.category]);
 
   const handleChange = (name: string, value: string) => {
+    // 'all' 값을 빈 문자열로 변환하여 API 요청에 사용
+    const apiValue = value === 'all' ? '' : value;
     const newFilters = { ...filters, [name]: value };
     setFilters(newFilters);
     
-    // 필터 변경 시 부모에게 알림
-    onFilterChange(newFilters);
+    // 필터 변경 시 부모에게 알림 (API 요청용 값으로 변환)
+    const apiFilters = { ...newFilters };
+    if (apiFilters.category === 'all') apiFilters.category = '';
+    if (apiFilters.stockGrade === 'all') apiFilters.stockGrade = '';
+    
+    onFilterChange(apiFilters);
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -95,13 +101,19 @@ export function StockFilter({
     const resetFilters: StockFilterValues = {
       query: "",
       itemType: filters.itemType, // 현재 선택된 항목 유형은 유지
-      category: "",
-      stockGrade: "",
+      category: "all",
+      stockGrade: "all",
       sortBy: "name",
       sortOrder: "asc",
     };
     setFilters(resetFilters);
-    onFilterChange(resetFilters);
+    
+    // API 요청용 값으로 변환
+    const apiFilters = { ...resetFilters };
+    apiFilters.category = '';
+    apiFilters.stockGrade = '';
+    
+    onFilterChange(apiFilters);
   };
 
   return (
@@ -138,14 +150,14 @@ export function StockFilter({
               <div className="space-y-2">
                 <Label htmlFor="category">카테고리</Label>
                 <Select
-                  value={filters.category || ""}
+                  value={filters.category || "all"}
                   onValueChange={(value) => handleChange("category", value)}
                 >
                   <SelectTrigger id="category">
                     <SelectValue placeholder="모든 카테고리" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">모든 카테고리</SelectItem>
+                    <SelectItem value="all">모든 카테고리</SelectItem>
                     {availableCategories.map((category) => (
                       <SelectItem key={category} value={category}>
                         {category}
@@ -161,14 +173,14 @@ export function StockFilter({
               <div className="space-y-2">
                 <Label htmlFor="stockGrade">재고 등급</Label>
                 <Select
-                  value={filters.stockGrade || ""}
+                  value={filters.stockGrade || "all"}
                   onValueChange={(value) => handleChange("stockGrade", value)}
                 >
                   <SelectTrigger id="stockGrade">
                     <SelectValue placeholder="모든 등급" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">모든 등급</SelectItem>
+                    <SelectItem value="all">모든 등급</SelectItem>
                     <SelectItem value="A">A 등급</SelectItem>
                     <SelectItem value="B">B 등급</SelectItem>
                     <SelectItem value="C">C 등급</SelectItem>

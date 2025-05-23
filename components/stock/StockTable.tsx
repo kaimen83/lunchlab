@@ -14,7 +14,6 @@ import {
   ExternalLink,
   RefreshCw,
   Package,
-  PlusCircle,
   ArrowUpDown,
   ShoppingCart,
 } from "lucide-react";
@@ -242,13 +241,6 @@ export function StockTable({
             </Badge>
           )}
         </div>
-
-        <Button asChild size="sm">
-          <Link href={`/companies/${companyId}/stock/add`}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            새 항목 추가
-          </Link>
-        </Button>
       </div>
 
       <div className="rounded-md border">
@@ -300,9 +292,6 @@ export function StockTable({
                   <div className="flex flex-col items-center justify-center text-muted-foreground">
                     <Package className="h-12 w-12 mb-2" />
                     <p>재고 항목이 없습니다.</p>
-                    <p className="text-xs">
-                      위의 &quot;새 항목 추가&quot; 버튼을 클릭하여 재고 항목을 추가하세요.
-                    </p>
                   </div>
                 </TableCell>
               </TableRow>
