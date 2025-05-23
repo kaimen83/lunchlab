@@ -68,13 +68,13 @@ export function StockTransactionTable({
       case "in":
         return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">입고</Badge>;
       case "out":
-        return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">출고</Badge>;
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">출고</Badge>;
       case "adjustment":
         return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">조정</Badge>;
       case "verification":
         return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">실사</Badge>;
       default:
-        return <Badge variant="outline">기타</Badge>;
+        return <Badge variant="secondary">{type}</Badge>;
     }
   };
 
@@ -92,6 +92,12 @@ export function StockTransactionTable({
       default:
         return <Badge variant="outline">알 수 없음</Badge>;
     }
+  };
+
+  // 숫자 포맷 함수 (천단위 구분자)
+  const formatNumber = (value: number | undefined) => {
+    if (value === undefined || value === null) return "-";
+    return value.toLocaleString("ko-KR");
   };
 
   // 날짜 포맷 함수
@@ -224,9 +230,8 @@ export function StockTransactionTable({
                       </span>
                     )}
                   </TableCell>
-                  <TableCell>
-                    {transaction.transaction_type === "out" ? "-" : ""}
-                    {transaction.quantity} {transaction.unit}
+                  <TableCell className="text-right">
+                    {formatNumber(transaction.quantity)} {transaction.unit}
                   </TableCell>
                   <TableCell>{formatDate(transaction.created_at)}</TableCell>
                   <TableCell>{transaction.created_by.name}</TableCell>

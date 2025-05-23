@@ -132,10 +132,16 @@ export function StockTable({
     });
   };
 
-  // 금액 포맷팅 함수
+  // 숫자 포맷 함수 (천단위 구분자)
+  const formatNumber = (value: number | undefined) => {
+    if (value === undefined || value === null) return "-";
+    return value.toLocaleString("ko-KR");
+  };
+
+  // 가격 포맷 함수
   const formatPrice = (price: number | undefined) => {
-    if (price === null || price === undefined) return "-";
-    return price.toLocaleString('ko-KR') + "원";
+    if (price === undefined || price === null) return "-";
+    return `${formatNumber(price)}원`;
   };
 
   if (isLoading) {
@@ -336,7 +342,7 @@ export function StockTable({
                     <TableCell>
                       {item.details?.code_name || "-"}
                     </TableCell>
-                    <TableCell>{item.current_quantity} {item.unit}</TableCell>
+                    <TableCell>{formatNumber(item.current_quantity)} {item.unit}</TableCell>
                     <TableCell>{formatPrice(price)}</TableCell>
                     <TableCell>{formatPrice(totalValue)}</TableCell>
                     <TableCell>
