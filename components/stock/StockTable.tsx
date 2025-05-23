@@ -56,6 +56,8 @@ interface StockTableProps {
   sortOrder: "asc" | "desc";
   companyId: string;
   onRefresh: () => void;
+  stockGrade: string;
+  itemType: string;
 }
 
 export function StockTable({
@@ -68,6 +70,8 @@ export function StockTable({
   sortOrder,
   companyId,
   onRefresh,
+  stockGrade,
+  itemType,
 }: StockTableProps) {
   const sortIcon = (field: string) => {
     if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4" />;
@@ -121,22 +125,25 @@ export function StockTable({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[50px]">
+                <TableHead className="w-[80px]">
                   <Skeleton className="h-4 w-8" />
                 </TableHead>
-                <TableHead>
+                <TableHead className="w-[200px]">
                   <Skeleton className="h-4 w-20" />
                 </TableHead>
-                <TableHead>
+                <TableHead className="w-[100px]">
                   <Skeleton className="h-4 w-20" />
                 </TableHead>
-                <TableHead>
+                <TableHead className="w-[100px]">
                   <Skeleton className="h-4 w-20" />
                 </TableHead>
-                <TableHead>
+                <TableHead className="w-[180px]">
                   <Skeleton className="h-4 w-20" />
                 </TableHead>
-                <TableHead className="text-right">
+                <TableHead className="w-[80px]">
+                  <Skeleton className="h-4 w-20" />
+                </TableHead>
+                <TableHead className="w-[60px] text-right">
                   <Skeleton className="h-4 w-20 ml-auto" />
                 </TableHead>
               </TableRow>
@@ -151,6 +158,9 @@ export function StockTable({
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-6 w-24" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-6 w-16" />
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-6 w-16" />
@@ -189,6 +199,11 @@ export function StockTable({
           <div className="text-sm text-muted-foreground">
             총 {pagination.total}개 항목
           </div>
+          {stockGrade && stockGrade !== "all" && itemType === "ingredient" && (
+            <Badge variant="secondary" className="ml-2">
+              재고등급: {stockGrade}
+            </Badge>
+          )}
         </div>
 
         <Button asChild size="sm">
@@ -203,8 +218,8 @@ export function StockTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[50px]">유형</TableHead>
-              <TableHead>
+              <TableHead className="w-[80px]">유형</TableHead>
+              <TableHead className="w-[200px]">
                 <button
                   onClick={() => onSort("name")}
                   className="inline-flex items-center hover:text-primary"
@@ -212,7 +227,15 @@ export function StockTable({
                   항목명 {sortIcon("name")}
                 </button>
               </TableHead>
-              <TableHead>
+              <TableHead className="w-[100px]">
+                <button
+                  onClick={() => onSort("code_name")}
+                  className="inline-flex items-center hover:text-primary"
+                >
+                  코드 {sortIcon("code_name")}
+                </button>
+              </TableHead>
+              <TableHead className="w-[100px]">
                 <button
                   onClick={() => onSort("current_quantity")}
                   className="inline-flex items-center hover:text-primary"
@@ -220,7 +243,7 @@ export function StockTable({
                   수량 {sortIcon("current_quantity")}
                 </button>
               </TableHead>
-              <TableHead>
+              <TableHead className="w-[180px]">
                 <button
                   onClick={() => onSort("last_updated")}
                   className="inline-flex items-center hover:text-primary"
@@ -228,14 +251,14 @@ export function StockTable({
                   최종 업데이트 {sortIcon("last_updated")}
                 </button>
               </TableHead>
-              <TableHead>상태</TableHead>
-              <TableHead className="text-right">액션</TableHead>
+              <TableHead className="w-[80px]">상태</TableHead>
+              <TableHead className="w-[60px] text-right">더보기</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-10">
+                <TableCell colSpan={7} className="text-center py-10">
                   <div className="flex flex-col items-center justify-center text-muted-foreground">
                     <Package className="h-12 w-12 mb-2 text-muted-foreground/50" />
                     <p>등록된 재고 항목이 없습니다.</p>
@@ -253,11 +276,9 @@ export function StockTable({
                   <TableCell>{getItemTypeBadge(item.item_type)}</TableCell>
                   <TableCell className="font-medium">
                     {item.name || item.details?.name || '알 수 없음'}
-                    {item.details?.code_name && (
-                      <span className="text-xs text-muted-foreground ml-2">
-                        ({item.details.code_name})
-                      </span>
-                    )}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {item.details?.code_name || '없음'}
                   </TableCell>
                   <TableCell>
                     {item.current_quantity} {item.unit}
@@ -265,17 +286,29 @@ export function StockTable({
                   <TableCell>{formatDate(item.last_updated)}</TableCell>
                   <TableCell>{getQuantityBadge(item)}</TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      asChild
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                    >
-                      <Link href={`/companies/${companyId}/stock/items/${item.id}`}>
+                    {item.id.startsWith('temp_') ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 cursor-not-allowed opacity-50"
+                        title="등록이 필요한 항목입니다"
+                      >
                         <ExternalLink className="h-4 w-4" />
-                        <span className="sr-only">상세 보기</span>
-                      </Link>
-                    </Button>
+                        <span className="sr-only">등록 필요</span>
+                      </Button>
+                    ) : (
+                      <Button
+                        asChild
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                      >
+                        <Link href={`/companies/${companyId}/stock/items/${item.id}`}>
+                          <ExternalLink className="h-4 w-4" />
+                          <span className="sr-only">상세 보기</span>
+                        </Link>
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

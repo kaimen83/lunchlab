@@ -154,9 +154,18 @@ export async function GET(
       let ingredientQuery = supabase
         .from('ingredients')
         .select('*')
-        .in('id', availableIngredientIds)
-        .order(sortBy === 'name' ? 'name' : 'created_at', { ascending: sortOrder === 'asc' })
-        .range(offset, offset + limit - 1);
+        .in('id', availableIngredientIds);
+        
+      // 정렬 조건 적용
+      if (sortBy === 'name') {
+        ingredientQuery = ingredientQuery.order('name', { ascending: sortOrder === 'asc' });
+      } else if (sortBy === 'code_name') {
+        ingredientQuery = ingredientQuery.order('code_name', { ascending: sortOrder === 'asc' });
+      } else {
+        ingredientQuery = ingredientQuery.order('created_at', { ascending: sortOrder === 'asc' });
+      }
+      
+      ingredientQuery = ingredientQuery.range(offset, offset + limit - 1);
       
       const { data: ingredients, error: ingredientsError } = await ingredientQuery;
       
@@ -221,9 +230,18 @@ export async function GET(
       let containerQuery = supabase
         .from('containers')
         .select('*')
-        .in('id', availableContainerIds)
-        .order(sortBy === 'name' ? 'name' : 'created_at', { ascending: sortOrder === 'asc' })
-        .range(offset, offset + limit - 1);
+        .in('id', availableContainerIds);
+        
+      // 정렬 조건 적용
+      if (sortBy === 'name') {
+        containerQuery = containerQuery.order('name', { ascending: sortOrder === 'asc' });
+      } else if (sortBy === 'code_name') {
+        containerQuery = containerQuery.order('code_name', { ascending: sortOrder === 'asc' });
+      } else {
+        containerQuery = containerQuery.order('created_at', { ascending: sortOrder === 'asc' });
+      }
+      
+      containerQuery = containerQuery.range(offset, offset + limit - 1);
       
       const { data: containers, error: containersError } = await containerQuery;
       
@@ -273,6 +291,14 @@ export async function GET(
         return sortOrder === 'asc' 
           ? a.name.localeCompare(b.name) 
           : b.name.localeCompare(a.name);
+      });
+    } else if (sortBy === 'code_name') {
+      allItems.sort((a, b) => {
+        const codeA = a.details?.code_name || '';
+        const codeB = b.details?.code_name || '';
+        return sortOrder === 'asc'
+          ? codeA.localeCompare(codeB)
+          : codeB.localeCompare(codeA);
       });
     } else if (sortBy === 'current_quantity') {
       allItems.sort((a, b) => {

@@ -12,10 +12,11 @@ import { auth } from '@clerk/nextjs/server';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; itemId: string } }
+  { params }: { params: Promise<{ id: string; itemId: string }> }
 ) {
   try {
-    const { id: companyId, itemId } = params;
+    // Next.js 15에서는 params가 Promise이므로 await로 처리
+    const { id: companyId, itemId } = await params;
     const { userId } = await auth();
 
     // 로그인하지 않은 경우 권한 없음

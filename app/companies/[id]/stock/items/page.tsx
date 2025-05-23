@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { StockFilter, StockFilterValues } from "@/components/stock/StockFilter";
 import { StockItem, StockTable, PaginationInfo } from "@/components/stock/StockTable";
 import { StockTransactionForm } from "@/components/stock/StockTransactionForm";
@@ -23,15 +23,17 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
   });
   const [filters, setFilters] = useState<StockFilterValues>({
     query: "",
-    itemType: "", // 초기값을 비워두어 API에서 기본 조건(B등급 식자재와 모든 용기)이 적용되도록 함
+    itemType: "container", // 초기값을 container로 설정하여 용기 탭이 선택된 상태로 보이도록 함
     category: "",
     stockGrade: "",
     sortBy: "name",
     sortOrder: "asc",
   });
+  
+  const shouldFetch = useRef(false);
 
   // 재고 항목 목록 조회
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
     setIsLoading(true);
     try {
       const queryParams = new URLSearchParams({
@@ -67,31 +69,34 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [companyId, pagination.page, pagination.pageSize, filters, toast]);
 
   // 필터 변경 시 목록 다시 조회
-  const handleFilterChange = (newFilters: StockFilterValues) => {
+  const handleFilterChange = useCallback((newFilters: StockFilterValues) => {
     setFilters(newFilters);
     setPagination((prev) => ({ ...prev, page: 1 })); // 필터 변경 시 1페이지로 이동
-  };
+    shouldFetch.current = true;
+  }, []);
 
   // 페이지 변경 핸들러
-  const handlePageChange = (page: number) => {
+  const handlePageChange = useCallback((page: number) => {
     setPagination((prev) => ({ ...prev, page }));
-  };
+    shouldFetch.current = true;
+  }, []);
 
   // 정렬 변경 핸들러
-  const handleSort = (field: string) => {
+  const handleSort = useCallback((field: string) => {
     setFilters((prev) => {
       // 같은 필드를 다시 클릭하면 정렬 방향 변경
       const newSortOrder =
         prev.sortBy === field && prev.sortOrder === "asc" ? "desc" : "asc";
       return { ...prev, sortBy: field, sortOrder: newSortOrder };
     });
-  };
+    shouldFetch.current = true;
+  }, []);
 
   // 거래 생성 핸들러
-  const handleTransactionSubmit = async (data: any) => {
+  const handleTransactionSubmit = useCallback(async (data: any) => {
     try {
       const response = await fetch(
         `/api/companies/${companyId}/stock/transactions`,
@@ -121,6 +126,7 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
       });
 
       // 거래 처리 후 재고 목록 갱신
+      shouldFetch.current = true;
       fetchItems();
     } catch (error) {
       console.error("거래 생성 오류:", error);
@@ -130,12 +136,22 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
         variant: "destructive",
       });
     }
-  };
+  }, [companyId, fetchItems, toast]);
 
-  // 초기 데이터 로딩 및 필터/페이지 변경 시 데이터 다시 로딩
+  // 상태 변경 시 데이터 다시 로딩
   useEffect(() => {
+    // shouldFetch 플래그가 true일 때만 데이터를 가져옵니다
+    if (shouldFetch.current) {
+      fetchItems();
+      shouldFetch.current = false;
+    }
+  }, [fetchItems]);
+
+  // 컴포넌트 마운트 시 초기 데이터 로딩
+  useEffect(() => {
+    shouldFetch.current = true; // 초기 로딩 시 플래그 설정
     fetchItems();
-  }, [companyId, pagination.page, filters]);
+  }, [companyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="grid gap-6 md:grid-cols-3">
@@ -153,7 +169,9 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
           sortField={filters.sortBy || ""}
           sortOrder={filters.sortOrder || "asc"}
           companyId={companyId}
-          onRefresh={fetchItems}
+          onRefresh={() => { shouldFetch.current = true; fetchItems(); }}
+          stockGrade={filters.stockGrade || ""}
+          itemType={filters.itemType || ""}
         />
       </div>
       <div>
