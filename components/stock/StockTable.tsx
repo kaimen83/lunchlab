@@ -16,10 +16,12 @@ import {
   Package,
   PlusCircle,
   ArrowUpDown,
+  ShoppingCart,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
+import { useStockCart } from "./StockCartContext";
 
 // 재고 항목 타입 정의
 export interface StockItem {
@@ -73,6 +75,9 @@ export function StockTable({
   stockGrade,
   itemType,
 }: StockTableProps) {
+  // 장바구니 컨텍스트 사용
+  const { addItem } = useStockCart();
+
   const sortIcon = (field: string) => {
     if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4" />;
     return sortOrder === "asc" ? (
@@ -146,6 +151,9 @@ export function StockTable({
                 <TableHead className="w-[60px] text-right">
                   <Skeleton className="h-4 w-20 ml-auto" />
                 </TableHead>
+                <TableHead className="w-[60px] text-right">
+                  <Skeleton className="h-4 w-20 ml-auto" />
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -172,7 +180,10 @@ export function StockTable({
                       <Skeleton className="h-6 w-24" />
                     </TableCell>
                     <TableCell className="text-right">
-                      <Skeleton className="h-8 w-20 ml-auto" />
+                      <Skeleton className="h-8 w-8 ml-auto" />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Skeleton className="h-8 w-8 ml-auto" />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -253,12 +264,13 @@ export function StockTable({
               </TableHead>
               <TableHead className="w-[80px]">상태</TableHead>
               <TableHead className="w-[60px] text-right">더보기</TableHead>
+              <TableHead className="w-[60px] text-right">장바구니</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-10">
+                <TableCell colSpan={8} className="text-center py-10">
                   <div className="flex flex-col items-center justify-center text-muted-foreground">
                     <Package className="h-12 w-12 mb-2 text-muted-foreground/50" />
                     <p>등록된 재고 항목이 없습니다.</p>
@@ -309,6 +321,19 @@ export function StockTable({
                         </Link>
                       </Button>
                     )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => addItem(item)}
+                      title="장바구니에 추가"
+                      disabled={item.id.startsWith('temp_')}
+                    >
+                      <ShoppingCart className="h-4 w-4" />
+                      <span className="sr-only">장바구니 추가</span>
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))

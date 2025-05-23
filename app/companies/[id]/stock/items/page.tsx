@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { StockFilter, StockFilterValues } from "@/components/stock/StockFilter";
 import { StockItem, StockTable, PaginationInfo } from "@/components/stock/StockTable";
-import { StockTransactionForm } from "@/components/stock/StockTransactionForm";
+import { StockCartPanel } from "@/components/stock/StockCartPanel";
+import { StockCartProvider } from "@/components/stock/StockCartContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
@@ -23,7 +24,7 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
   });
   const [filters, setFilters] = useState<StockFilterValues>({
     query: "",
-    itemType: "container", // 초기값을 container로 설정하여 용기 탭이 선택된 상태로 보이도록 함
+    itemType: "container",
     category: "",
     stockGrade: "",
     sortBy: "name",
@@ -95,48 +96,11 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
     shouldFetch.current = true;
   }, []);
 
-  // 거래 생성 핸들러
-  const handleTransactionSubmit = useCallback(async (data: any) => {
-    try {
-      const response = await fetch(
-        `/api/companies/${companyId}/stock/transactions`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            stockItemIds: [data.stockItemId],  // 배열로 변환
-            quantities: [data.quantity],       // 배열로 변환
-            requestType: data.transactionType === "in" ? "incoming" : "outgoing", // 이름 변환
-            notes: data.notes || "",
-            directProcess: true  // 직접 처리 플래그 추가
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "거래 생성에 실패했습니다");
-      }
-
-      toast({
-        title: "거래가 생성되었습니다",
-        description: `${data.transactionType === "in" ? "입고" : "출고"} 거래가 성공적으로 처리되었습니다.`,
-      });
-
-      // 거래 처리 후 재고 목록 갱신
-      shouldFetch.current = true;
-      fetchItems();
-    } catch (error) {
-      console.error("거래 생성 오류:", error);
-      toast({
-        title: "거래 생성 실패",
-        description: error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다",
-        variant: "destructive",
-      });
-    }
-  }, [companyId, fetchItems, toast]);
+  // 일괄 거래 완료 후 콜백
+  const handleBulkProcessComplete = useCallback(() => {
+    shouldFetch.current = true;
+    fetchItems();
+  }, [fetchItems]);
 
   // 상태 변경 시 데이터 다시 로딩
   useEffect(() => {
@@ -154,34 +118,34 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
   }, [companyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="grid gap-6 md:grid-cols-3">
-      <div className="md:col-span-2 space-y-4">
-        <StockFilter
-          onFilterChange={handleFilterChange}
-          defaultValues={filters}
-        />
-        <StockTable
-          items={items}
-          pagination={pagination}
-          isLoading={isLoading}
-          onPageChange={handlePageChange}
-          onSort={handleSort}
-          sortField={filters.sortBy || ""}
-          sortOrder={filters.sortOrder || "asc"}
-          companyId={companyId}
-          onRefresh={() => { shouldFetch.current = true; fetchItems(); }}
-          stockGrade={filters.stockGrade || ""}
-          itemType={filters.itemType || ""}
-        />
+    <StockCartProvider>
+      <div className="grid gap-6 md:grid-cols-3">
+        <div className="md:col-span-2 space-y-4">
+          <StockFilter
+            onFilterChange={handleFilterChange}
+            defaultValues={filters}
+          />
+          <StockTable
+            items={items}
+            pagination={pagination}
+            isLoading={isLoading}
+            onPageChange={handlePageChange}
+            onSort={handleSort}
+            sortField={filters.sortBy || ""}
+            sortOrder={filters.sortOrder || "asc"}
+            companyId={companyId}
+            onRefresh={() => { shouldFetch.current = true; fetchItems(); }}
+            stockGrade={filters.stockGrade || ""}
+            itemType={filters.itemType || ""}
+          />
+        </div>
+        <div>
+          <StockCartPanel
+            companyId={companyId}
+            onProcessComplete={handleBulkProcessComplete}
+          />
+        </div>
       </div>
-      <div>
-        <StockTransactionForm
-          companyId={companyId}
-          stockItems={items}
-          isLoading={isLoading}
-          onSubmit={handleTransactionSubmit}
-        />
-      </div>
-    </div>
+    </StockCartProvider>
   );
 } 
