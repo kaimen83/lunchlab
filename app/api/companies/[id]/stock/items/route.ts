@@ -202,7 +202,10 @@ export async function GET(
             unit: stockItem?.unit || ingredient.unit || '개',
             last_updated: stockItem?.last_updated || new Date().toISOString(),
             created_at: stockItem?.created_at || new Date().toISOString(),
-            details: ingredient,
+            details: {
+              ...ingredient,
+              price: ingredient.price || undefined
+            },
             name: ingredient.name || '알 수 없음'
           });
         }
@@ -275,10 +278,13 @@ export async function GET(
             item_type: 'container',
             item_id: container.id,
             current_quantity: stockItem?.current_quantity || 0,
-            unit: stockItem?.unit || '개',
+            unit: stockItem?.unit || '개', // 용기는 기본적으로 '개' 단위 사용
             last_updated: stockItem?.last_updated || new Date().toISOString(),
             created_at: stockItem?.created_at || new Date().toISOString(),
-            details: container,
+            details: {
+              ...container,
+              price: container.price || undefined
+            },
             name: container.name || '알 수 없음'
           });
         }

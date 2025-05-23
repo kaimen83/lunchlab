@@ -36,6 +36,7 @@ export interface StockItem {
     id: string;
     name: string;
     code_name?: string;
+    price?: number; // 단가 정보 추가
     [key: string]: any;
   };
 }
@@ -121,6 +122,12 @@ export function StockTable({
     });
   };
 
+  // 금액 포맷팅 함수
+  const formatPrice = (price: number | undefined) => {
+    if (price === null || price === undefined) return "-";
+    return price.toLocaleString('ko-KR') + "원";
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -144,10 +151,16 @@ export function StockTable({
                 <TableHead className="w-[100px]">
                   <Skeleton className="h-4 w-20" />
                 </TableHead>
-                <TableHead className="w-[180px]">
+                <TableHead className="w-[100px]">
                   <Skeleton className="h-4 w-20" />
                 </TableHead>
-                <TableHead className="w-[80px]">
+                <TableHead className="w-[100px]">
+                  <Skeleton className="h-4 w-20" />
+                </TableHead>
+                <TableHead className="w-[100px]">
+                  <Skeleton className="h-4 w-20" />
+                </TableHead>
+                <TableHead className="w-[180px]">
                   <Skeleton className="h-4 w-20" />
                 </TableHead>
                 <TableHead className="w-[60px] text-right">
@@ -173,10 +186,16 @@ export function StockTable({
                       <Skeleton className="h-6 w-16" />
                     </TableCell>
                     <TableCell>
-                      <Skeleton className="h-6 w-20" />
+                      <Skeleton className="h-6 w-16" />
                     </TableCell>
                     <TableCell>
-                      <Skeleton className="h-6 w-24" />
+                      <Skeleton className="h-6 w-16" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-6 w-16" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-6 w-20" />
                     </TableCell>
                     <TableCell className="text-right">
                       <Skeleton className="h-8 w-8 ml-auto" />
@@ -250,6 +269,8 @@ export function StockTable({
                   수량 {sortIcon("current_quantity")}
                 </button>
               </TableHead>
+              <TableHead className="w-[100px]">단가</TableHead>
+              <TableHead className="w-[100px]">재고액</TableHead>
               <TableHead className="w-[180px]">
                 <button
                   onClick={() => onSort("last_updated")}
@@ -258,84 +279,99 @@ export function StockTable({
                   최종 업데이트 {sortIcon("last_updated")}
                 </button>
               </TableHead>
-              <TableHead className="w-[80px]">상태</TableHead>
-              <TableHead className="w-[60px] text-right">장바구니</TableHead>
+              <TableHead className="text-right">장바구니</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-10">
+                <TableCell colSpan={8} className="h-24 text-center">
                   <div className="flex flex-col items-center justify-center text-muted-foreground">
-                    <Package className="h-12 w-12 mb-2 text-muted-foreground/50" />
-                    <p>등록된 재고 항목이 없습니다.</p>
-                    <Button asChild variant="link" className="mt-2">
-                      <Link href={`/companies/${companyId}/stock/add`}>
-                        새 항목 추가하기
-                      </Link>
-                    </Button>
+                    <Package className="h-12 w-12 mb-2" />
+                    <p>재고 항목이 없습니다.</p>
+                    <p className="text-xs">
+                      위의 &quot;새 항목 추가&quot; 버튼을 클릭하여 재고 항목을 추가하세요.
+                    </p>
                   </div>
                 </TableCell>
               </TableRow>
             ) : (
-              items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>{getItemTypeBadge(item.item_type)}</TableCell>
-                  <TableCell className="font-medium">
-                    {item.id.startsWith('temp_') ? (
-                      <span className="cursor-not-allowed" title="등록이 필요한 항목입니다">
-                        {item.name || item.details?.name || '알 수 없음'}
-                      </span>
-                    ) : (
-                      <Link 
-                        href={`/companies/${companyId}/stock/items/${item.id}`}
-                        className="hover:underline hover:text-primary cursor-pointer"
+              items.map((item) => {
+                // 임시 항목인지 확인
+                const isTemporary = item.id.startsWith("temp_");
+                
+                // 단가와 재고액 계산
+                const price = item.details?.price;
+                let totalValue;
+                
+                if (item.item_type === "ingredient" && item.details?.package_amount) {
+                  // 식자재: 수량÷포장단위×단가
+                  const packageAmount = item.details.package_amount;
+                  totalValue = price && item.current_quantity !== undefined && packageAmount > 0
+                    ? (item.current_quantity / packageAmount) * price
+                    : undefined;
+                } else {
+                  // 용기: 단가×수량
+                  totalValue = price && item.current_quantity !== undefined
+                    ? price * item.current_quantity
+                    : undefined;
+                }
+                
+                return (
+                  <TableRow key={item.id}>
+                    <TableCell>{getItemTypeBadge(item.item_type)}</TableCell>
+                    <TableCell>
+                      {isTemporary ? (
+                        <span className="cursor-not-allowed">{item.name}</span>
+                      ) : (
+                        <Link
+                          href={`/companies/${companyId}/stock/items/${item.id}`}
+                          className="hover:underline flex items-center"
+                        >
+                          {item.name}
+                          <ExternalLink className="h-3 w-3 ml-1 text-muted-foreground" />
+                        </Link>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {item.details?.code_name || "-"}
+                    </TableCell>
+                    <TableCell>{item.current_quantity} {item.unit}</TableCell>
+                    <TableCell>{formatPrice(price)}</TableCell>
+                    <TableCell>{formatPrice(totalValue)}</TableCell>
+                    <TableCell>
+                      {formatDate(item.last_updated || item.created_at)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => addItem(item)}
+                        title="장바구니 추가"
                       >
-                        {item.name || item.details?.name || '알 수 없음'}
-                      </Link>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {item.details?.code_name || '없음'}
-                  </TableCell>
-                  <TableCell>
-                    {item.current_quantity} {item.unit}
-                  </TableCell>
-                  <TableCell>{formatDate(item.last_updated)}</TableCell>
-                  <TableCell>{getQuantityBadge(item)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={() => addItem(item)}
-                      title="장바구니에 추가"
-                      disabled={item.id.startsWith('temp_')}
-                    >
-                      <ShoppingCart className="h-4 w-4" />
-                      <span className="sr-only">장바구니 추가</span>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
+                        <ShoppingCart className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </div>
 
       {pagination.pageCount > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-center space-x-2">
           <Button
             variant="outline"
             size="sm"
             onClick={() => onPageChange(pagination.page - 1)}
-            disabled={pagination.page === 1}
+            disabled={pagination.page <= 1}
           >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            이전
+            <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="text-sm">
-            {pagination.page} / {pagination.pageCount} 페이지
+            {pagination.page} / {pagination.pageCount}
           </span>
           <Button
             variant="outline"
@@ -343,8 +379,7 @@ export function StockTable({
             onClick={() => onPageChange(pagination.page + 1)}
             disabled={pagination.page >= pagination.pageCount}
           >
-            다음
-            <ChevronRight className="h-4 w-4 ml-1" />
+            <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       )}

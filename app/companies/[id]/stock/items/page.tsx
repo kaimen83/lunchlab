@@ -24,7 +24,7 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
   });
   const [filters, setFilters] = useState<StockFilterValues>({
     query: "",
-    itemType: "container",
+    itemType: "ingredient",
     category: "",
     stockGrade: "",
     sortBy: "name",
@@ -32,6 +32,47 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
   });
   
   const shouldFetch = useRef(false);
+  const isInitialized = useRef(false);
+
+  // 상태를 localStorage에 저장하는 함수
+  const saveStateToLocalStorage = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const stateToSave = {
+        filters,
+        pagination: {
+          page: pagination.page,
+          pageSize: pagination.pageSize
+        }
+      };
+      localStorage.setItem(`stock-list-state-${companyId}`, JSON.stringify(stateToSave));
+    }
+  }, [filters, pagination.page, pagination.pageSize, companyId]);
+
+  // localStorage에서 상태를 불러오는 함수
+  const loadStateFromLocalStorage = useCallback(() => {
+    if (typeof window !== 'undefined' && !isInitialized.current) {
+      const savedState = localStorage.getItem(`stock-list-state-${companyId}`);
+      if (savedState) {
+        try {
+          const parsedState = JSON.parse(savedState);
+          if (parsedState.filters) {
+            setFilters(parsedState.filters);
+          }
+          if (parsedState.pagination) {
+            setPagination(prev => ({
+              ...prev,
+              page: parsedState.pagination.page || 1,
+              pageSize: parsedState.pagination.pageSize || 10
+            }));
+          }
+          shouldFetch.current = true;
+        } catch (error) {
+          console.error('상태 복원 중 오류 발생:', error);
+        }
+      }
+      isInitialized.current = true;
+    }
+  }, [companyId]);
 
   // 재고 항목 목록 조회
   const fetchItems = useCallback(async () => {
@@ -59,7 +100,14 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
 
       const data = await response.json();
       setItems(data.items);
-      setPagination(data.pagination);
+      setPagination(prev => ({
+        ...prev,
+        total: data.pagination.total,
+        pageCount: data.pagination.pageCount
+      }));
+      
+      // 데이터를 가져온 후 상태 저장
+      saveStateToLocalStorage();
     } catch (error) {
       console.error("재고 항목 로딩 오류:", error);
       toast({
@@ -70,7 +118,7 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [companyId, pagination.page, pagination.pageSize, filters, toast]);
+  }, [companyId, pagination.page, pagination.pageSize, filters, toast, saveStateToLocalStorage]);
 
   // 필터 변경 시 목록 다시 조회
   const handleFilterChange = useCallback((newFilters: StockFilterValues) => {
@@ -111,11 +159,14 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
     }
   }, [fetchItems]);
 
-  // 컴포넌트 마운트 시 초기 데이터 로딩
+  // 컴포넌트 마운트 시 localStorage에서 상태 불러오기 및 초기 데이터 로딩
   useEffect(() => {
-    shouldFetch.current = true; // 초기 로딩 시 플래그 설정
-    fetchItems();
-  }, [companyId]); // eslint-disable-line react-hooks/exhaustive-deps
+    loadStateFromLocalStorage(); // 먼저 저장된 상태 불러오기
+    if (!shouldFetch.current) { // 상태 복원 후에도 fetch 필요하면 실행
+      shouldFetch.current = true;
+      fetchItems();
+    }
+  }, [companyId, loadStateFromLocalStorage, fetchItems]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <StockCartProvider>

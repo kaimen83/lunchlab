@@ -29,7 +29,7 @@ export interface StockFilterValues {
 
 export function StockFilter({
   onFilterChange,
-  defaultValues = { itemType: "container" },
+  defaultValues = { itemType: "ingredient" },
 }: StockFilterProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [filters, setFilters] = useState<StockFilterValues>(defaultValues);
@@ -85,7 +85,7 @@ export function StockFilter({
   const handleReset = () => {
     const resetFilters: StockFilterValues = {
       query: "",
-      itemType: "container",
+      itemType: "ingredient",
       category: "",
       stockGrade: "",
       sortBy: "name",
@@ -130,8 +130,8 @@ export function StockFilter({
             className="w-full"
           >
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="container">용기</TabsTrigger>
               <TabsTrigger value="ingredient">식자재</TabsTrigger>
+              <TabsTrigger value="container">용기</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
