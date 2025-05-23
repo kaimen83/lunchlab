@@ -10,9 +10,10 @@ import { useToast } from "@/hooks/use-toast";
 
 interface StockItemsPageProps {
   companyId: string;
+  selectedItemType?: "ingredient" | "container";
 }
 
-export default function StockItemsPage({ companyId }: StockItemsPageProps) {
+export default function StockItemsPage({ companyId, selectedItemType = "ingredient" }: StockItemsPageProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [items, setItems] = useState<StockItem[]>([]);
@@ -24,7 +25,7 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
   });
   const [filters, setFilters] = useState<StockFilterValues>({
     query: "",
-    itemType: "ingredient",
+    itemType: selectedItemType,
     category: "",
     stockGrade: "",
     sortBy: "name",
@@ -33,6 +34,15 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
   
   const shouldFetch = useRef(false);
   const isInitialized = useRef(false);
+
+  // 상위 컴포넌트에서 selectedItemType이 변경되면 필터 업데이트
+  useEffect(() => {
+    if (filters.itemType !== selectedItemType) {
+      setFilters(prev => ({ ...prev, itemType: selectedItemType }));
+      setPagination(prev => ({ ...prev, page: 1 })); // 필터 변경 시 1페이지로 이동
+      shouldFetch.current = true;
+    }
+  }, [selectedItemType]);
 
   // 상태를 localStorage에 저장하는 함수
   const saveStateToLocalStorage = useCallback(() => {
@@ -56,7 +66,12 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
         try {
           const parsedState = JSON.parse(savedState);
           if (parsedState.filters) {
-            setFilters(parsedState.filters);
+            // selectedItemType이 있으면 우선 적용
+            const itemType = selectedItemType || parsedState.filters.itemType || "ingredient";
+            setFilters({
+              ...parsedState.filters,
+              itemType
+            });
           }
           if (parsedState.pagination) {
             setPagination(prev => ({
@@ -72,7 +87,7 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
       }
       isInitialized.current = true;
     }
-  }, [companyId]);
+  }, [companyId, selectedItemType]);
 
   // 재고 항목 목록 조회
   const fetchItems = useCallback(async () => {
@@ -174,7 +189,10 @@ export default function StockItemsPage({ companyId }: StockItemsPageProps) {
         <div className="md:col-span-2 space-y-4">
           <StockFilter
             onFilterChange={handleFilterChange}
-            defaultValues={filters}
+            defaultValues={{
+              ...filters,
+              itemType: selectedItemType // 선택된 항목 유형을 StockFilter에 전달
+            }}
           />
           <StockTable
             items={items}

@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { useStockCart } from "./StockCartContext";
+import { StockItemDetailModal } from "./StockItemDetailModal";
 
 // 재고 항목 타입 정의
 export interface StockItem {
@@ -78,6 +79,16 @@ export function StockTable({
 }: StockTableProps) {
   // 장바구니 컨텍스트 사용
   const { addItem } = useStockCart();
+  
+  // 선택된 항목과 모달 상태 관리
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // 항목 클릭 핸들러
+  const handleItemClick = (itemId: string) => {
+    setSelectedItemId(itemId);
+    setIsModalOpen(true);
+  };
 
   const sortIcon = (field: string) => {
     if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4" />;
@@ -324,13 +335,13 @@ export function StockTable({
                       {isTemporary ? (
                         <span className="cursor-not-allowed">{item.name}</span>
                       ) : (
-                        <Link
-                          href={`/companies/${companyId}/stock/items/${item.id}`}
-                          className="hover:underline flex items-center"
+                        <button
+                          onClick={() => handleItemClick(item.id)}
+                          className="hover:underline flex items-center text-left"
                         >
                           {item.name}
                           <ExternalLink className="h-3 w-3 ml-1 text-muted-foreground" />
-                        </Link>
+                        </button>
                       )}
                     </TableCell>
                     <TableCell>
@@ -383,6 +394,14 @@ export function StockTable({
           </Button>
         </div>
       )}
+      
+      {/* 재고 항목 상세 모달 */}
+      <StockItemDetailModal
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        companyId={companyId}
+        itemId={selectedItemId}
+      />
     </div>
   );
 } 
