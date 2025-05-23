@@ -15,11 +15,13 @@ export interface CartItem {
 interface StockCartContextType {
   items: CartItem[];
   transactionType: "in" | "out"; // 입고 또는 출고
+  transactionDate: Date; // 거래 날짜
   addItem: (item: StockItem) => void;
   removeItem: (stockItemId: string) => void;
   updateQuantity: (stockItemId: string, quantity: number) => void;
   clearCart: () => void;
   setTransactionType: (type: "in" | "out") => void;
+  setTransactionDate: (date: Date) => void; // 거래 날짜 설정 함수
   processCart: (notes: string, companyId: string) => Promise<boolean>;
 }
 
@@ -30,6 +32,7 @@ const StockCartContext = createContext<StockCartContextType | undefined>(undefin
 export function StockCartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [transactionType, setTransactionType] = useState<"in" | "out">("in");
+  const [transactionDate, setTransactionDate] = useState<Date>(new Date()); // 현재 날짜로 초기화
   const { toast } = useToast();
 
   // 항목 추가
@@ -105,7 +108,8 @@ export function StockCartProvider({ children }: { children: ReactNode }) {
             quantities: items.map(item => item.quantity),
             requestType: transactionType === "in" ? "incoming" : "outgoing",
             notes,
-            directProcess: true // 직접 처리 플래그
+            directProcess: true, // 직접 처리 플래그
+            transactionDate: transactionDate.toISOString(), // 거래 날짜 추가
           }),
         }
       );
@@ -138,11 +142,13 @@ export function StockCartProvider({ children }: { children: ReactNode }) {
   const contextValue: StockCartContextType = {
     items,
     transactionType,
+    transactionDate,
     addItem,
     removeItem,
     updateQuantity,
     clearCart,
     setTransactionType,
+    setTransactionDate,
     processCart,
   };
 

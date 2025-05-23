@@ -18,10 +18,15 @@ import {
   ShoppingCart,
   Trash2,
   MinusCircle,
+  CalendarIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useStockCart, CartItem } from "./StockCartContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { ko } from "date-fns/locale";
 
 interface StockCartPanelProps {
   companyId: string;
@@ -32,7 +37,9 @@ export function StockCartPanel({ companyId, onProcessComplete }: StockCartPanelP
   const {
     items,
     transactionType,
+    transactionDate,
     setTransactionType,
+    setTransactionDate,
     removeItem,
     updateQuantity,
     clearCart,
@@ -91,6 +98,31 @@ export function StockCartPanel({ companyId, onProcessComplete }: StockCartPanelP
               출고
             </Button>
           </div>
+        </div>
+
+        {/* 거래 날짜 선택 */}
+        <div className="space-y-2">
+          <Label htmlFor="date">거래 날짜</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full justify-start text-left font-normal"
+                id="date"
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {format(transactionDate, "yyyy년 MM월 dd일", { locale: ko })}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={transactionDate}
+                onSelect={(date) => date && setTransactionDate(date)}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* 장바구니가 비어있는 경우 */}
