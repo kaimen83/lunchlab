@@ -122,24 +122,29 @@ export async function GET(
       transactions.map(async (transaction) => {
         const stockItem = transaction.stock_item;
         let itemDetails = null;
+        let itemUnit = '개'; // 기본 단위는 '개'로 설정
 
         if (stockItem && typeof stockItem === 'object' && 'item_type' in stockItem) {
           if (stockItem.item_type === 'ingredient') {
             const { data: ingredient } = await supabase
               .from('ingredients')
-              .select('id, name, unit')
+              .select('id, name, unit, code_name')
               .eq('id', stockItem.item_id)
               .single();
             
             itemDetails = ingredient;
+            if (ingredient?.unit) {
+              itemUnit = ingredient.unit; // 식자재의 경우 단위 정보 저장
+            }
           } else if (stockItem.item_type === 'container') {
             const { data: container } = await supabase
               .from('containers')
-              .select('id, name')
+              .select('id, name, code_name')
               .eq('id', stockItem.item_id)
               .single();
             
             itemDetails = container;
+            // 용기는 항상 '개' 단위 사용
           }
         }
 
@@ -150,7 +155,7 @@ export async function GET(
                             transaction.transaction_type === 'outgoing' ? 'out' : 
                             transaction.transaction_type,
           quantity: transaction.quantity,
-          unit: itemDetails?.unit || '개',
+          unit: itemUnit, // 저장된 단위 정보 사용
           created_at: transaction.transaction_date || transaction.created_at,
           notes: transaction.notes || '',
           status: 'completed', // 기본값 설정
@@ -394,7 +399,7 @@ export async function POST(
     // 트랜잭션 시작
     if (isAdminOrOwner && requestData.directProcess === true) {
       // 관리자/소유자가 직접 처리하는 경우
-      const transactionPromises = stockItemIds.map(async (stockItemId, index) => {
+      const transactionPromises = stockItemIds.map(async (stockItemId: string, index: number) => {
         const quantity = quantities[index];
         
         // 거래 내역 생성
@@ -425,6 +430,10 @@ export async function POST(
           .single();
         
         let newQuantity;
+        
+        if (!stockItem) {
+          throw new Error(`재고 항목을 찾을 수 없습니다: ${stockItemId}`);
+        }
         
         if (requestType === 'incoming') {
           newQuantity = Number(stockItem.current_quantity) + Number(quantity);
@@ -485,7 +494,7 @@ export async function POST(
       }
 
       // 승인 요청 항목 생성
-      const approvalItems = stockItemIds.map((stockItemId, index) => ({
+      const approvalItems = stockItemIds.map((stockItemId: string, index: number) => ({
         approval_request_id: approvalRequest.id,
         stock_item_id: stockItemId,
         quantity: quantities[index],
