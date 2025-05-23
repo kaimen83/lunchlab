@@ -143,9 +143,29 @@ export async function GET(
           }
         }
 
+        // 클라이언트 컴포넌트에서 필요한 구조로 변환
         return {
-          ...transaction,
-          itemDetails
+          id: transaction.id,
+          transaction_type: transaction.transaction_type === 'incoming' ? 'in' : 
+                            transaction.transaction_type === 'outgoing' ? 'out' : 
+                            transaction.transaction_type,
+          quantity: transaction.quantity,
+          unit: itemDetails?.unit || '개',
+          created_at: transaction.transaction_date || transaction.created_at,
+          notes: transaction.notes || '',
+          status: 'completed', // 기본값 설정
+          created_by: {
+            id: transaction.user_id || '',
+            name: transaction.user_name || '시스템'
+          },
+          stock_item: {
+            id: stockItem?.id || '',
+            item_type: stockItem?.item_type || '',
+            details: {
+              name: itemDetails?.name || '삭제된 항목',
+              code_name: itemDetails?.code_name || ''
+            }
+          }
         };
       })
     );
@@ -167,6 +187,99 @@ export async function GET(
       { status: 500 }
     );
   }
+}
+
+// 임시 ID 처리를 위한 함수 추가
+async function processTemporaryIds(
+  supabase: any, 
+  stockItemIds: string[], 
+  companyId: string, 
+  userId: string
+): Promise<string[]> {
+  const processedIds = [...stockItemIds]; // 기존 ID 배열 복사
+  
+  for (let i = 0; i < stockItemIds.length; i++) {
+    const id = stockItemIds[i];
+    
+    // 임시 식자재 ID인지 확인 (temp_ingredient_로 시작하는지)
+    if (id.startsWith('temp_ingredient_')) {
+      // 임시 ID에서 실제 식자재 ID 추출
+      const ingredientId = id.replace('temp_ingredient_', '');
+      
+      // 이 식자재의 정보 조회
+      const { data: ingredient, error: ingredientError } = await supabase
+        .from('ingredients')
+        .select('name, unit')
+        .eq('id', ingredientId)
+        .single();
+        
+      if (ingredientError) {
+        console.error('식자재 정보 조회 오류:', ingredientError);
+        throw new Error(`식자재 정보를 조회할 수 없습니다: ${ingredientError.message}`);
+      }
+      
+      // 해당 식자재에 대한 재고 항목 생성
+      const { data: newStockItem, error: createError } = await supabase
+        .from('stock_items')
+        .insert({
+          company_id: companyId,
+          item_type: 'ingredient',
+          item_id: ingredientId,
+          current_quantity: 0, // 초기 수량은 0
+          unit: ingredient.unit || '개'
+        })
+        .select()
+        .single();
+        
+        if (createError) {
+          console.error('재고 항목 생성 오류:', createError);
+          throw new Error(`재고 항목을 생성할 수 없습니다: ${createError.message}`);
+        }
+        
+        // 생성된 실제 재고 항목 ID로 대체
+        processedIds[i] = newStockItem.id;
+    }
+    // temp_container_로 시작하는 경우도 처리 (필요시)
+    else if (id.startsWith('temp_container_')) {
+      // 임시 ID에서 실제 용기 ID 추출
+      const containerId = id.replace('temp_container_', '');
+      
+      // 이 용기의 정보 조회
+      const { data: container, error: containerError } = await supabase
+        .from('containers')
+        .select('name')
+        .eq('id', containerId)
+        .single();
+        
+      if (containerError) {
+        console.error('용기 정보 조회 오류:', containerError);
+        throw new Error(`용기 정보를 조회할 수 없습니다: ${containerError.message}`);
+      }
+      
+      // 해당 용기에 대한 재고 항목 생성
+      const { data: newStockItem, error: createError } = await supabase
+        .from('stock_items')
+        .insert({
+          company_id: companyId,
+          item_type: 'container',
+          item_id: containerId,
+          current_quantity: 0, // 초기 수량은 0
+          unit: '개' // 용기의 기본 단위는 '개'
+        })
+        .select()
+        .single();
+        
+        if (createError) {
+          console.error('재고 항목 생성 오류:', createError);
+          throw new Error(`재고 항목을 생성할 수 없습니다: ${createError.message}`);
+        }
+        
+        // 생성된 실제 재고 항목 ID로 대체
+        processedIds[i] = newStockItem.id;
+    }
+  }
+  
+  return processedIds;
 }
 
 /**
@@ -212,7 +325,7 @@ export async function POST(
 
     // 요청 본문 파싱
     const requestData = await request.json();
-    const { 
+    let { 
       stockItemIds, 
       quantities, 
       requestType, 
@@ -240,6 +353,16 @@ export async function POST(
       return NextResponse.json(
         { error: '항목 ID와 수량의 개수가 일치하지 않습니다.' },
         { status: 400 }
+      );
+    }
+
+    // 임시 ID 처리
+    try {
+      stockItemIds = await processTemporaryIds(supabase, stockItemIds, companyId, userId);
+    } catch (error: any) {
+      return NextResponse.json(
+        { error: `임시 재고 항목 처리 중 오류가 발생했습니다: ${error.message}` },
+        { status: 500 }
       );
     }
 
