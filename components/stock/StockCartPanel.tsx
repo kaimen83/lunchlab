@@ -99,9 +99,6 @@ export function StockCartPanel({ companyId, onProcessComplete }: StockCartPanelP
                 재고 항목을 선택하여 입고 또는 출고 거래를 생성합니다
               </CardDescription>
             </div>
-            <Badge variant="secondary" className="text-sm">
-              {items.length}개 항목
-            </Badge>
           </div>
         </CardHeader>
 
@@ -225,78 +222,80 @@ export function StockCartPanel({ companyId, onProcessComplete }: StockCartPanelP
             </TabsContent>
           </Tabs>
 
-          {/* 선택된 항목 섹션 - 모든 탭에서 공통으로 표시 */}
-          <div className="px-6 pb-4">
-            <Separator className="mb-4" />
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShoppingCart className="h-4 w-4 text-primary" />
-                  <Label className="text-sm font-medium">선택된 항목</Label>
+          {/* 선택된 항목 섹션 - 수동 설정 탭에서만 표시 */}
+          {activeTab === "manual" && (
+            <div className="px-6 pb-4">
+              <Separator className="mb-4" />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShoppingCart className="h-4 w-4 text-primary" />
+                    <Label className="text-sm font-medium">선택된 항목</Label>
+                    {items.length > 0 && (
+                      <Badge variant="outline" className="text-xs">
+                        {items.length}개
+                      </Badge>
+                    )}
+                  </div>
                   {items.length > 0 && (
-                    <Badge variant="outline" className="text-xs">
-                      {items.length}개
-                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearCart}
+                      className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      전체 삭제
+                    </Button>
                   )}
                 </div>
-                {items.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearCart}
-                    className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" />
-                    전체 삭제
-                  </Button>
+
+                {items.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-6 text-center border-2 border-dashed border-muted rounded-lg bg-muted/20">
+                    <ShoppingCart className="h-8 w-8 mb-2 text-muted-foreground/50" />
+                    <p className="text-sm text-muted-foreground font-medium">
+                      선택된 항목이 없습니다
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      재고 테이블에서 항목을 추가하거나 조리계획서를 불러와 주세요
+                    </p>
+                  </div>
+                ) : (
+                  <div className="border rounded-lg bg-card">
+                    <ScrollArea className="max-h-[480px]">
+                      <div className="p-2 space-y-1">
+                        {items.map((item, index) => (
+                          <CartItemRow
+                            key={item.stockItemId}
+                            item={item}
+                            onRemove={removeItem}
+                            onQuantityChange={updateQuantity}
+                            isLast={index === items.length - 1}
+                          />
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
                 )}
               </div>
 
-              {items.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-6 text-center border-2 border-dashed border-muted rounded-lg bg-muted/20">
-                  <ShoppingCart className="h-8 w-8 mb-2 text-muted-foreground/50" />
-                  <p className="text-sm text-muted-foreground font-medium">
-                    선택된 항목이 없습니다
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    재고 테이블에서 항목을 추가하거나 조리계획서를 불러와 주세요
-                  </p>
-                </div>
-              ) : (
-                <div className="border rounded-lg bg-card">
-                  <ScrollArea className="max-h-[480px]">
-                    <div className="p-2 space-y-1">
-                      {items.map((item, index) => (
-                        <CartItemRow
-                          key={item.stockItemId}
-                          item={item}
-                          onRemove={removeItem}
-                          onQuantityChange={updateQuantity}
-                          isLast={index === items.length - 1}
-                        />
-                      ))}
-                    </div>
-                  </ScrollArea>
+              {/* 메모 섹션 */}
+              {items.length > 0 && (
+                <div className="space-y-3 mt-4">
+                  <Separator />
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">메모 (선택사항)</Label>
+                    <Textarea
+                      placeholder="거래에 대한 추가 정보를 입력하세요"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      className="resize-none h-16 text-sm"
+                    />
+                  </div>
                 </div>
               )}
             </div>
-
-            {/* 메모 섹션 */}
-            {items.length > 0 && (
-              <div className="space-y-3 mt-4">
-                <Separator />
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">메모 (선택사항)</Label>
-                  <Textarea
-                    placeholder="거래에 대한 추가 정보를 입력하세요"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="resize-none h-16 text-sm"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+          )}
         </CardContent>
 
         {/* 실행 버튼 */}

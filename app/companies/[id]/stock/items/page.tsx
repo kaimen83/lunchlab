@@ -4,13 +4,19 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { StockFilter, StockFilterValues } from "@/components/stock/StockFilter";
 import { StockItem, StockTable, PaginationInfo } from "@/components/stock/StockTable";
 import { StockCartPanel } from "@/components/stock/StockCartPanel";
-import { StockCartProvider } from "@/components/stock/StockCartContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
 interface StockItemsPageProps {
   companyId: string;
   selectedItemType?: "ingredient" | "container";
+}
+
+// 확장된 필터 타입
+interface ExtendedStockFilterValues extends StockFilterValues {
+  category?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 }
 
 export default function StockItemsPage({ companyId, selectedItemType = "ingredient" }: StockItemsPageProps) {
@@ -23,7 +29,7 @@ export default function StockItemsPage({ companyId, selectedItemType = "ingredie
     pageSize: 10,
     pageCount: 0,
   });
-  const [filters, setFilters] = useState<StockFilterValues>({
+  const [filters, setFilters] = useState<ExtendedStockFilterValues>({
     query: "",
     itemType: selectedItemType,
     category: "all",
@@ -139,7 +145,7 @@ export default function StockItemsPage({ companyId, selectedItemType = "ingredie
   }, [companyId, pagination.page, pagination.pageSize, filters, toast, saveStateToLocalStorage]);
 
   // 필터 변경 시 목록 다시 조회
-  const handleFilterChange = useCallback((newFilters: StockFilterValues) => {
+  const handleFilterChange = useCallback((newFilters: ExtendedStockFilterValues) => {
     setFilters(newFilters);
     setPagination((prev) => ({ ...prev, page: 1 })); // 필터 변경 시 1페이지로 이동
     shouldFetch.current = true;
@@ -187,37 +193,35 @@ export default function StockItemsPage({ companyId, selectedItemType = "ingredie
   }, [companyId, loadStateFromLocalStorage, fetchItems]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <StockCartProvider>
-      <div className="grid gap-6 md:grid-cols-3">
-        <div className="md:col-span-2 space-y-4">
-          <StockFilter
-            onFilterChange={handleFilterChange}
-            defaultValues={{
-              ...filters,
-              itemType: selectedItemType // 선택된 항목 유형을 StockFilter에 전달
-            }}
-          />
-          <StockTable
-            items={items}
-            pagination={pagination}
-            isLoading={isLoading}
-            onPageChange={handlePageChange}
-            onSort={handleSort}
-            sortField={filters.sortBy || ""}
-            sortOrder={filters.sortOrder || "asc"}
-            companyId={companyId}
-            onRefresh={() => { shouldFetch.current = true; fetchItems(); }}
-            stockGrade={filters.stockGrade || ""}
-            itemType={filters.itemType || ""}
-          />
-        </div>
-        <div>
-          <StockCartPanel
-            companyId={companyId}
-            onProcessComplete={handleBulkProcessComplete}
-          />
-        </div>
+    <div className="grid gap-6 md:grid-cols-3">
+      <div className="md:col-span-2 space-y-4">
+        <StockFilter
+          onFilterChange={handleFilterChange}
+          defaultValues={{
+            ...filters,
+            itemType: selectedItemType // 선택된 항목 유형을 StockFilter에 전달
+          }}
+        />
+        <StockTable
+          items={items}
+          pagination={pagination}
+          isLoading={isLoading}
+          onPageChange={handlePageChange}
+          onSort={handleSort}
+          sortField={filters.sortBy || ""}
+          sortOrder={filters.sortOrder || "asc"}
+          companyId={companyId}
+          onRefresh={() => { shouldFetch.current = true; fetchItems(); }}
+          stockGrade={filters.stockGrade || ""}
+          itemType={filters.itemType || ""}
+        />
       </div>
-    </StockCartProvider>
+      <div>
+        <StockCartPanel
+          companyId={companyId}
+          onProcessComplete={handleBulkProcessComplete}
+        />
+      </div>
+    </div>
   );
 } 
