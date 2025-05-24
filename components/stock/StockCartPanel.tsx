@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowDown,
   ArrowUp,
@@ -23,6 +24,9 @@ import {
   X,
   CalendarIcon,
   FileText,
+  Zap,
+  Settings,
+  Package,
   Plus,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +59,7 @@ export function StockCartPanel({ companyId, onProcessComplete }: StockCartPanelP
   const [notes, setNotes] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCookingPlanModalOpen, setIsCookingPlanModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("quick"); // 현재 활성 탭 관리
 
   // 장바구니 처리 핸들러
   const handleProcess = async () => {
@@ -76,6 +81,13 @@ export function StockCartPanel({ companyId, onProcessComplete }: StockCartPanelP
     }
   };
 
+  // 장바구니에 항목이 추가될 때 자동으로 수동 설정 탭으로 전환
+  useEffect(() => {
+    if (items.length > 0 && activeTab === "quick") {
+      setActiveTab("manual");
+    }
+  }, [items.length, activeTab]);
+
   return (
     <>
       <Card className="w-full">
@@ -93,196 +105,255 @@ export function StockCartPanel({ companyId, onProcessComplete }: StockCartPanelP
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-6">
-          {/* 빠른 불러오기 섹션 */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Plus className="h-4 w-4 text-muted-foreground" />
-              <Label className="text-sm font-medium">빠른 불러오기</Label>
+        <CardContent className="p-0">
+          <Tabs defaultValue="quick" className="w-full" value={activeTab} onValueChange={setActiveTab}>
+            <div className="px-6 pt-4 pb-2">
+              <TabsList className="grid w-full grid-cols-2 bg-muted/50">
+                <TabsTrigger value="quick" className="gap-2">
+                  <Zap className="h-4 w-4" />
+                  빠른 설정
+                </TabsTrigger>
+                <TabsTrigger value="manual" className="gap-2">
+                  <Settings className="h-4 w-4" />
+                  수동 설정
+                </TabsTrigger>
+              </TabsList>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => setIsCookingPlanModalOpen(true)}
-              className="w-full justify-start gap-2 h-10"
-            >
-              <FileText className="h-4 w-4" />
-              조리계획서에서 불러오기
-              <Badge variant="secondary" className="ml-auto text-xs">
-                자동 계산
-              </Badge>
-            </Button>
-          </div>
 
-          <Separator />
-
-          {/* 거래 설정 섹션 */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-              <Label className="text-sm font-medium">거래 설정</Label>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* 거래 유형 */}
-              <div className="space-y-2">
-                <Label className="text-sm">거래 유형</Label>
-                <div className="grid grid-cols-2 gap-2">
+            {/* 빠른 설정 탭 */}
+            <TabsContent value="quick" className="px-6 pb-4 mt-4">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Zap className="h-4 w-4 text-primary" />
+                  <Label className="text-sm font-medium">조리계획서에서 자동 불러오기</Label>
+                </div>
+                
+                <div className="grid gap-3">
                   <Button
-                    type="button"
-                    variant={transactionType === "in" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setTransactionType("in")}
-                    className="justify-center"
+                    variant="outline"
+                    onClick={() => setIsCookingPlanModalOpen(true)}
+                    className="w-full justify-start gap-3 h-12 border-2 border-dashed hover:border-primary hover:bg-primary/5 transition-all"
                   >
-                    <ArrowDown className="mr-1.5 h-3.5 w-3.5" />
-                    입고
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={transactionType === "out" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setTransactionType("out")}
-                    className="justify-center"
-                  >
-                    <ArrowUp className="mr-1.5 h-3.5 w-3.5" />
-                    출고
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10">
+                      <FileText className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">조리계획서에서 불러오기</span>
+                      <span className="text-xs text-muted-foreground">필요 수량이 자동으로 계산됩니다</span>
+                    </div>
+                    <Badge variant="secondary" className="ml-auto">
+                      자동
+                    </Badge>
                   </Button>
                 </div>
               </div>
+            </TabsContent>
 
-              {/* 거래 날짜 */}
-              <div className="space-y-2">
-                <Label className="text-sm">거래 날짜</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !transactionDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                      {transactionDate ? (
-                        format(transactionDate, "MM/dd", { locale: ko })
-                      ) : (
-                        "날짜 선택"
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={transactionDate}
-                      onSelect={(date) => date && setTransactionDate(date)}
-                      locale={ko}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+            {/* 수동 설정 탭 */}
+            <TabsContent value="manual" className="px-6 pb-4 mt-4">
+              <div className="space-y-4">
+                {/* 거래 설정 섹션 */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4 text-primary" />
+                    <Label className="text-sm font-medium">거래 설정</Label>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* 거래 유형 */}
+                    <div className="space-y-2">
+                      <Label className="text-sm">거래 유형</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          variant={transactionType === "in" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setTransactionType("in")}
+                          className="justify-center"
+                        >
+                          <ArrowDown className="mr-1.5 h-3.5 w-3.5" />
+                          입고
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={transactionType === "out" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setTransactionType("out")}
+                          className="justify-center"
+                        >
+                          <ArrowUp className="mr-1.5 h-3.5 w-3.5" />
+                          출고
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* 거래 날짜 */}
+                    <div className="space-y-2">
+                      <Label className="text-sm">거래 날짜</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !transactionDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                            {transactionDate ? (
+                              format(transactionDate, "MM/dd", { locale: ko })
+                            ) : (
+                              "날짜 선택"
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={transactionDate}
+                            onSelect={(date) => date && setTransactionDate(date)}
+                            locale={ko}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </TabsContent>
+          </Tabs>
 
-          <Separator />
-
-          {/* 선택된 항목 섹션 */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                <Label className="text-sm font-medium">선택된 항목</Label>
+          {/* 선택된 항목 섹션 - 모든 탭에서 공통으로 표시 */}
+          <div className="px-6 pb-4">
+            <Separator className="mb-4" />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4 text-primary" />
+                  <Label className="text-sm font-medium">선택된 항목</Label>
+                  {items.length > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      {items.length}개
+                    </Badge>
+                  )}
+                </div>
                 {items.length > 0 && (
-                  <Badge variant="outline" className="text-xs">
-                    {items.length}개
-                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearCart}
+                    className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    전체 삭제
+                  </Button>
                 )}
               </div>
-              {items.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearCart}
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                >
-                  <Trash2 className="h-3 w-3 mr-1" />
-                  전체 삭제
-                </Button>
+
+              {items.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-6 text-center border-2 border-dashed border-muted rounded-lg bg-muted/20">
+                  <ShoppingCart className="h-8 w-8 mb-2 text-muted-foreground/50" />
+                  <p className="text-sm text-muted-foreground font-medium">
+                    선택된 항목이 없습니다
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    재고 테이블에서 항목을 추가하거나 조리계획서를 불러와 주세요
+                  </p>
+                </div>
+              ) : (
+                <div className="border rounded-lg bg-card">
+                  <ScrollArea className="max-h-[480px]">
+                    <div className="p-2 space-y-1">
+                      {items.map((item, index) => (
+                        <CartItemRow
+                          key={item.stockItemId}
+                          item={item}
+                          onRemove={removeItem}
+                          onQuantityChange={updateQuantity}
+                          isLast={index === items.length - 1}
+                        />
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
               )}
             </div>
 
-            {items.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted rounded-lg">
-                <ShoppingCart className="h-8 w-8 mb-2 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground font-medium">
-                  선택된 항목이 없습니다
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  재고 테이블에서 항목을 추가하거나 조리계획서를 불러와 주세요
-                </p>
-              </div>
-            ) : (
-              <div className="border rounded-lg">
-                <ScrollArea className="max-h-[240px]">
-                  <div className="p-3 space-y-2">
-                    {items.map((item, index) => (
-                      <CartItemRow
-                        key={item.stockItemId}
-                        item={item}
-                        onRemove={removeItem}
-                        onQuantityChange={updateQuantity}
-                        isLast={index === items.length - 1}
-                      />
-                    ))}
-                  </div>
-                </ScrollArea>
+            {/* 메모 섹션 */}
+            {items.length > 0 && (
+              <div className="space-y-3 mt-4">
+                <Separator />
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">메모 (선택사항)</Label>
+                  <Textarea
+                    placeholder="거래에 대한 추가 정보를 입력하세요"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="resize-none h-16 text-sm"
+                  />
+                </div>
               </div>
             )}
           </div>
-
-          {/* 메모 섹션 */}
-          {items.length > 0 && (
-            <>
-              <Separator />
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">메모 (선택사항)</Label>
-                <Textarea
-                  placeholder="거래에 대한 추가 정보를 입력하세요"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="resize-none h-20 text-sm"
-                />
-              </div>
-            </>
-          )}
         </CardContent>
 
         {/* 실행 버튼 */}
         {items.length > 0 && (
-          <CardFooter className="pt-4">
-            <Button
-              onClick={handleProcess}
-              disabled={isProcessing}
-              className="w-full h-11"
-              size="lg"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  처리 중...
-                </>
-              ) : (
-                <>
-                  {transactionType === "in" ? (
-                    <ArrowDown className="mr-2 h-4 w-4" />
-                  ) : (
-                    <ArrowUp className="mr-2 h-4 w-4" />
-                  )}
-                  {items.length}개 항목 {transactionType === "in" ? "입고" : "출고"} 처리
-                </>
-              )}
-            </Button>
+          <CardFooter className="px-6 pt-4 pb-6">
+            <div className="w-full space-y-3">
+              {/* 요약 정보 */}
+              <div className="flex items-center justify-between text-sm bg-muted/50 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "w-3 h-3 rounded-full",
+                    transactionType === "in" ? "bg-green-500" : "bg-red-500"
+                  )} />
+                  <span className="font-medium">
+                    {transactionType === "in" ? "입고" : "출고"} 거래
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <Package className="h-4 w-4" />
+                  <span>{items.length}개 항목</span>
+                </div>
+              </div>
+              
+              {/* 실행 버튼 */}
+              <Button
+                onClick={handleProcess}
+                disabled={isProcessing}
+                className={cn(
+                  "w-full h-12 font-medium text-base relative overflow-hidden",
+                  transactionType === "in" 
+                    ? "bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800" 
+                    : "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800",
+                  "shadow-lg hover:shadow-xl transition-all duration-200"
+                )}
+                size="lg"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    <span>처리 중...</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      {transactionType === "in" ? (
+                        <ArrowDown className="h-5 w-5" />
+                      ) : (
+                        <ArrowUp className="h-5 w-5" />
+                      )}
+                      <span>
+                        {items.length}개 항목 {transactionType === "in" ? "입고" : "출고"} 처리
+                      </span>
+                    </div>
+                  </>
+                )}
+              </Button>
+            </div>
           </CardFooter>
         )}
       </Card>
@@ -306,50 +377,53 @@ interface CartItemRowProps {
   isLast?: boolean;
 }
 
-function CartItemRow({ item, onRemove, onQuantityChange, isLast }: CartItemRowProps) {
+function CartItemRow({ item, onRemove, onQuantityChange }: CartItemRowProps) {
   return (
-    <div className={cn(
-      "flex items-center justify-between p-3 rounded-md bg-muted/30 border",
-      !isLast && "mb-2"
-    )}>
-      <div className="flex-1 min-w-0 mr-3">
-        <div className="flex items-center gap-2 mb-1">
-          <p className="font-medium text-sm truncate">{item.name}</p>
+    <div className="flex items-center gap-2 p-2 rounded-md bg-muted/40 hover:bg-muted/60 transition-colors border border-border/50">
+      {/* 아이템 정보 */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <div className={cn(
+              "w-2 h-2 rounded-full",
+              item.itemType === "ingredient" ? "bg-blue-500" : "bg-green-500"
+            )} />
+            <span className="font-medium text-sm truncate max-w-[120px]">{item.name}</span>
+          </div>
           <Badge 
             variant={item.itemType === "ingredient" ? "secondary" : "outline"} 
-            className="text-xs shrink-0"
+            className="text-xs px-1.5 py-0 h-5 shrink-0"
           >
             {item.itemType === "ingredient" ? "식자재" : "용기"}
           </Badge>
         </div>
-        <p className="text-xs text-muted-foreground">
-          현재 재고: {item.current_quantity.toLocaleString()} {item.unit}
-        </p>
+        <div className="text-xs text-muted-foreground mt-0.5">
+          현재: {item.current_quantity.toLocaleString()} {item.unit}
+        </div>
       </div>
       
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="flex items-center gap-1">
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            value={item.quantity}
-            onChange={(e) =>
-              onQuantityChange(item.stockItemId, parseFloat(e.target.value) || 0)
-            }
-            className="w-20 h-8 text-right text-sm"
-          />
-          <span className="text-xs text-muted-foreground min-w-[2rem]">
-            {item.unit}
-          </span>
-        </div>
+      {/* 수량 입력 */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <Input
+          type="number"
+          step="0.01"
+          min="0"
+          value={item.quantity}
+          onChange={(e) =>
+            onQuantityChange(item.stockItemId, parseFloat(e.target.value) || 0)
+          }
+          className="w-16 h-7 text-right text-xs px-2 border-muted-foreground/20"
+        />
+        <span className="text-xs text-muted-foreground min-w-[1.5rem] text-left">
+          {item.unit}
+        </span>
         <Button
           variant="ghost"
           size="sm"
           onClick={() => onRemove(item.stockItemId)}
-          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
         >
-          <X className="h-3.5 w-3.5" />
+          <X className="h-3 w-3" />
           <span className="sr-only">제거</span>
         </Button>
       </div>
