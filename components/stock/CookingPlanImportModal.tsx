@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Calendar as CalendarIcon, FileText, Loader2, ShoppingCart, Search, CheckCircle2, AlertCircle, Edit3, Save, X } from 'lucide-react';
+import { Calendar as CalendarIcon, FileText, Loader2, ShoppingCart, Search, CheckCircle2, AlertCircle, Edit3, Save, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -11,15 +11,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogPortal,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
@@ -63,42 +57,6 @@ interface CookingPlanImportModalProps {
   onImportComplete: () => void;
 }
 
-// Error Boundary Component
-class PortalErrorBoundary extends React.Component<
-  { children: React.ReactNode; fallback?: React.ReactNode },
-  { hasError: boolean }
-> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    // DOM 관련 에러만 처리
-    if (error.message.includes('removeChild') || error.message.includes('Node')) {
-      console.warn('Portal DOM error caught and handled:', error);
-      return { hasError: false }; // 에러를 무시하고 계속 진행
-    }
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error, errorInfo: any) {
-    if (error.message.includes('removeChild') || error.message.includes('Node')) {
-      console.warn('Portal cleanup error handled:', error, errorInfo);
-      return;
-    }
-    console.error('Portal error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback || <div>Something went wrong.</div>;
-    }
-
-    return this.props.children;
-  }
-}
-
 export function CookingPlanImportModal({
   open,
   onOpenChange,
@@ -116,63 +74,23 @@ export function CookingPlanImportModal({
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedQuantities, setEditedQuantities] = useState<Map<string, number>>(new Map());
 
-  // Popover 상태 명시적 관리
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  // 인라인 캘린더 표시 상태
+  const [showCalendar, setShowCalendar] = useState(false);
 
   // 컴포넌트 마운트 상태 추적을 위한 ref
   const isMountedRef = useRef(true);
-  
-  // Portal 컨테이너 ref (Dialog와 Popover가 같은 컨테이너 사용)
-  const portalContainerRef = useRef<HTMLDivElement | null>(null);
-
-  // Portal 컨테이너 생성 및 정리
-  useEffect(() => {
-    if (open && !portalContainerRef.current) {
-      // Portal 컨테이너 생성
-      const container = document.createElement('div');
-      container.id = 'cooking-plan-modal-portal';
-      container.style.position = 'relative';
-      container.style.zIndex = '50';
-      document.body.appendChild(container);
-      portalContainerRef.current = container;
-    }
-
-    return () => {
-      // Portal 컨테이너 정리
-      if (portalContainerRef.current && portalContainerRef.current.parentNode) {
-        try {
-          portalContainerRef.current.parentNode.removeChild(portalContainerRef.current);
-        } catch (error) {
-          console.warn('Portal container cleanup warning:', error);
-        }
-        portalContainerRef.current = null;
-      }
-    };
-  }, [open]);
 
   // 컴포넌트 마운트/언마운트 추적
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      // 컴포넌트 언마운트 시 모든 팝오버 강제 닫기
-      try {
-        setIsCalendarOpen(false);
-      } catch (error) {
-        console.warn('Calendar popover cleanup warning:', error);
-      }
     };
   }, []);
 
   // 모달이 닫힐 때 상태 초기화
   useEffect(() => {
     if (!open) {
-      // 먼저 팝오버 닫기
-      if (isMountedRef.current) {
-        setIsCalendarOpen(false);
-      }
-      
-      // 약간의 지연을 두고 상태 초기화 (DOM 업데이트 완료 후)
       const timeoutId = setTimeout(() => {
         if (isMountedRef.current) {
           setCookingPlanData(null);
@@ -182,8 +100,9 @@ export function CookingPlanImportModal({
           setIsProcessing(false);
           setIsEditMode(false);
           setEditedQuantities(new Map());
+          setShowCalendar(false);
         }
-      }, 200);
+      }, 100);
 
       return () => clearTimeout(timeoutId);
     }
@@ -242,6 +161,12 @@ export function CookingPlanImportModal({
       setIsEditMode(!isEditMode);
     });
   }, [isEditMode, cookingPlanData, safeSetState]);
+
+  // 날짜 선택 핸들러
+  const handleDateSelect = useCallback((date: Date | undefined) => {
+    setSelectedDate(date);
+    setShowCalendar(false); // 날짜 선택 시 캘린더 닫기
+  }, []);
 
   // 조리계획서 조회
   const fetchCookingPlan = async () => {
@@ -431,17 +356,12 @@ export function CookingPlanImportModal({
 
       // 성공한 경우 모달 닫기 및 새로고침
       if (successful > 0) {
-        // 먼저 콜백 호출
         onImportComplete();
-        
-        // 단계적 모달 닫기 프로세스
-        safeSetState(() => setIsCalendarOpen(false)); // 먼저 팝오버 닫기
-        
         setTimeout(() => {
           if (isMountedRef.current) {
-            onOpenChange(false); // 그 다음 모달 닫기
+            onOpenChange(false);
           }
-        }, 100); // 짧은 지연 시간으로 변경
+        }, 100);
       }
     } catch (error) {
       console.error('일괄 출고 처리 오류:', error);
@@ -455,347 +375,337 @@ export function CookingPlanImportModal({
     }
   };
 
-  // 모달 닫기 핸들러 (즉시 닫기로 변경)
-  const handleOpenChange = useCallback((open: boolean) => {
-    if (!open && !isProcessing && isMountedRef.current) {
-      // 즉시 팝오버와 모달 닫기
-      safeSetState(() => setIsCalendarOpen(false));
-      onOpenChange(false);
-    }
-  }, [isProcessing, safeSetState, onOpenChange]);
-
   const allItems = cookingPlanData ? [...cookingPlanData.ingredients, ...cookingPlanData.containers] : [];
   const isAllSelected = allItems.length > 0 && selectedItems.size === allItems.length;
   const today = new Date();
 
   return (
-    <PortalErrorBoundary>
-      <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogPortal container={portalContainerRef.current}>
-          <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
-            <DialogHeader className="pb-4">
-              <DialogTitle className="flex items-center gap-3 text-xl">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <FileText className="h-5 w-5 text-primary" />
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogHeader className="pb-4">
+          <DialogTitle className="flex items-center gap-3 text-xl">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <FileText className="h-5 w-5 text-primary" />
+            </div>
+            조리계획서 불러오기
+          </DialogTitle>
+          <DialogDescription className="text-base">
+            특정 날짜의 조리계획서에서 재고 등급이 있는 식재료와 용기를 불러와 필요수량을 수정한 후 일괄 출고 처리할 수 있습니다.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto space-y-6">
+          {/* 날짜 선택 섹션 */}
+          <Card>
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="font-semibold">날짜 선택</h3>
                 </div>
-                조리계획서 불러오기
-              </DialogTitle>
-              <DialogDescription className="text-base">
-                특정 날짜의 조리계획서에서 재고 등급이 있는 식재료와 용기를 불러와 필요수량을 수정한 후 일괄 출고 처리할 수 있습니다.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="flex-1 overflow-y-auto space-y-6">
-              {/* 날짜 선택 섹션 */}
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-4 flex-1">
-                      <div className="flex items-center gap-2">
-                        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                        <h3 className="font-semibold">날짜 선택</h3>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <Popover 
-                          open={isCalendarOpen} 
-                          onOpenChange={setIsCalendarOpen}
-                        >
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              className={cn(
-                                'w-[280px] justify-start text-left font-normal h-11',
-                                !selectedDate && 'text-muted-foreground'
-                              )}
-                            >
-                              <CalendarIcon className="mr-3 h-4 w-4" />
-                              {selectedDate ? (
-                                <span className="font-medium">
-                                  {format(selectedDate, 'yyyy년 MM월 dd일 (E)', { locale: ko })}
-                                </span>
-                              ) : (
-                                '조리계획서 날짜를 선택하세요'
-                              )}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent 
-                            className="w-auto p-0" 
-                            align="start"
-                          >
-                            <Calendar
-                              mode="single"
-                              selected={selectedDate}
-                              onSelect={(date) => {
-                                setSelectedDate(date);
-                                setIsCalendarOpen(false); // 날짜 선택 시 팝오버 닫기
-                              }}
-                              locale={ko}
-                              initialFocus
-                              today={today}
-                              className="rounded-md border"
-                              modifiers={{
-                                today: today
-                              }}
-                              modifiersStyles={{
-                                today: {
-                                  backgroundColor: '#3b82f6',
-                                  color: 'white',
-                                  fontWeight: 'bold',
-                                  borderRadius: '6px'
-                                }
-                              }}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <Button
-                          onClick={fetchCookingPlan}
-                          disabled={!selectedDate || isLoading}
-                          className="h-11 px-6"
-                        >
-                          {isLoading ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              조회 중...
-                            </>
+                
+                <div className="space-y-4">
+                  {/* 날짜 선택 버튼 */}
+                  <div className="flex items-center gap-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowCalendar(!showCalendar)}
+                      className={cn(
+                        'w-[280px] justify-between text-left font-normal h-11',
+                        !selectedDate && 'text-muted-foreground'
+                      )}
+                    >
+                      <div className="flex items-center">
+                        <CalendarIcon className="mr-3 h-4 w-4" />
+                        <span>
+                          {selectedDate ? (
+                            <span className="font-medium">
+                              {format(selectedDate, 'yyyy년 MM월 dd일 (E)', { locale: ko })}
+                            </span>
                           ) : (
-                            <>
-                              <Search className="mr-2 h-4 w-4" />
-                              조리계획서 조회
-                            </>
+                            '조리계획서 날짜를 선택하세요'
                           )}
-                        </Button>
+                        </span>
                       </div>
-                    </div>
+                      {showCalendar ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </Button>
+                    
+                    <Button
+                      onClick={fetchCookingPlan}
+                      disabled={!selectedDate || isLoading}
+                      className="h-11 px-6"
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          조회 중...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="mr-2 h-4 w-4" />
+                          조리계획서 조회
+                        </>
+                      )}
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
 
-              {/* 조리계획서 데이터 표시 */}
-              {cookingPlanData && (
-                <>
-                  {allItems.length > 0 ? (
-                    <Card>
-                      <CardContent className="p-6">
-                        <div className="space-y-4">
-                          {/* 헤더 */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-green-100 rounded-lg">
-                                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                              </div>
-                              <div>
-                                <h3 className="text-lg font-semibold">
-                                  {format(new Date(cookingPlanData.date), 'yyyy년 MM월 dd일', { locale: ko })} 조리계획서
-                                </h3>
-                                <p className="text-sm text-muted-foreground">
-                                  총 {allItems.length}개 항목이 발견되었습니다
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              {/* 수정 모드 토글 버튼 */}
-                              <Button
-                                variant={isEditMode ? "default" : "outline"}
-                                size="sm"
-                                onClick={toggleEditMode}
-                                className="gap-2"
-                              >
-                                {isEditMode ? (
-                                  <>
-                                    <Save className="h-4 w-4" />
-                                    수정 완료
-                                  </>
-                                ) : (
-                                  <>
-                                    <Edit3 className="h-4 w-4" />
-                                    수량 수정
-                                  </>
-                                )}
-                              </Button>
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  id="select-all"
-                                  checked={isAllSelected}
-                                  onCheckedChange={toggleAllSelection}
-                                />
-                                <label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
-                                  전체 선택
-                                </label>
-                              </div>
-                              {selectedItems.size > 0 && (
-                                <Badge variant="secondary" className="px-3 py-1">
-                                  {selectedItems.size}개 선택됨
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
+                  {/* 인라인 캘린더 */}
+                  {showCalendar && (
+                    <div className="border rounded-lg p-4 bg-muted/5 animate-in slide-in-from-top-2 duration-200">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={handleDateSelect}
+                        locale={ko}
+                        today={today}
+                        className="rounded-md"
+                        modifiers={{
+                          today: today
+                        }}
+                        modifiersStyles={{
+                          today: {
+                            backgroundColor: '#3b82f6',
+                            color: 'white',
+                            fontWeight: 'bold',
+                            borderRadius: '6px'
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-                          <Separator />
-
-                          {/* 테이블 */}
-                          <div className="rounded-lg border overflow-hidden">
-                            <Table>
-                              <TableHeader className="bg-muted/50">
-                                <TableRow>
-                                  <TableHead className="w-[50px]">선택</TableHead>
-                                  <TableHead className="w-[80px]">유형</TableHead>
-                                  <TableHead>항목명</TableHead>
-                                  <TableHead className="w-[100px]">코드</TableHead>
-                                  <TableHead className="w-[140px] text-right">
-                                    {isEditMode ? '수정 수량' : '필요 수량'}
-                                  </TableHead>
-                                  <TableHead className="w-[100px]">재고 등급</TableHead>
-                                  <TableHead>공급업체</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {allItems.map((item) => (
-                                  <TableRow 
-                                    key={item.id}
-                                    className={cn(
-                                      "hover:bg-muted/50 transition-colors",
-                                      selectedItems.has(item.id) && "bg-primary/5"
-                                    )}
-                                  >
-                                    <TableCell>
-                                      <Checkbox
-                                        checked={selectedItems.has(item.id)}
-                                        onCheckedChange={() => toggleItemSelection(item.id)}
-                                      />
-                                    </TableCell>
-                                    <TableCell>
-                                      <Badge 
-                                        variant={item.item_type === 'ingredient' ? 'secondary' : 'outline'}
-                                        className="text-xs"
-                                      >
-                                        {item.item_type === 'ingredient' ? '식자재' : '용기'}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell className="font-medium">{item.name}</TableCell>
-                                    <TableCell className="text-muted-foreground">
-                                      {item.code_name || '-'}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      {isEditMode ? (
-                                        <div className="flex flex-col items-end gap-1">
-                                          <Input
-                                            type="number"
-                                            min="0"
-                                            step="0.1"
-                                            value={getActualQuantity(item)}
-                                            onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                                            className="w-24 h-8 text-right text-sm"
-                                          />
-                                          <span className="text-xs text-muted-foreground">
-                                            {item.unit}
-                                          </span>
-                                        </div>
-                                      ) : (
-                                        <div className="flex flex-col items-end">
-                                          <span className="font-semibold font-mono">
-                                            {formatNumber(getActualQuantity(item))}
-                                          </span>
-                                          <span className="text-xs text-muted-foreground">
-                                            {item.unit}
-                                          </span>
-                                          {editedQuantities.has(item.id) && editedQuantities.get(item.id) !== item.total_amount && (
-                                            <span className="text-xs text-orange-600 font-medium">
-                                              (원래: {formatNumber(item.total_amount)})
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
-                                    </TableCell>
-                                    <TableCell>
-                                      {item.stock_grade ? (
-                                        <Badge variant="outline" className="text-xs">
-                                          {item.stock_grade} 등급
-                                        </Badge>
-                                      ) : (
-                                        <span className="text-muted-foreground text-sm">-</span>
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="text-muted-foreground">
-                                      {item.supplier || '-'}
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-
-                          {/* 수정 모드 안내 메시지 */}
-                          {isEditMode && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                              <div className="flex items-start gap-3">
-                                <Edit3 className="h-5 w-5 text-blue-600 mt-0.5" />
-                                <div>
-                                  <h4 className="font-medium text-blue-900 mb-1">수량 수정 모드</h4>
-                                  <p className="text-sm text-blue-700">
-                                    각 항목의 필요수량을 직접 수정할 수 있습니다. 수정이 완료되면 "수정 완료" 버튼을 클릭하세요.
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <Card>
-                      <CardContent className="p-8">
-                        <div className="text-center space-y-4">
-                          <div className="p-3 bg-orange-100 rounded-full w-fit mx-auto">
-                            <AlertCircle className="h-8 w-8 text-orange-600" />
+          {/* 조리계획서 데이터 표시 */}
+          {cookingPlanData && (
+            <>
+              {allItems.length > 0 ? (
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      {/* 헤더 */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-green-100 rounded-lg">
+                            <CheckCircle2 className="h-5 w-5 text-green-600" />
                           </div>
                           <div>
-                            <h3 className="font-semibold text-lg mb-2">조리계획서가 없습니다</h3>
-                            <p className="text-muted-foreground">
-                              {cookingPlanData.message || '해당 날짜의 조리계획서가 없거나 재고 관리 대상 항목이 없습니다.'}
+                            <h3 className="text-lg font-semibold">
+                              {format(new Date(cookingPlanData.date), 'yyyy년 MM월 dd일', { locale: ko })} 조리계획서
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              총 {allItems.length}개 항목이 발견되었습니다
                             </p>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </>
-              )}
-            </div>
+                        <div className="flex items-center gap-3">
+                          {/* 수정 모드 토글 버튼 */}
+                          <Button
+                            variant={isEditMode ? "default" : "outline"}
+                            size="sm"
+                            onClick={toggleEditMode}
+                            className="gap-2"
+                          >
+                            {isEditMode ? (
+                              <>
+                                <Save className="h-4 w-4" />
+                                수정 완료
+                              </>
+                            ) : (
+                              <>
+                                <Edit3 className="h-4 w-4" />
+                                수량 수정
+                              </>
+                            )}
+                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id="select-all"
+                              checked={isAllSelected}
+                              onCheckedChange={toggleAllSelection}
+                            />
+                            <label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
+                              전체 선택
+                            </label>
+                          </div>
+                          {selectedItems.size > 0 && (
+                            <Badge variant="secondary" className="px-3 py-1">
+                              {selectedItems.size}개 선택됨
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
 
-            <DialogFooter className="pt-6 border-t">
-              <div className="flex items-center justify-between w-full">
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleOpenChange(false)}
-                  disabled={isProcessing}
-                  className="px-6"
-                >
-                  취소
-                </Button>
-                {cookingPlanData && selectedItems.size > 0 && (
-                  <Button
-                    onClick={processBulkOutgoing}
-                    disabled={isProcessing}
-                    className="gap-2 px-6"
-                  >
-                    {isProcessing ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        처리 중...
-                      </>
-                    ) : (
-                      <>
-                        <ShoppingCart className="h-4 w-4" />
-                        선택 항목 일괄 출고 ({selectedItems.size}개)
-                      </>
-                    )}
-                  </Button>
+                      <Separator />
+
+                      {/* 테이블 */}
+                      <div className="rounded-lg border overflow-hidden">
+                        <Table>
+                          <TableHeader className="bg-muted/50">
+                            <TableRow>
+                              <TableHead className="w-[50px]">선택</TableHead>
+                              <TableHead className="w-[80px]">유형</TableHead>
+                              <TableHead>항목명</TableHead>
+                              <TableHead className="w-[100px]">코드</TableHead>
+                              <TableHead className="w-[140px] text-right">
+                                {isEditMode ? '수정 수량' : '필요 수량'}
+                              </TableHead>
+                              <TableHead className="w-[100px]">재고 등급</TableHead>
+                              <TableHead>공급업체</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {allItems.map((item) => (
+                              <TableRow 
+                                key={item.id}
+                                className={cn(
+                                  "hover:bg-muted/50 transition-colors",
+                                  selectedItems.has(item.id) && "bg-primary/5"
+                                )}
+                              >
+                                <TableCell>
+                                  <Checkbox
+                                    checked={selectedItems.has(item.id)}
+                                    onCheckedChange={() => toggleItemSelection(item.id)}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Badge 
+                                    variant={item.item_type === 'ingredient' ? 'secondary' : 'outline'}
+                                    className="text-xs"
+                                  >
+                                    {item.item_type === 'ingredient' ? '식자재' : '용기'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="font-medium">{item.name}</TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {item.code_name || '-'}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {isEditMode ? (
+                                    <div className="flex flex-col items-end gap-1">
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.1"
+                                        value={getActualQuantity(item)}
+                                        onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                                        className="w-24 h-8 text-right text-sm"
+                                      />
+                                      <span className="text-xs text-muted-foreground">
+                                        {item.unit}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex flex-col items-end">
+                                      <span className="font-semibold font-mono">
+                                        {formatNumber(getActualQuantity(item))}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {item.unit}
+                                      </span>
+                                      {editedQuantities.has(item.id) && editedQuantities.get(item.id) !== item.total_amount && (
+                                        <span className="text-xs text-orange-600 font-medium">
+                                          (원래: {formatNumber(item.total_amount)})
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {item.stock_grade ? (
+                                    <Badge variant="outline" className="text-xs">
+                                      {item.stock_grade} 등급
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground text-sm">-</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {item.supplier || '-'}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+
+                      {/* 수정 모드 안내 메시지 */}
+                      {isEditMode && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <div className="flex items-start gap-3">
+                            <Edit3 className="h-5 w-5 text-blue-600 mt-0.5" />
+                            <div>
+                              <h4 className="font-medium text-blue-900 mb-1">수량 수정 모드</h4>
+                              <p className="text-sm text-blue-700">
+                                각 항목의 필요수량을 직접 수정할 수 있습니다. 수정이 완료되면 "수정 완료" 버튼을 클릭하세요.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="p-8">
+                    <div className="text-center space-y-4">
+                      <div className="p-3 bg-orange-100 rounded-full w-fit mx-auto">
+                        <AlertCircle className="h-8 w-8 text-orange-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-lg mb-2">조리계획서가 없습니다</h3>
+                        <p className="text-muted-foreground">
+                          {cookingPlanData.message || '해당 날짜의 조리계획서가 없거나 재고 관리 대상 항목이 없습니다.'}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+        </div>
+
+        <DialogFooter className="pt-6 border-t">
+          <div className="flex items-center justify-between w-full">
+            <Button 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              disabled={isProcessing}
+              className="px-6"
+            >
+              취소
+            </Button>
+            {cookingPlanData && selectedItems.size > 0 && (
+              <Button
+                onClick={processBulkOutgoing}
+                disabled={isProcessing}
+                className="gap-2 px-6"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    처리 중...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart className="h-4 w-4" />
+                    선택 항목 일괄 출고 ({selectedItems.size}개)
+                  </>
                 )}
-              </div>
-            </DialogFooter>
-          </DialogContent>
-        </DialogPortal>
-      </Dialog>
-    </PortalErrorBoundary>
+              </Button>
+            )}
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 } 
