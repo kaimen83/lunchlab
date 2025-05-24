@@ -86,10 +86,11 @@ export async function GET(
         }
         
         // 재고 등급 필터 적용
-        if (stockGrade) {
+        if (stockGrade && stockGrade !== 'all') {
           ingredientQuery = ingredientQuery.eq('stock_grade', stockGrade);
-        } else if (itemType === 'ingredient' || !itemType) {
-          ingredientQuery = ingredientQuery.eq('stock_grade', 'B');
+        } else {
+          // stockGrade가 없거나 'all'인 경우, 재고관리 등급이 있는 모든 식자재 조회
+          ingredientQuery = ingredientQuery.not('stock_grade', 'is', null);
         }
         
         const { data: ingredients, error: ingredientsError } = await ingredientQuery;

@@ -138,10 +138,11 @@ export function StockTable({
     return value.toLocaleString("ko-KR");
   };
 
-  // 가격 포맷 함수
+  // 가격 포맷 함수 (재고액은 반올림 처리)
   const formatPrice = (price: number | undefined) => {
     if (price === undefined || price === null) return "-";
-    return `${formatNumber(price)}원`;
+    const roundedPrice = Math.round(price);
+    return `${formatNumber(roundedPrice)}원`;
   };
 
   if (isLoading) {

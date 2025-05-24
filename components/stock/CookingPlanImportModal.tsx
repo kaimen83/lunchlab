@@ -280,7 +280,7 @@ export function CookingPlanImportModal({
         try {
           // 해당 항목의 재고 항목 ID를 찾기
           const stockItemResponse = await fetch(
-            `/api/companies/${companyId}/stock/items?itemType=${item.item_type}&query=${encodeURIComponent(item.name)}`
+            `/api/companies/${companyId}/stock/items?itemType=${item.item_type}&query=${encodeURIComponent(item.name)}&stockGrade=all`
           );
           
           if (!stockItemResponse.ok) {
@@ -294,7 +294,10 @@ export function CookingPlanImportModal({
           );
 
           if (!stockItem) {
-            failedItems.push(`${item.name} (재고 항목 없음)`);
+            // 재고 항목이 없으면 임시 ID 생성
+            const tempId = `temp_${item.item_type}_${item.id}`;
+            stockItemIds.push(tempId);
+            quantities.push(getActualQuantity(item));
             continue;
           }
 
