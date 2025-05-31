@@ -223,19 +223,37 @@ async function processTemporaryIds(
         throw new Error(`식자재 정보를 조회할 수 없습니다: ${ingredientError.message}`);
       }
       
-      // 해당 식자재에 대한 재고 항목 생성
-      const { data: newStockItem, error: createError } = await supabase
+      // 해당 식자재에 대한 재고 항목이 이미 존재하는지 확인
+      const { data: existingStockItem, error: checkError } = await supabase
         .from('stock_items')
-        .insert({
-          company_id: companyId,
-          item_type: 'ingredient',
-          item_id: ingredientId,
-          current_quantity: 0, // 초기 수량은 0
-          unit: ingredient.unit || '개'
-        })
-        .select()
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('item_type', 'ingredient')
+        .eq('item_id', ingredientId)
         .single();
-        
+      
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116은 "not found" 에러
+        console.error('재고 항목 조회 오류:', checkError);
+        throw new Error(`재고 항목을 조회할 수 없습니다: ${checkError.message}`);
+      }
+      
+      if (existingStockItem) {
+        // 이미 존재하는 재고 항목이 있으면 해당 ID 사용
+        processedIds[i] = existingStockItem.id;
+      } else {
+        // 존재하지 않으면 새로 생성
+        const { data: newStockItem, error: createError } = await supabase
+          .from('stock_items')
+          .insert({
+            company_id: companyId,
+            item_type: 'ingredient',
+            item_id: ingredientId,
+            current_quantity: 0, // 초기 수량은 0
+            unit: ingredient.unit || '개'
+          })
+          .select()
+          .single();
+          
         if (createError) {
           console.error('재고 항목 생성 오류:', createError);
           throw new Error(`재고 항목을 생성할 수 없습니다: ${createError.message}`);
@@ -243,6 +261,7 @@ async function processTemporaryIds(
         
         // 생성된 실제 재고 항목 ID로 대체
         processedIds[i] = newStockItem.id;
+      }
     }
     // temp_container_로 시작하는 경우도 처리 (필요시)
     else if (id.startsWith('temp_container_')) {
@@ -261,19 +280,37 @@ async function processTemporaryIds(
         throw new Error(`용기 정보를 조회할 수 없습니다: ${containerError.message}`);
       }
       
-      // 해당 용기에 대한 재고 항목 생성
-      const { data: newStockItem, error: createError } = await supabase
+      // 해당 용기에 대한 재고 항목이 이미 존재하는지 확인
+      const { data: existingStockItem, error: checkError } = await supabase
         .from('stock_items')
-        .insert({
-          company_id: companyId,
-          item_type: 'container',
-          item_id: containerId,
-          current_quantity: 0, // 초기 수량은 0
-          unit: '개' // 용기의 기본 단위는 '개'
-        })
-        .select()
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('item_type', 'container')
+        .eq('item_id', containerId)
         .single();
-        
+      
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116은 "not found" 에러
+        console.error('재고 항목 조회 오류:', checkError);
+        throw new Error(`재고 항목을 조회할 수 없습니다: ${checkError.message}`);
+      }
+      
+      if (existingStockItem) {
+        // 이미 존재하는 재고 항목이 있으면 해당 ID 사용
+        processedIds[i] = existingStockItem.id;
+      } else {
+        // 존재하지 않으면 새로 생성
+        const { data: newStockItem, error: createError } = await supabase
+          .from('stock_items')
+          .insert({
+            company_id: companyId,
+            item_type: 'container',
+            item_id: containerId,
+            current_quantity: 0, // 초기 수량은 0
+            unit: '개' // 용기의 기본 단위는 '개'
+          })
+          .select()
+          .single();
+          
         if (createError) {
           console.error('재고 항목 생성 오류:', createError);
           throw new Error(`재고 항목을 생성할 수 없습니다: ${createError.message}`);
@@ -281,6 +318,7 @@ async function processTemporaryIds(
         
         // 생성된 실제 재고 항목 ID로 대체
         processedIds[i] = newStockItem.id;
+      }
     }
   }
   
