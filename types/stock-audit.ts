@@ -1,0 +1,71 @@
+// 재고 실사 세션 타입
+export interface StockAudit {
+  id: string;
+  company_id: string;
+  name: string;
+  description?: string;
+  status: 'in_progress' | 'completed' | 'cancelled';
+  created_by: string; // Clerk user ID
+  created_at: string;
+  completed_at?: string;
+  updated_at: string;
+}
+
+// 재고 실사 항목 타입
+export interface StockAuditItem {
+  id: string;
+  audit_id: string;
+  stock_item_id: string;
+  item_name: string;
+  item_type: 'ingredient' | 'container';
+  unit?: string;
+  book_quantity: number; // 장부상 재고량
+  actual_quantity?: number; // 실사량 (null이면 미입력)
+  difference?: number; // 차이 (자동 계산)
+  status: 'pending' | 'completed' | 'discrepancy';
+  notes?: string;
+  audited_by?: string; // Clerk user ID
+  audited_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 실사 생성 요청 타입
+export interface CreateStockAuditRequest {
+  name: string;
+  description?: string;
+  item_types?: ('ingredient' | 'container')[]; // 포함할 항목 타입
+}
+
+// 실사 항목 업데이트 요청 타입
+export interface UpdateStockAuditItemRequest {
+  actual_quantity: number;
+  notes?: string;
+}
+
+// 실사 통계 타입
+export interface StockAuditStats {
+  total_items: number;
+  completed_items: number;
+  pending_items: number;
+  discrepancy_items: number;
+  completion_rate: number; // 완료율 (%)
+}
+
+// 실사 목록 응답 타입
+export interface StockAuditListResponse {
+  audits: StockAudit[];
+  pagination: {
+    total: number;
+    page: number;
+    pageSize: number;
+    pageCount: number;
+  };
+}
+
+// 실사 상세 응답 타입
+export interface StockAuditDetailResponse {
+  audit: StockAudit;
+  items: StockAuditItem[];
+  stats: StockAuditStats;
+} 
