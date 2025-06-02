@@ -128,7 +128,13 @@ export async function GET(
     const response: StockAuditDetailResponse = {
       audit,
       items: items || [],
-      stats
+      stats,
+      pagination: {
+        total: count || 0,
+        page,
+        pageSize,
+        pageCount: Math.ceil((count || 0) / pageSize)
+      }
     };
 
     return NextResponse.json(response);

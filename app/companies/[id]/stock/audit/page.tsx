@@ -101,10 +101,12 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
   }, [companyId, toast]);
 
   // 실사 상세 정보 조회
-  const fetchAuditDetail = useCallback(async (auditId: string) => {
+  const fetchAuditDetail = useCallback(async (auditId: string, page: number = 1) => {
     try {
       setIsLoading(true);
       const queryParams = new URLSearchParams({
+        page: page.toString(),
+        pageSize: pageSize.toString(),
         status: filters.status !== 'all' ? filters.status : '',
         itemType: filters.itemType !== 'all' ? filters.itemType : '',
         search: filters.search
@@ -127,7 +129,7 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [companyId, filters, toast]);
+  }, [companyId, pageSize, filters, toast]);
 
   // 새 실사 생성
   const createAudit = async () => {
@@ -154,9 +156,15 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
       }
       
       const data = await response.json();
+      
+      // 더 자세한 성공 메시지
+      const itemsInfo = data.items_count > 0 
+        ? `총 ${data.items_count}개 항목(식자재 + 용기)으로 실사가 생성되었습니다.`
+        : '재고 항목이 없어 빈 실사가 생성되었습니다.';
+      
       toast({
         title: "실사 생성 완료",
-        description: `${data.items_count}개 항목으로 실사가 생성되었습니다.`,
+        description: itemsInfo,
       });
       
       // 폼 초기화 및 목록 새로고침
@@ -165,7 +173,7 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
       await fetchAudits();
       
       // 새로 생성된 실사로 이동
-      await fetchAuditDetail(data.audit.id);
+      await fetchAuditDetail(data.audit.id, 1);
     } catch (error) {
       console.error('실사 생성 오류:', error);
       toast({
@@ -408,19 +416,22 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
     }
   };
 
-  // 페이지네이션된 항목 가져오기
+  // 페이지네이션된 항목 가져오기 (이제 서버에서 처리됨)
   const getPaginatedItems = () => {
-    if (!currentAudit) return [];
-    
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    return currentAudit.items.slice(startIndex, endIndex);
+    return currentAudit?.items || [];
   };
 
-  // 총 페이지 수 계산
+  // 총 페이지 수 계산 (서버에서 받은 정보 사용)
   const getTotalPages = () => {
-    if (!currentAudit) return 0;
-    return Math.ceil(currentAudit.items.length / pageSize);
+    return currentAudit?.pagination?.pageCount || 0;
+  };
+
+  // 페이지 변경 시 데이터 새로고침
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    if (currentAudit) {
+      fetchAuditDetail(currentAudit.audit.id, newPage);
+    }
   };
 
   // 인라인 편집 가능한 셀 컴포넌트
@@ -478,12 +489,13 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
     fetchAudits();
   }, [fetchAudits]);
 
-  // 필터 변경 시 상세 정보 새로고침
+  // 필터 변경 시 상세 정보 새로고침 (페이지는 1로 리셋)
   useEffect(() => {
     if (currentAudit) {
-      fetchAuditDetail(currentAudit.audit.id);
+      setCurrentPage(1);
+      fetchAuditDetail(currentAudit.audit.id, 1);
     }
-  }, [filters, fetchAuditDetail, currentAudit?.audit.id]);
+  }, [filters.status, filters.itemType, filters.search, currentAudit?.audit.id, fetchAuditDetail]);
 
   // 실사 변경 시 페이지 초기화
   useEffect(() => {
@@ -514,6 +526,13 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
               <DialogTitle>새 재고 실사 생성</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>안내:</strong> 현재 등록된 모든 식자재와 용기 재고에 대해 실사 항목이 생성됩니다.
+                  항목이 많을 경우 페이지네이션으로 나누어 표시됩니다.
+                </p>
+              </div>
+              
               <div>
                 <Label htmlFor="audit-name">실사명</Label>
                 <Input
@@ -562,7 +581,7 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
                       ? 'border-blue-500 bg-blue-50' 
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
-                  onClick={() => fetchAuditDetail(audit.id)}
+                  onClick={() => fetchAuditDetail(audit.id, 1)}
                 >
                   <div className="flex items-center justify-between">
                     <h3 className="font-medium text-sm">{audit.name}</h3>
@@ -616,7 +635,7 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
                 <div className="mt-4">
                   <div className="flex items-center justify-between text-sm mb-2">
                     <span>진행률</span>
-                    <span>{currentAudit.stats.completion_rate}%</span>
+                    <span>{currentAudit.stats.completion_rate}% ({currentAudit.stats.completed_items + currentAudit.stats.discrepancy_items}/{currentAudit.stats.total_items})</span>
                   </div>
                   <Progress value={currentAudit.stats.completion_rate} className="h-2" />
                   
@@ -624,6 +643,7 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
                     <span>완료: {currentAudit.stats.completed_items + currentAudit.stats.discrepancy_items}</span>
                     <span>대기: {currentAudit.stats.pending_items}</span>
                     <span>차이: {currentAudit.stats.discrepancy_items}</span>
+                    <span>총 {currentAudit.stats.total_items}개</span>
                   </div>
                 </div>
               </CardHeader>
@@ -702,6 +722,30 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
 
                 {/* 엑셀시트 형태 실사 항목 테이블 */}
                 <div className="border rounded-lg overflow-hidden">
+                  {/* 테이블 헤더 - 항목 정보 표시 */}
+                  <div className="bg-blue-50 px-4 py-3 border-b">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <h3 className="font-medium text-blue-900">실사 항목 목록</h3>
+                        <div className="flex items-center space-x-2 text-sm text-blue-700">
+                          <span className="bg-blue-100 px-2 py-1 rounded">
+                            총 {currentAudit.stats.total_items}개 항목
+                          </span>
+                          {currentAudit.pagination && currentAudit.pagination.total > pageSize && (
+                            <span className="text-blue-600">
+                              (현재 {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, currentAudit.pagination.total)}개 표시)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-sm text-blue-600">
+                        식자재 {currentAudit.items.filter(item => item.item_type === 'ingredient').length}개 + 
+                        용기 {currentAudit.items.filter(item => item.item_type === 'container').length}개
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* 컬럼 헤더 */}
                   <div className="bg-gray-50 px-4 py-3 border-b">
                     <div className="grid grid-cols-12 gap-4 text-sm font-medium text-gray-700">
                       <div className="col-span-4">항목명</div>
@@ -793,27 +837,30 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
                 </div>
                 
                 {/* 페이지네이션 */}
-                {currentAudit.items.length > pageSize && (
+                {currentAudit?.pagination && currentAudit.pagination.total > pageSize && (
                   <div className="flex items-center justify-between mt-4">
                     <div className="text-sm text-gray-500">
-                      총 {currentAudit.items.length}개 항목 중 {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, currentAudit.items.length)}개 표시
+                      <span className="font-medium">총 {currentAudit.pagination.total}개 항목</span> 중 
+                      <span className="font-medium"> {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, currentAudit.pagination.total)}개</span> 표시
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex items-center space-x-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                         disabled={currentPage === 1}
                       >
                         이전
                       </Button>
-                      <span className="flex items-center px-3 text-sm">
-                        {currentPage} / {getTotalPages()}
-                      </span>
+                      <div className="flex items-center space-x-1">
+                        <span className="text-sm text-gray-500">페이지</span>
+                        <span className="font-medium text-sm">{currentPage}</span>
+                        <span className="text-sm text-gray-500">/ {getTotalPages()}</span>
+                      </div>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCurrentPage(prev => Math.min(getTotalPages(), prev + 1))}
+                        onClick={() => handlePageChange(Math.min(getTotalPages(), currentPage + 1))}
                         disabled={currentPage === getTotalPages()}
                       >
                         다음
@@ -822,7 +869,7 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
                   </div>
                 )}
                 
-                {currentAudit.items.length === 0 && (
+                {currentAudit?.items.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     <Filter className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                     <p>조건에 맞는 항목이 없습니다.</p>

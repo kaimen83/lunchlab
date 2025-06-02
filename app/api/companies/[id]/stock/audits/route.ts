@@ -182,7 +182,14 @@ export async function POST(
       );
     }
 
+    console.log(`실사 생성: 회사 ${companyId}에서 ${stockItems?.length || 0}개 재고 항목 조회됨`);
+    console.log(`항목 타입별 분포:`, stockItems?.reduce((acc, item) => {
+      acc[item.item_type] = (acc[item.item_type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>));
+
     if (!stockItems || stockItems.length === 0) {
+      console.log('재고 항목이 없어서 빈 실사 생성');
       return NextResponse.json({
         audit,
         items_count: 0
@@ -247,6 +254,8 @@ export async function POST(
 
     // 실사 항목들 일괄 생성
     if (auditItems.length > 0) {
+      console.log(`${auditItems.length}개 실사 항목 생성 시도`);
+      
       const { error: itemsError } = await supabase
         .from('stock_audit_items')
         .insert(auditItems);
@@ -267,6 +276,8 @@ export async function POST(
           { status: 500 }
         );
       }
+      
+      console.log(`실사 항목 생성 완료: ${auditItems.length}개`);
     }
 
     return NextResponse.json({
