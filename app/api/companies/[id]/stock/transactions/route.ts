@@ -211,6 +211,13 @@ async function processTemporaryIds(
       // 임시 ID에서 실제 식자재 ID 추출
       const ingredientId = id.replace('temp_ingredient_', '');
       
+      // UUID 형식 검증
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(ingredientId)) {
+        console.error('유효하지 않은 UUID 형식:', ingredientId);
+        throw new Error(`유효하지 않은 식자재 ID 형식입니다: ${ingredientId}`);
+      }
+      
       // 이 식자재의 정보 조회
       const { data: ingredient, error: ingredientError } = await supabase
         .from('ingredients')
@@ -267,6 +274,13 @@ async function processTemporaryIds(
     else if (id.startsWith('temp_container_')) {
       // 임시 ID에서 실제 용기 ID 추출
       const containerId = id.replace('temp_container_', '');
+      
+      // UUID 형식 검증
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(containerId)) {
+        console.error('유효하지 않은 UUID 형식:', containerId);
+        throw new Error(`유효하지 않은 용기 ID 형식입니다: ${containerId}`);
+      }
       
       // 이 용기의 정보 조회
       const { data: container, error: containerError } = await supabase

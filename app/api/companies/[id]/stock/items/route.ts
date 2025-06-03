@@ -78,7 +78,30 @@ export async function GET(
         
         // 검색어나 카테고리 필터가 있으면 먼저 적용
         if (searchQuery) {
-          ingredientQuery = ingredientQuery.or(`name.ilike.%${searchQuery}%,code_name.ilike.%${searchQuery}%`);
+          // PostgREST의 or 쿼리에서 특수문자 문제를 피하기 위해 별도 쿼리로 분리
+          const nameResults = await supabase
+            .from('ingredients')
+            .select('id')
+            .eq('company_id', companyId)
+            .ilike('name', `%${searchQuery}%`);
+            
+          const codeResults = await supabase
+            .from('ingredients')
+            .select('id')
+            .eq('company_id', companyId)
+            .ilike('code_name', `%${searchQuery}%`);
+            
+          // 두 결과를 합치고 중복 제거
+          const nameIds = nameResults.data?.map(item => item.id) || [];
+          const codeIds = codeResults.data?.map(item => item.id) || [];
+          const combinedIds = [...new Set([...nameIds, ...codeIds])];
+          
+          if (combinedIds.length > 0) {
+            ingredientQuery = ingredientQuery.in('id', combinedIds);
+          } else {
+            // 검색 결과가 없으면 빈 결과 반환
+            ingredientQuery = ingredientQuery.eq('id', 'no-match');
+          }
         }
         
         if (category) {
@@ -115,7 +138,30 @@ export async function GET(
         
         // 검색어나 카테고리 필터가 있으면 먼저 적용
         if (searchQuery) {
-          containerQuery = containerQuery.or(`name.ilike.%${searchQuery}%,code_name.ilike.%${searchQuery}%`);
+          // PostgREST의 or 쿼리에서 특수문자 문제를 피하기 위해 별도 쿼리로 분리
+          const nameResults = await supabase
+            .from('containers')
+            .select('id')
+            .eq('company_id', companyId)
+            .ilike('name', `%${searchQuery}%`);
+            
+          const codeResults = await supabase
+            .from('containers')
+            .select('id')
+            .eq('company_id', companyId)
+            .ilike('code_name', `%${searchQuery}%`);
+            
+          // 두 결과를 합치고 중복 제거
+          const nameIds = nameResults.data?.map(item => item.id) || [];
+          const codeIds = codeResults.data?.map(item => item.id) || [];
+          const combinedIds = [...new Set([...nameIds, ...codeIds])];
+          
+          if (combinedIds.length > 0) {
+            containerQuery = containerQuery.in('id', combinedIds);
+          } else {
+            // 검색 결과가 없으면 빈 결과 반환
+            containerQuery = containerQuery.eq('id', 'no-match');
+          }
         }
         
         if (category) {

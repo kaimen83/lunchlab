@@ -25,10 +25,34 @@ export async function GET(req: NextRequest) {
     const supabase = createServerSupabaseClient();
     
     // 회사 검색 쿼리 - 이름이나 설명에 검색어 포함된 회사 검색
-    const { data: companies, error, count } = await supabase
+    // PostgREST의 or 쿼리에서 특수문자 문제를 피하기 위해 별도 쿼리로 분리
+    const nameResults = await supabase
       .from('companies')
-      .select('*', { count: 'exact' })
-      .or(`name.ilike.%${query}%, description.ilike.%${query}%`)
+      .select('id')
+      .ilike('name', `%${query}%`);
+      
+    const descResults = await supabase
+      .from('companies')
+      .select('id')
+      .ilike('description', `%${query}%`);
+      
+    // 두 결과를 합치고 중복 제거
+    const nameIds = nameResults.data?.map(item => item.id) || [];
+    const descIds = descResults.data?.map(item => item.id) || [];
+    const combinedIds = [...new Set([...nameIds, ...descIds])];
+    
+    let companiesQuery = supabase
+      .from('companies')
+      .select('*', { count: 'exact' });
+      
+    if (combinedIds.length > 0) {
+      companiesQuery = companiesQuery.in('id', combinedIds);
+    } else {
+      // 검색 결과가 없으면 빈 결과 반환
+      companiesQuery = companiesQuery.eq('id', 'no-match');
+    }
+    
+    const { data: companies, error, count } = await companiesQuery
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
     

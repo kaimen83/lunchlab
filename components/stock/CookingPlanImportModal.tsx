@@ -221,7 +221,7 @@ export function CookingPlanImportModal({
     }
 
     const newItems: StockRequirement[] = selectedSearchItems.map(selectedItem => ({
-      id: `additional_${Date.now()}_${selectedItem.id}_${Math.random()}`,
+      id: `temp_${addItemType}_${selectedItem.id}`,
       name: selectedItem.name,
       item_type: addItemType,
       total_amount: addItemQuantity,
@@ -386,7 +386,13 @@ export function CookingPlanImportModal({
 
           if (!stockItem) {
             // 재고 항목이 없으면 임시 ID 생성
-            const tempId = `temp_${item.item_type}_${item.id}`;
+            // item.id가 이미 temp_ 형태인지 확인
+            let tempId;
+            if (item.id.startsWith('temp_')) {
+              tempId = item.id; // 이미 temp_ 형태면 그대로 사용
+            } else {
+              tempId = `temp_${item.item_type}_${item.id}`;
+            }
             stockItemIds.push(tempId);
             quantities.push(getActualQuantity(item));
             continue;
