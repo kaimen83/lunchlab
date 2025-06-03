@@ -110,7 +110,24 @@ export default function CookingPlanContainer({ companyId, initialDate, onComplet
       link.setAttribute('href', dataUri);
       link.setAttribute('download', filename);
       link.style.display = 'none';
+      
+      // React와의 충돌을 방지하기 위해 body에 추가하지 않고 직접 클릭
+      // 일부 브라우저에서는 DOM에 추가해야 동작하므로 안전하게 처리
+      document.body.appendChild(link);
       link.click();
+      
+      // 즉시 제거하여 React와의 충돌 방지
+      setTimeout(() => {
+        try {
+          if (link.parentNode && document.body.contains(link)) {
+            document.body.removeChild(link);
+          }
+        } catch (error) {
+          // 제거 중 오류 발생 시 무시 (이미 제거되었을 수 있음)
+          console.warn('링크 요소 제거 중 오류:', error);
+        }
+      }, 100);
+      
     } catch (error) {
       console.error('다운로드 오류:', error);
     }

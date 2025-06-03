@@ -36,6 +36,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { formatQuantity } from "@/lib/utils/format";
 
 interface StockItemDetailProps {
   params: Promise<{
@@ -273,7 +274,7 @@ export default function StockItemDetailPage({ params }: StockItemDetailProps) {
                   <h3 className="text-sm font-medium text-muted-foreground">현재 수량</h3>
                   <div className="flex items-center mt-1">
                     <span className="text-xl font-semibold mr-2">
-                      {item.current_quantity} {item.unit}
+                      {formatQuantity(item.current_quantity, item.unit)} {item.unit}
                     </span>
                     {getQuantityBadge()}
                   </div>

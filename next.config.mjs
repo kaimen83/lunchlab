@@ -13,7 +13,7 @@ const nextConfig = {
     ignoreBuildErrors: true, // 빌드 시 TypeScript 에러를 무시합니다
   },
   // 최신 Next.js에서는 swcMinify가 기본값이므로 명시적으로 지정할 필요가 없음
-  reactStrictMode: true,
+  reactStrictMode: false, // DOM 조작 관련 에러 해결을 위해 일시적으로 비활성화
   poweredByHeader: false,
   // 실험적인 App Router 최적화 - 성능 향상을 위해 추가
   experimental: {

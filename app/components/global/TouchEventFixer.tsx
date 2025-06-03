@@ -98,7 +98,7 @@ export default function TouchEventFixer() {
         }
       });
       
-      // Dialog 관련 오버레이 요소만 제거 (DropdownMenu는 제외)
+      // Dialog 관련 오버레이 요소만 제거 (DropdownMenu는 제외) - React와 충돌 방지
       const overlays = document.querySelectorAll('[data-radix-popper-content-wrapper]');
       overlays.forEach(overlay => {
         try {
@@ -108,18 +108,30 @@ export default function TouchEventFixer() {
             overlay.hasAttribute('data-radix-menu-content') ||
             overlay.getAttribute('data-state') === 'open';
           
-          // 요소가 DOM에 있고 메뉴 요소가 아닌 경우에만 제거
+          // React가 관리하는 요소인지 확인 (React Fiber 노드 체크)
+          const isReactManaged = overlay.hasOwnProperty('_reactInternalFiber') || 
+                                overlay.hasOwnProperty('__reactInternalInstance') ||
+                                overlay.hasOwnProperty('_reactInternals');
+          
+          // 요소가 DOM에 있고 메뉴 요소가 아니며 React가 관리하지 않는 경우에만 제거
           if (overlay.parentNode && 
               document.body.contains(overlay) && 
-              !isMenuElement) {
-            overlay.parentNode.removeChild(overlay);
+              !isMenuElement &&
+              !isReactManaged) {
+            // React와의 충돌을 방지하기 위해 display: none으로 숨기기만 함
+            if (overlay instanceof HTMLElement) {
+              overlay.style.display = 'none';
+              overlay.style.pointerEvents = 'none';
+              // 나중에 정리될 수 있도록 마킹
+              overlay.setAttribute('data-touch-fixer-hidden', 'true');
+            }
           }
         } catch (error) {
           // 노드 제거 중 오류 발생 시 무시
         }
       });
       
-      // 불필요한 data-state="closed" 다이얼로그 정리 - 안전하게 처리
+      // 불필요한 data-state="closed" 다이얼로그 정리 - React와 충돌 방지
       closedDialogs.forEach(dialog => {
         try {
           // DropdownMenu 관련 요소는 제외하고 다이얼로그만 대상으로
@@ -128,12 +140,23 @@ export default function TouchEventFixer() {
             !dialog.closest('[role="menu"]') && 
             !dialog.hasAttribute('data-radix-menu-content');
           
-          // 요소가 실제로 DOM에 존재하는지 확인
+          // React가 관리하는 요소인지 확인
+          const isReactManaged = dialog.hasOwnProperty('_reactInternalFiber') || 
+                                dialog.hasOwnProperty('__reactInternalInstance') ||
+                                dialog.hasOwnProperty('_reactInternals');
+          
+          // 요소가 실제로 DOM에 존재하고 React가 관리하지 않는 경우에만 처리
           if (dialog.parentElement && 
               document.body.contains(dialog) && 
               isDialogElement &&
+              !isReactManaged &&
               dialog.getAttribute('data-remove-on-close') === 'true') {
-            dialog.parentElement.removeChild(dialog);
+            // React와의 충돌을 방지하기 위해 display: none으로 숨기기만 함
+            if (dialog instanceof HTMLElement) {
+              dialog.style.display = 'none';
+              dialog.style.pointerEvents = 'none';
+              dialog.setAttribute('data-touch-fixer-hidden', 'true');
+            }
           }
         } catch (error) {
           // 제거 중 오류 발생 시 무시

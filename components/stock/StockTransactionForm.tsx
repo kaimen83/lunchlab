@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/card";
 import { ArrowDown, ArrowUp, Loader2 } from "lucide-react";
 import { StockItem } from "./StockTable";
+import { formatQuantity } from "@/lib/utils/format";
 
 // 폼 스키마 정의
 const transactionFormSchema = z.object({
@@ -180,8 +181,8 @@ export function StockTransactionForm({
                       ) : (
                         stockItems.map((item) => (
                           <SelectItem key={item.id} value={item.id}>
-                            {item.details.name}
-                            {item.details.code_name && ` (${item.details.code_name})`} - 현재: {item.current_quantity} {item.unit}
+                            {item.details?.name}
+                            {item.details?.code_name && ` (${item.details.code_name})`} - 현재: {formatQuantity(item.current_quantity, item.unit)} {item.unit}
                           </SelectItem>
                         ))
                       )}

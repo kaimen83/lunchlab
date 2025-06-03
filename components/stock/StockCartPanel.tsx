@@ -38,6 +38,7 @@ import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { CookingPlanImportModal } from "./CookingPlanImportModal";
 import { cn } from "@/lib/utils";
+import { formatQuantity } from "@/lib/utils/format";
 
 interface StockCartPanelProps {
   companyId: string;
@@ -397,7 +398,7 @@ function CartItemRow({ item, onRemove, onQuantityChange }: CartItemRowProps) {
           </Badge>
         </div>
         <div className="text-xs text-muted-foreground mt-0.5">
-          현재: {item.current_quantity.toLocaleString()} {item.unit}
+          현재: {formatQuantity(item.current_quantity, item.unit)} {item.unit}
         </div>
       </div>
       

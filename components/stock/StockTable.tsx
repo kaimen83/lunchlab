@@ -22,6 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { useStockCart } from "./StockCartContext";
 import { StockItemDetailModal } from "./StockItemDetailModal";
+import { formatQuantity } from "@/lib/utils/format";
 
 // 재고 항목 타입 정의
 export interface StockItem {
@@ -137,6 +138,8 @@ export function StockTable({
     if (value === undefined || value === null) return "-";
     return value.toLocaleString("ko-KR");
   };
+
+
 
   // 가격 포맷 함수 (재고액은 반올림 처리)
   const formatPrice = (price: number | undefined) => {
@@ -343,7 +346,7 @@ export function StockTable({
                     <TableCell>
                       {item.details?.code_name || "-"}
                     </TableCell>
-                    <TableCell>{formatNumber(item.current_quantity)} {item.unit}</TableCell>
+                    <TableCell>{formatQuantity(item.current_quantity, item.unit)} {item.unit}</TableCell>
                     <TableCell>{formatPrice(price)}</TableCell>
                     <TableCell>{formatPrice(totalValue)}</TableCell>
                     <TableCell>
