@@ -270,7 +270,7 @@ export async function POST(
             item_type: 'container',
             item_id: container.id,
             item_name: container.name,
-            unit: 'EA', // 용기는 기본적으로 EA 단위
+            unit: '개', // 용기는 기본적으로 '개' 단위
             current_quantity: stockItem?.current_quantity || 0,
             has_stock_record: !!stockItem
           });
