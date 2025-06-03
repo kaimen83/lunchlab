@@ -124,6 +124,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const limit = parseInt(url.searchParams.get('limit') || '25', 10);
     const search = url.searchParams.get('search') || '';
     const detailed = url.searchParams.get('detailed') === 'true';
+    const sortField = url.searchParams.get('sort') || 'name';
+    const sortDirection = url.searchParams.get('direction') || 'asc';
+    
+    // 정렬 가능한 필드 검증
+    const validSortFields = [
+      'name', 'code_name', 'supplier', 'package_amount', 'price', 
+      'items_per_box', 'stock_grade', 'origin', 'calories', 'created_at'
+    ];
+    
+    const finalSortField = validSortFields.includes(sortField) ? sortField : 'name';
+    const finalSortDirection = ['asc', 'desc'].includes(sortDirection) ? sortDirection : 'asc';
     
     // 페이지네이션 계산
     const offset = (page - 1) * limit;
@@ -153,22 +164,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
             .eq('company_id', companyId)
       ),
       
-      // 현재 페이지 식재료 데이터 조회 (검색어가 있는 경우 필터링)
-      (search
-        ? supabase
-            .from('ingredients')
-            .select(fields)
-            .eq('company_id', companyId)
-            .ilike('name', `%${search}%`)
-            .order('name')
-            .range(offset, offset + limit - 1)
-        : supabase
-            .from('ingredients')
-            .select(fields)
-            .eq('company_id', companyId)
-            .order('name')
-            .range(offset, offset + limit - 1)
-      )
+      // 한글 정렬을 위한 PostgreSQL 함수 사용
+      supabase.rpc('get_ingredients_with_korean_sort', {
+        p_company_id: companyId,
+        p_search: search,
+        p_sort_field: finalSortField,
+        p_sort_direction: finalSortDirection,
+        p_limit: limit,
+        p_offset: offset
+      })
     ]);
 
     const { count, error: countError } = countResult;

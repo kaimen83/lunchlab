@@ -95,7 +95,7 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin';
 
   // 식재료 목록 로드 - useCallback으로 메모이제이션
-  const loadIngredients = useCallback(async (page: number = 1, search: string = '') => {
+  const loadIngredients = useCallback(async (page: number = 1, search: string = '', sort?: string, direction?: string) => {
     setIsLoading(true);
     
     try {
@@ -108,9 +108,15 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
         suppliersList = await suppliersResponse.json();
       }
       
+      // 정렬 파라미터 설정 (현재 상태 기준)
+      const currentSort = sort || sortField;
+      const currentDirection = direction || sortDirection;
+      
+
+      
       // 식재료 목록을 페이지네이션과 함께 가져옵니다
       const response = await fetch(
-        `/api/companies/${companyId}/ingredients?page=${page}&limit=${pagination.limit}&search=${encodeURIComponent(search)}`
+        `/api/companies/${companyId}/ingredients?page=${page}&limit=${pagination.limit}&search=${encodeURIComponent(search)}&sort=${currentSort}&direction=${currentDirection}`
       );
       
       if (!response.ok) {
@@ -148,7 +154,7 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
     } finally {
       setIsLoading(false);
     }
-  }, [companyId, pagination.limit, toast]);
+  }, [companyId, pagination.limit, sortField, sortDirection, toast]);
 
   // 특정 식재료의 상세 정보를 로드하는 함수
   const loadIngredientDetails = useCallback(async (ingredientId: string) => {
@@ -253,33 +259,19 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
 
   // 정렬 처리
   const toggleSort = (field: keyof Ingredient) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
+    const newDirection = (sortField === field && sortDirection === 'asc') ? 'desc' : 'asc';
+    const newField = field;
+    
+    setSortField(newField);
+    setSortDirection(newDirection);
+    
+    // 정렬 변경 시 첫 페이지로 리셋하고 데이터 다시 로드
+    setPagination(prev => ({ ...prev, page: 1 }));
+    loadIngredients(1, debouncedSearchQuery, newField, newDirection);
   };
 
-  // 정렬된 식재료 목록 (클라이언트 측 정렬만 적용)
-  const sortedIngredients = useMemo(() => {
-    return [...ingredients].sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-      
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortDirection === 'asc' 
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
-      }
-      
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
-      }
-      
-      return 0;
-    });
-  }, [ingredients, sortField, sortDirection]);
+  // 서버에서 이미 정렬된 상태로 받아오므로 클라이언트 측 정렬 불필요
+  const sortedIngredients = ingredients;
 
   // 식재료 추가 모달 열기
   const handleAddIngredient = () => {
