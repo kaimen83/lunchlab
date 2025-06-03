@@ -189,7 +189,7 @@ export async function PATCH(
     const body = await request.json();
     const { action, apply_differences = false } = body;
 
-    if (action !== 'complete') {
+    if (action !== 'complete' && action !== 'apply_differences') {
       return NextResponse.json(
         { error: '지원하지 않는 액션입니다.' },
         { status: 400 }
@@ -211,15 +211,24 @@ export async function PATCH(
       );
     }
 
-    if (audit.status === 'completed') {
+    // 실사 완료 액션의 경우 이미 완료된 실사인지 확인
+    if (action === 'complete' && audit.status === 'completed') {
       return NextResponse.json(
         { error: '이미 완료된 실사입니다.' },
         { status: 400 }
       );
     }
 
+    // 재고량 반영 액션의 경우 완료된 실사인지 확인
+    if (action === 'apply_differences' && audit.status !== 'completed') {
+      return NextResponse.json(
+        { error: '완료된 실사만 재고량을 반영할 수 있습니다.' },
+        { status: 400 }
+      );
+    }
+
     // 실사량이 입력된 모든 항목들 조회 (실제 재고량 반영을 위해)
-    if (apply_differences) {
+    if (apply_differences || action === 'apply_differences') {
       const { data: auditedItems, error: auditedError } = await supabase
         .from('stock_audit_items')
         .select('stock_item_id, actual_quantity, difference, status, item_name')
@@ -325,28 +334,33 @@ export async function PATCH(
       }
     }
 
-    // 실사 세션 완료 처리
-    const { data: updatedAudit, error: updateError } = await supabase
-      .from('stock_audits')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString()
-      })
-      .eq('id', auditId)
-      .select()
-      .single();
+    // 실사 세션 완료 처리 (완료 액션인 경우에만)
+    let updatedAudit = audit;
+    if (action === 'complete') {
+      const { data: completedAudit, error: updateError } = await supabase
+        .from('stock_audits')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', auditId)
+        .select()
+        .single();
 
-    if (updateError) {
-      console.error('실사 완료 처리 오류:', updateError);
-      return NextResponse.json(
-        { error: '실사 완료 처리에 실패했습니다.' },
-        { status: 500 }
-      );
+      if (updateError) {
+        console.error('실사 완료 처리 오류:', updateError);
+        return NextResponse.json(
+          { error: '실사 완료 처리에 실패했습니다.' },
+          { status: 500 }
+        );
+      }
+      
+      updatedAudit = completedAudit;
     }
 
     // 반영된 항목 수 계산
     let appliedCount = 0;
-    if (apply_differences) {
+    if (apply_differences || action === 'apply_differences') {
       const { data: auditedItems } = await supabase
         .from('stock_audit_items')
         .select('id')
@@ -359,8 +373,9 @@ export async function PATCH(
 
     return NextResponse.json({
       audit: updatedAudit,
-      applied_differences: apply_differences,
-      applied_count: appliedCount
+      applied_differences: apply_differences || action === 'apply_differences',
+      applied_count: appliedCount,
+      action: action
     });
 
   } catch (error) {

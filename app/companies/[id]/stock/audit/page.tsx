@@ -364,6 +364,69 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
     completeAudit(shouldApply);
   };
 
+  // 완료된 실사의 재고량 수동 반영
+  const applyStockDifferences = async () => {
+    if (!currentAudit) return;
+
+    try {
+      const response = await fetch(
+        `/api/companies/${companyId}/stock/audits/${currentAudit.audit.id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'apply_differences'
+          })
+        }
+      );
+
+      if (!response.ok) throw new Error('재고량 반영 실패');
+      
+      const data = await response.json();
+      toast({
+        title: "재고량 반영 완료",
+        description: `${data.applied_count || 0}개 항목의 재고량이 실사량으로 반영되었습니다.`,
+      });
+      
+      // 재고량 반영 후 실사 상세 정보 새로고침
+      await fetchAuditDetail(currentAudit.audit.id);
+    } catch (error) {
+      console.error('재고량 반영 오류:', error);
+      toast({
+        title: "오류 발생",
+        description: "재고량 반영 중 문제가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // 재고량 반영 확인 다이얼로그
+  const handleApplyStockDifferences = () => {
+    if (!currentAudit) return;
+    
+    const discrepancyItemsCount = currentAudit.items.filter(item => 
+      item.actual_quantity !== null && 
+      item.actual_quantity !== undefined &&
+      item.difference !== 0
+    ).length;
+    
+    if (discrepancyItemsCount === 0) {
+      toast({
+        title: "반영할 차이 없음",
+        description: "장부량과 실사량에 차이가 있는 항목이 없습니다.",
+      });
+      return;
+    }
+
+    const shouldApply = window.confirm(
+      `장부량과 실사량에 차이가 있는 ${discrepancyItemsCount}개 항목의 재고량을 실사량으로 반영하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`
+    );
+    
+    if (shouldApply) {
+      applyStockDifferences();
+    }
+  };
+
   // 상태별 색상 및 아이콘
   const getStatusInfo = (status: string) => {
     switch (status) {
@@ -626,6 +689,19 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
                         onClick={handleCompleteAudit}
                       >
                         실사 완료
+                      </Button>
+                    </div>
+                  )}
+
+                  {currentAudit.audit.status === 'completed' && (
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="outline"
+                        onClick={handleApplyStockDifferences}
+                        className="bg-yellow-50 border-yellow-300 text-yellow-800 hover:bg-yellow-100"
+                      >
+                        <AlertTriangle className="h-4 w-4 mr-2" />
+                        재고량 반영
                       </Button>
                     </div>
                   )}

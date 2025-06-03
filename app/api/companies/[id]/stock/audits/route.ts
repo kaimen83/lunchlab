@@ -164,88 +164,193 @@ export async function POST(
       );
     }
 
-    // 현재 재고 항목들을 조회 (모든 항목 포함)
-    const { data: stockItems, error: stockItemsError } = await supabase
-      .from('stock_items')
-      .select('id, item_type, item_id, current_quantity, unit')
-      .eq('company_id', companyId)
-      .in('item_type', item_types); // 모든 재고 항목 포함
+    // 모든 등록된 항목들을 조회하여 실사 대상 결정
+    let allItems = [];
 
-    if (stockItemsError) {
-      console.error('재고 항목 조회 오류:', stockItemsError);
-      return NextResponse.json(
-        { 
-          error: '재고 항목을 조회하는데 실패했습니다.',
-          details: stockItemsError.message 
-        },
-        { status: 500 }
-      );
+    // 1. 식자재 항목 조회 (재고 정보와 함께)
+    if (item_types.includes('ingredient')) {
+      const { data: ingredients, error: ingredientsError } = await supabase
+        .from('ingredients')
+        .select('id, name, unit')
+        .eq('company_id', companyId)
+        .not('stock_grade', 'is', null); // 재고관리 등급이 있는 식자재만
+
+      if (ingredientsError) {
+        console.error('식자재 조회 오류:', ingredientsError);
+        return NextResponse.json(
+          { 
+            error: '식자재를 조회하는데 실패했습니다.',
+            details: ingredientsError.message 
+          },
+          { status: 500 }
+        );
+      }
+
+      if (ingredients && ingredients.length > 0) {
+        // 해당 식자재들의 재고 정보 조회
+        const ingredientIds = ingredients.map(ing => ing.id);
+        const { data: stockItems, error: stockError } = await supabase
+          .from('stock_items')
+          .select('id, item_id, current_quantity')
+          .eq('company_id', companyId)
+          .eq('item_type', 'ingredient')
+          .in('item_id', ingredientIds);
+
+        if (stockError) {
+          console.error('식자재 재고 조회 오류:', stockError);
+          return NextResponse.json(
+            { 
+              error: '식자재 재고를 조회하는데 실패했습니다.',
+              details: stockError.message 
+            },
+            { status: 500 }
+          );
+        }
+
+        // 식자재 항목들을 실사 항목 형태로 변환
+        for (const ingredient of ingredients) {
+          const stockItem = stockItems?.find(stock => stock.item_id === ingredient.id);
+          allItems.push({
+            id: stockItem?.id || null,
+            item_type: 'ingredient',
+            item_id: ingredient.id,
+            item_name: ingredient.name,
+            unit: ingredient.unit || 'EA',
+            current_quantity: stockItem?.current_quantity || 0,
+            has_stock_record: !!stockItem
+          });
+        }
+      }
     }
 
-    console.log(`실사 생성: 회사 ${companyId}에서 ${stockItems?.length || 0}개 재고 항목 조회됨`);
-    console.log(`항목 타입별 분포:`, stockItems?.reduce((acc, item) => {
+    // 2. 용기 항목 조회 (재고 정보와 함께)
+    if (item_types.includes('container')) {
+      const { data: containers, error: containersError } = await supabase
+        .from('containers')
+        .select('id, name, price')
+        .eq('company_id', companyId);
+
+      if (containersError) {
+        console.error('용기 조회 오류:', containersError);
+        return NextResponse.json(
+          { 
+            error: '용기를 조회하는데 실패했습니다.',
+            details: containersError.message 
+          },
+          { status: 500 }
+        );
+      }
+
+      if (containers && containers.length > 0) {
+        // 해당 용기들의 재고 정보 조회
+        const containerIds = containers.map(cont => cont.id);
+        const { data: stockItems, error: stockError } = await supabase
+          .from('stock_items')
+          .select('id, item_id, current_quantity')
+          .eq('company_id', companyId)
+          .eq('item_type', 'container')
+          .in('item_id', containerIds);
+
+        if (stockError) {
+          console.error('용기 재고 조회 오류:', stockError);
+          return NextResponse.json(
+            { 
+              error: '용기 재고를 조회하는데 실패했습니다.',
+              details: stockError.message 
+            },
+            { status: 500 }
+          );
+        }
+
+        // 용기 항목들을 실사 항목 형태로 변환
+        for (const container of containers) {
+          const stockItem = stockItems?.find(stock => stock.item_id === container.id);
+          allItems.push({
+            id: stockItem?.id || null,
+            item_type: 'container',
+            item_id: container.id,
+            item_name: container.name,
+            unit: 'EA', // 용기는 기본적으로 EA 단위
+            current_quantity: stockItem?.current_quantity || 0,
+            has_stock_record: !!stockItem
+          });
+        }
+      }
+    }
+
+    console.log(`실사 생성: 회사 ${companyId}에서 ${allItems.length}개 항목 조회됨`);
+    console.log(`항목 타입별 분포:`, allItems.reduce((acc, item) => {
       acc[item.item_type] = (acc[item.item_type] || 0) + 1;
       return acc;
     }, {} as Record<string, number>));
+    console.log(`재고 레코드 있는 항목: ${allItems.filter(item => item.has_stock_record).length}개`);
+    console.log(`재고 레코드 없는 항목: ${allItems.filter(item => !item.has_stock_record).length}개`);
 
-    if (!stockItems || stockItems.length === 0) {
-      console.log('재고 항목이 없어서 빈 실사 생성');
+    if (allItems.length === 0) {
+      console.log('등록된 항목이 없어서 빈 실사 생성');
       return NextResponse.json({
         audit,
         items_count: 0
       }, { status: 201 });
     }
 
-    // 식자재와 용기 ID 분리
-    const ingredientIds = stockItems
-      .filter(item => item.item_type === 'ingredient')
-      .map(item => item.item_id);
-    
-    const containerIds = stockItems
-      .filter(item => item.item_type === 'container')
-      .map(item => item.item_id);
-
-    // 식자재 정보 조회
-    let ingredientsMap = new Map();
-    if (ingredientIds.length > 0) {
-      const { data: ingredients, error: ingredientsError } = await supabase
-        .from('ingredients')
-        .select('id, name')
-        .in('id', ingredientIds);
+    // 재고 레코드가 없는 항목들에 대해 stock_items 레코드 생성
+    const itemsWithoutStock = allItems.filter(item => !item.has_stock_record);
+    if (itemsWithoutStock.length > 0) {
+      console.log(`${itemsWithoutStock.length}개 항목에 대해 재고 레코드 생성 중...`);
       
-      if (ingredientsError) {
-        console.error('식자재 정보 조회 오류:', ingredientsError);
-      } else {
-        ingredients?.forEach(ingredient => {
-          ingredientsMap.set(ingredient.id, ingredient.name);
-        });
-      }
-    }
+      const stockItemsToCreate = itemsWithoutStock.map(item => ({
+        company_id: companyId,
+        item_type: item.item_type,
+        item_id: item.item_id,
+        current_quantity: 0,
+        unit: item.unit
+      }));
 
-    // 용기 정보 조회
-    let containersMap = new Map();
-    if (containerIds.length > 0) {
-      const { data: containers, error: containersError } = await supabase
-        .from('containers')
-        .select('id, name')
-        .in('id', containerIds);
-      
-      if (containersError) {
-        console.error('용기 정보 조회 오류:', containersError);
-      } else {
-        containers?.forEach(container => {
-          containersMap.set(container.id, container.name);
-        });
+      const { data: createdStockItems, error: stockItemsCreateError } = await supabase
+        .from('stock_items')
+        .insert(stockItemsToCreate)
+        .select('id, item_type, item_id');
+
+      if (stockItemsCreateError) {
+        console.error('재고 레코드 생성 오류:', stockItemsCreateError);
+        // 실사 세션도 삭제
+        await supabase
+          .from('stock_audits')
+          .delete()
+          .eq('id', audit.id);
+
+        return NextResponse.json(
+          { 
+            error: '재고 레코드를 생성하는데 실패했습니다.',
+            details: stockItemsCreateError.message 
+          },
+          { status: 500 }
+        );
       }
+
+      // 생성된 stock_item_id를 allItems에 업데이트
+      if (createdStockItems) {
+        for (const createdItem of createdStockItems) {
+          const targetItem = allItems.find(item => 
+            item.item_type === createdItem.item_type && 
+            item.item_id === createdItem.item_id
+          );
+          if (targetItem) {
+            targetItem.id = createdItem.id;
+            targetItem.has_stock_record = true;
+          }
+        }
+      }
+
+      console.log(`재고 레코드 생성 완료: ${createdStockItems?.length || 0}개`);
     }
 
     // 실사 항목 데이터 준비
-    const auditItems = stockItems.map(item => ({
+    const auditItems = allItems.map(item => ({
       audit_id: audit.id,
-      stock_item_id: item.id,
-      item_name: item.item_type === 'ingredient' 
-        ? ingredientsMap.get(item.item_id) || '알 수 없는 식자재'
-        : containersMap.get(item.item_id) || '알 수 없는 용기',
+      stock_item_id: item.id, // 이제 모든 항목이 stock_item_id를 가짐
+      item_name: item.item_name,
       item_type: item.item_type,
       unit: item.unit,
       book_quantity: item.current_quantity,
