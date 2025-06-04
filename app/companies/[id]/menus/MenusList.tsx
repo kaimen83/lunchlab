@@ -83,7 +83,7 @@ import {
 // 리팩토링된 코드에서 사용할 타입과 유틸리티 함수, 컴포넌트 임포트
 import { Menu as MenuType, MenusListProps, ContainerDetailsResponse } from "./types";
 import { formatCurrency } from "./utils";
-import { loadMenus, loadContainerDetails, deleteMenu } from "./api";
+import { loadMenus, loadContainerDetails, deleteMenu, PaginatedMenusResponse } from "./api";
 import MenuCard, { MobileMenuCard } from "./components/MenuCard";
 
 export default function MenusList({ companyId, userRole }: MenusListProps) {
@@ -92,6 +92,7 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
   const [menus, setMenus] = useState<MenuType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [sortField, setSortField] = useState<keyof MenuType>("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [selectedMenu, setSelectedMenu] = useState<MenuType | null>(null);
@@ -106,15 +107,64 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
   // 컨테이너 상세 정보 관련 상태 추가
   const [containerDetails, setContainerDetails] = useState<Record<string, ContainerDetailsResponse>>({});
   const [loadingContainers, setLoadingContainers] = useState<Record<string, boolean>>({});
+  
+  // 페이지네이션 상태 추가
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [pageSize] = useState(20); // 페이지당 항목 수 고정
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const isOwnerOrAdmin = userRole === "owner" || userRole === "admin";
 
-  // 메뉴 목록 로드
-  const fetchMenus = async () => {
-    setIsLoading(true);
+  // 검색어 디바운싱 (500ms 지연)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // 컴포넌트 마운트 시 초기 로드
+  useEffect(() => {
+    fetchMenus(1, false);
+  }, [companyId]);
+
+  // 디바운싱된 검색어가 변경되면 첫 페이지부터 새로 검색
+  useEffect(() => {
+    if (debouncedSearchQuery !== searchQuery) return; // 디바운싱 중이면 실행하지 않음
+    setCurrentPage(1);
+    fetchMenus(1, false, debouncedSearchQuery);
+  }, [debouncedSearchQuery]);
+
+  // 메뉴 목록 로드 (페이지네이션 및 검색 지원)
+  const fetchMenus = async (page: number = 1, append: boolean = false, search?: string) => {
+    if (page === 1) {
+      setIsLoading(true);
+    } else {
+      setIsLoadingMore(true);
+    }
+    
     try {
-      const data = await loadMenus(companyId);
-      setMenus(data);
+      const response: PaginatedMenusResponse = await loadMenus(
+        companyId, 
+        page, 
+        pageSize, 
+        search || debouncedSearchQuery
+      );
+      
+      if (append) {
+        // 기존 메뉴에 추가 (무한 스크롤)
+        setMenus(prev => [...prev, ...response.data]);
+      } else {
+        // 새로운 메뉴로 교체
+        setMenus(response.data);
+      }
+      
+      setCurrentPage(response.pagination.page);
+      setTotalPages(response.pagination.totalPages);
+      setTotalCount(response.pagination.total);
     } catch (error) {
       console.error("메뉴 로드 오류:", error);
       toast({
@@ -127,6 +177,14 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
       });
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  };
+
+  // 다음 페이지 로드 (무한 스크롤)
+  const loadMoreMenus = async () => {
+    if (currentPage < totalPages && !isLoadingMore) {
+      await fetchMenus(currentPage + 1, true, debouncedSearchQuery);
     }
   };
 
@@ -188,10 +246,6 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
     }
   };
 
-  useEffect(() => {
-    fetchMenus();
-  }, [companyId]);
-
   // 정렬 처리
   const toggleSort = (field: keyof MenuType) => {
     if (sortField === field) {
@@ -202,30 +256,8 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
     }
   };
 
-  // 정렬 및 필터링된 메뉴 목록
-  const filteredMenus = menus
-    .filter(
-      (menu) =>
-        menu.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (menu.description &&
-          menu.description.toLowerCase().includes(searchQuery.toLowerCase())),
-    )
-    .sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-
-      if (typeof aValue === "string" && typeof bValue === "string") {
-        return sortDirection === "asc"
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
-      }
-
-      if (typeof aValue === "number" && typeof bValue === "number") {
-        return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
-      }
-
-      return 0;
-    });
+  // 서버에서 이미 정렬된 메뉴 목록 사용 (클라이언트 사이드 필터링 제거)
+  const filteredMenus = menus;
 
   // 메뉴 추가 모달 열기
   const handleAddMenu = () => {
@@ -287,8 +319,9 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
 
   // 메뉴 저장 후 처리
   const handleSaveMenu = (savedMenu: MenuType) => {
-    // 메뉴가 저장된 후 전체 메뉴 목록을 다시 로드하여 최신 정보를 표시
-    fetchMenus();
+    // 메뉴가 저장된 후 첫 페이지부터 다시 로드하여 최신 정보를 표시
+    setCurrentPage(1);
+    fetchMenus(1, false, debouncedSearchQuery);
     
     setModalOpen(false);
     setSelectedMenu(null);
@@ -309,9 +342,12 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
       <div className="flex flex-col sm:flex-row gap-3 justify-between">
         <div className="relative flex-1 sm:w-64">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          {searchQuery !== debouncedSearchQuery && (
+            <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+          )}
           <Input
-            placeholder="메뉴 이름 검색..."
-            className="pl-9"
+            placeholder="메뉴 이름 또는 설명 검색..."
+            className="pl-9 pr-9"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -325,38 +361,104 @@ export default function MenusList({ companyId, userRole }: MenusListProps) {
 
       {/* 메뉴 목록 */}
       {isLoading ? (
-        <div className="py-12 text-center text-muted-foreground">로딩 중...</div>
+        <div className="py-12 text-center text-muted-foreground">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          메뉴 목록을 불러오는 중...
+        </div>
       ) : filteredMenus.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredMenus.map((menu) => (
-            <MenuCard
-              key={menu.id}
-              menu={menu}
-              expandedMenuId={expandedMenuId}
-              expandedContainers={expandedContainers}
-              containerDetails={containerDetails}
-              loadingContainers={loadingContainers}
-              isOwnerOrAdmin={isOwnerOrAdmin}
-              onAccordionToggle={handleAccordionToggle}
-              onContainerExpand={toggleContainerExpand}
-              onViewIngredients={handleViewIngredients}
-              onEditMenu={handleEditMenu}
-              onDeleteConfirm={handleDeleteConfirm}
-              formatCurrency={formatCurrency}
-            />
-          ))}
+        <div className="space-y-6">
+          {/* 메뉴 개수 및 검색 상태 표시 */}
+          <div className="text-sm text-muted-foreground">
+            {debouncedSearchQuery ? (
+              <>
+                '{debouncedSearchQuery}' 검색 결과: {totalCount}개 중 {menus.length}개 표시
+              </>
+            ) : (
+              <>
+                총 {totalCount}개의 메뉴 중 {menus.length}개 표시
+              </>
+            )}
+          </div>
+          
+          {/* 메뉴 카드 그리드 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredMenus.map((menu) => (
+              <MenuCard
+                key={menu.id}
+                menu={menu}
+                expandedMenuId={expandedMenuId}
+                expandedContainers={expandedContainers}
+                containerDetails={containerDetails}
+                loadingContainers={loadingContainers}
+                isOwnerOrAdmin={isOwnerOrAdmin}
+                onAccordionToggle={handleAccordionToggle}
+                onContainerExpand={toggleContainerExpand}
+                onViewIngredients={handleViewIngredients}
+                onEditMenu={handleEditMenu}
+                onDeleteConfirm={handleDeleteConfirm}
+                formatCurrency={formatCurrency}
+              />
+            ))}
+          </div>
+          
+          {/* 더 보기 버튼 */}
+          {currentPage < totalPages && (
+            <div className="text-center py-6">
+              <Button 
+                onClick={loadMoreMenus} 
+                disabled={isLoadingMore}
+                variant="outline"
+                className="w-full sm:w-auto"
+              >
+                {isLoadingMore ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    로딩 중...
+                  </>
+                ) : (
+                  <>
+                    더 보기 ({totalCount - menus.length}개 남음)
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="py-12 text-center border rounded-md">
           <CookingPot className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-          <h3 className="text-lg font-medium mb-1">등록된 메뉴가 없습니다</h3>
-          <p className="text-muted-foreground mb-4">
-            '메뉴 추가' 버튼을 클릭하여 새 메뉴를 등록하세요.
-          </p>
-          <Button onClick={handleAddMenu}>
-            <Plus className="mr-2 h-4 w-4" />
-            메뉴 추가
-          </Button>
+          {debouncedSearchQuery ? (
+            <>
+              <h3 className="text-lg font-medium mb-1">검색 결과가 없습니다</h3>
+              <p className="text-muted-foreground mb-4">
+                '{debouncedSearchQuery}'에 대한 검색 결과를 찾을 수 없습니다.
+                <br />
+                다른 검색어를 시도해보세요.
+              </p>
+              <Button 
+                variant="outline" 
+                onClick={() => setSearchQuery("")}
+                className="mr-2"
+              >
+                검색 초기화
+              </Button>
+              <Button onClick={handleAddMenu}>
+                <Plus className="mr-2 h-4 w-4" />
+                메뉴 추가
+              </Button>
+            </>
+          ) : (
+            <>
+              <h3 className="text-lg font-medium mb-1">등록된 메뉴가 없습니다</h3>
+              <p className="text-muted-foreground mb-4">
+                '메뉴 추가' 버튼을 클릭하여 새 메뉴를 등록하세요.
+              </p>
+              <Button onClick={handleAddMenu}>
+                <Plus className="mr-2 h-4 w-4" />
+                메뉴 추가
+              </Button>
+            </>
+          )}
         </div>
       )}
 

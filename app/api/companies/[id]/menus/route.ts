@@ -8,7 +8,7 @@ interface RouteContext {
   }>;
 }
 
-// 회사의 메뉴 목록 조회
+// 회사의 메뉴 목록 조회 (페이지네이션 및 성능 최적화)
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { userId } = await auth();
@@ -17,6 +17,13 @@ export async function GET(request: Request, context: RouteContext) {
     if (!userId) {
       return NextResponse.json({ error: '인증되지 않은 요청입니다.' }, { status: 401 });
     }
+
+    // URL 파라미터에서 페이지네이션 및 검색 정보 추출
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = parseInt(url.searchParams.get('limit') || '20');
+    const search = url.searchParams.get('search') || '';
+    const offset = (page - 1) * limit;
     
     const supabase = createServerSupabaseClient();
     
@@ -56,100 +63,158 @@ export async function GET(request: Request, context: RouteContext) {
         error: '메뉴 관리 기능이 활성화되지 않았습니다. 관리자에게 문의하세요.' 
       }, { status: 403 });
     }
-    
-    // 메뉴 목록 조회
-    const { data: menus, error: menusError } = await supabase
+
+    // 검색 조건을 포함한 쿼리 빌더 생성
+    let countQuery = supabase
+      .from('menus')
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', companyId);
+
+    let menusQuery = supabase
       .from('menus')
       .select('*')
-      .eq('company_id', companyId)
-      .order('name', { ascending: true });
+      .eq('company_id', companyId);
+
+    // 검색어가 있는 경우 필터 적용
+    if (search.trim()) {
+      const searchFilter = `name.ilike.%${search}%,description.ilike.%${search}%`;
+      countQuery = countQuery.or(searchFilter);
+      menusQuery = menusQuery.or(searchFilter);
+    }
+
+    // 전체 메뉴 수 조회 (검색 조건 포함)
+    const { count: totalCount, error: countError } = await countQuery;
+
+    if (countError) {
+      console.error('메뉴 개수 조회 오류:', countError);
+      return NextResponse.json({ error: '메뉴 개수 조회 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+    
+    // 페이지네이션과 정렬을 적용한 메뉴 목록 조회
+    const { data: menus, error: menusError } = await menusQuery
+      .order('name', { ascending: true })
+      .range(offset, offset + limit - 1);
     
     if (menusError) {
       console.error('메뉴 조회 오류:', menusError);
       return NextResponse.json({ error: '메뉴 목록 조회 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
-    // 각 메뉴의 용기 및 용기별 원가 정보 조회
-    const menusWithContainers = await Promise.all(
-      (menus || []).map(async (menu) => {
-        // 메뉴의 용기 정보 조회
-        const { data: menuContainers, error: containersError } = await supabase
-          .from('menu_containers')
-          .select(`
-            id,
-            container:container_id (
-              id, 
-              name, 
-              description, 
-              category,
-              price
-            )
-          `)
-          .eq('menu_id', menu.id);
-
-        if (containersError) {
-          console.error('메뉴 용기 조회 오류:', containersError);
-          return { ...menu, containers: [] };
+    // 조회된 메뉴가 없는 경우 빈 배열 반환
+    if (!menus || menus.length === 0) {
+      return NextResponse.json({
+        data: [],
+        pagination: {
+          page,
+          limit,
+          total: totalCount || 0,
+          totalPages: Math.ceil((totalCount || 0) / limit),
+          search
         }
+      });
+    }
 
-        // 각 용기별 식재료와 원가 계산
-        const containers = await Promise.all(
-          (menuContainers || []).map(async (menuContainer) => {
-            // 용기에 포함된 식재료 조회
-            const { data: ingredients, error: ingredientsError } = await supabase
-              .from('menu_container_ingredients')
-              .select(`
-                id,
-                ingredient_id,
-                amount,
-                ingredient:ingredient_id (
-                  id,
-                  name,
-                  package_amount,
-                  unit,
-                  price
-                )
-              `)
-              .eq('menu_container_id', menuContainer.id);
+    // 메뉴 ID 목록 추출
+    const menuIds = menus.map(menu => menu.id);
 
-            if (ingredientsError) {
-              console.error('용기 식재료 조회 오류:', ingredientsError);
-              return {
-                ...menuContainer,
-                ingredients: [],
-                ingredients_cost: 0,
-                total_cost: menuContainer.container.price || 0
-              };
-            }
+    // 모든 메뉴의 용기 정보를 한 번에 조회 (JOIN 사용)
+    const { data: menuContainersData, error: containersError } = await supabase
+      .from('menu_containers')
+      .select(`
+        id,
+        menu_id,
+        container:container_id (
+          id, 
+          name, 
+          description, 
+          category,
+          price
+        )
+      `)
+      .in('menu_id', menuIds);
 
-            // 용기 식재료 원가 계산
-            const ingredientsCost = (ingredients || []).reduce((total, item) => {
-              if (!item.ingredient) return total;
-              const unitPrice = item.ingredient.price / item.ingredient.package_amount;
-              return total + (unitPrice * item.amount);
-            }, 0);
+    if (containersError) {
+      console.error('메뉴 용기 조회 오류:', containersError);
+      return NextResponse.json({ error: '메뉴 용기 정보 조회 중 오류가 발생했습니다.' }, { status: 500 });
+    }
 
-            // 용기 자체 가격 + 식재료 원가
-            const containerPrice = menuContainer.container.price || 0;
-            const totalCost = containerPrice + ingredientsCost;
+    // 용기 ID 목록 추출
+    const containerIds = (menuContainersData || []).map(mc => mc.id);
 
-            return {
-              ...menuContainer,
-              ingredients: ingredients || [],
-              ingredients_cost: ingredientsCost,
-              total_cost: totalCost
-            };
-          })
+    // 모든 용기의 식재료 정보를 한 번에 조회 (JOIN 사용)
+    const { data: containerIngredientsData, error: ingredientsError } = await supabase
+      .from('menu_container_ingredients')
+      .select(`
+        id,
+        menu_container_id,
+        ingredient_id,
+        amount,
+        ingredient:ingredient_id (
+          id,
+          name,
+          package_amount,
+          unit,
+          price
+        )
+      `)
+      .in('menu_container_id', containerIds);
+
+    if (ingredientsError) {
+      console.error('용기 식재료 조회 오류:', ingredientsError);
+      return NextResponse.json({ error: '용기 식재료 정보 조회 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+
+    // 데이터 그룹핑 및 조합
+    const menusWithContainers = menus.map(menu => {
+      // 해당 메뉴의 용기들 찾기
+      const menuContainers = (menuContainersData || []).filter(mc => mc.menu_id === menu.id);
+      
+      // 각 용기에 식재료 정보 추가
+      const containers = menuContainers.map(menuContainer => {
+        // 해당 용기의 식재료들 찾기
+        const ingredients = (containerIngredientsData || []).filter(
+          ci => ci.menu_container_id === menuContainer.id
         );
 
+        // 용기 식재료 원가 계산
+        const ingredientsCost = ingredients.reduce((total, item) => {
+          if (!item.ingredient) return total;
+          const ingredient = item.ingredient as any;
+          if (!ingredient.price || !ingredient.package_amount) return total;
+          const unitPrice = ingredient.price / ingredient.package_amount;
+          return total + (unitPrice * item.amount);
+        }, 0);
+
+        // 용기 자체 가격 + 식재료 원가
+        const container = menuContainer.container as any;
+        const containerPrice = container?.price || 0;
+        const totalCost = containerPrice + ingredientsCost;
+
         return {
-          ...menu,
-          containers
+          ...menuContainer,
+          ingredients,
+          ingredients_cost: ingredientsCost,
+          total_cost: totalCost
         };
-      })
-    );
-    
-    return NextResponse.json(menusWithContainers || []);
+      });
+
+      return {
+        ...menu,
+        containers
+      };
+    });
+
+    // 페이지네이션 정보와 함께 반환
+    return NextResponse.json({
+      data: menusWithContainers,
+      pagination: {
+        page,
+        limit,
+        total: totalCount || 0,
+        totalPages: Math.ceil((totalCount || 0) / limit),
+        search
+      }
+    });
   } catch (error) {
     console.error('메뉴 조회 중 오류 발생:', error);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
