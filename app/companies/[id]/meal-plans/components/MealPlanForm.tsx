@@ -45,9 +45,9 @@ export default function MealPlanForm({
   const [selectedContainerForMenu, setSelectedContainerForMenu] = useState<string | null>(null);
   const [isMenuSelectOpen, setIsMenuSelectOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isLoadingMenus, setIsLoadingMenus] = useState<boolean>(true);
+  const [containerLoadingState, setContainerLoadingState] = useState<Record<string, boolean>>({});
+  const [containerMenuCache, setContainerMenuCache] = useState<Record<string, MenuContainer[]>>({});
   const [isLoadingContainers, setIsLoadingContainers] = useState<boolean>(true);
-  const [isLoadingMenuContainers, setIsLoadingMenuContainers] = useState<boolean>(true);
   const [selectedTemplate, setSelectedTemplate] = useState<{ id: string; name: string } | null>(null);
   
   // 초기 데이터 설정
@@ -79,6 +79,11 @@ export default function MealPlanForm({
         
         setSelectedContainers(selectedContainerIds);
         setContainerMenuSelections(containerMenuMap);
+        
+        // 기존 데이터가 있는 용기들의 메뉴 정보를 미리 로드
+        selectedContainerIds.forEach(containerId => {
+          loadMenusForContainer(containerId);
+        });
       }
     } else {
       // 초기 데이터가 없는 경우 (생성 모드)
@@ -87,8 +92,6 @@ export default function MealPlanForm({
     
     // 용기 목록 로드
     loadContainers();
-    // 메뉴-용기 연결 정보 로드
-    loadMenuContainers();
   }, [initialData, defaultMealTime, companyId]);
 
   // 용기 목록 로드
@@ -115,28 +118,48 @@ export default function MealPlanForm({
     }
   };
   
-  // 메뉴-용기 연결 정보 로드
-  const loadMenuContainers = async () => {
-    setIsLoadingMenuContainers(true);
+  // 특정 용기의 메뉴만 로드하는 새로운 함수
+  const loadMenusForContainer = async (containerId: string) => {
+    // 이미 로딩 중이거나 캐시에 있으면 스킵
+    if (containerLoadingState[containerId] || containerMenuCache[containerId]) {
+      return;
+    }
+    
+    setContainerLoadingState(prev => ({ ...prev, [containerId]: true }));
+    
     try {
-      const response = await fetch(`/api/companies/${companyId}/menu-containers`);
+      // 특정 용기의 메뉴만 요청
+      const response = await fetch(`/api/companies/${companyId}/menu-containers?containerId=${containerId}`);
       
       if (!response.ok) {
-        throw new Error('메뉴-용기 연결 정보를 불러오는데 실패했습니다.');
+        throw new Error('메뉴 정보를 불러오는데 실패했습니다.');
       }
       
       const data = await response.json();
-      setMenuContainers(data);
-      setIsLoadingMenus(false); // 메뉴 정보도 함께 로드되므로 메뉴 로딩 상태도 업데이트
+      
+      // 용기별 캐시에 저장
+      setContainerMenuCache(prev => ({
+        ...prev,
+        [containerId]: data
+      }));
+      
+      // 전체 menuContainers 상태도 업데이트 (기존 로직과의 호환성을 위해)
+      setMenuContainers(prev => {
+        // 중복 제거하면서 새 데이터 추가
+        const existingIds = new Set(prev.map(item => item.id));
+        const newItems = data.filter((item: MenuContainer) => !existingIds.has(item.id));
+        return [...prev, ...newItems];
+      });
+      
     } catch (error) {
-      console.error('메뉴-용기 연결 정보 로드 오류:', error);
+      console.error('메뉴 로드 오류:', error);
       toast({
         title: '오류 발생',
-        description: error instanceof Error ? error.message : '메뉴-용기 연결 정보를 불러오는데 실패했습니다.',
+        description: error instanceof Error ? error.message : '메뉴 정보를 불러오는데 실패했습니다.',
         variant: 'destructive',
       });
     } finally {
-      setIsLoadingMenuContainers(false);
+      setContainerLoadingState(prev => ({ ...prev, [containerId]: false }));
     }
   };
   
@@ -248,7 +271,7 @@ export default function MealPlanForm({
     
     try {
       // 메뉴 선택과 용기 선택을 API 요구 형식으로 변환
-      const menu_selections = [];
+      const menu_selections: Array<{ menuId: string | null; containerId: string }> = [];
       
       selectedContainers.forEach(containerId => {
         const menuIds = containerMenuSelections[containerId] || [];
@@ -322,7 +345,7 @@ export default function MealPlanForm({
     // 호환 용기 ID가 있는 경우, 해당 용기의 식재료 정보를 기존 용기에 적용
     if (compatibleContainerId) {
       try {
-        setIsLoadingMenuContainers(true); // 로딩 상태 시작
+        setContainerLoadingState(prev => ({ ...prev, [containerId]: true })); // 로딩 상태 시작
         
         // 호환 용기의 메뉴 식재료 정보 가져오기
         const response = await fetch(`/api/companies/${companyId}/menu-containers?menuId=${menuId}&containerId=${compatibleContainerId}`);
@@ -369,8 +392,9 @@ export default function MealPlanForm({
           }
         }
         
-        // 메뉴 컨테이너 정보 새로고침
-        await loadMenuContainers();
+        // 해당 용기의 메뉴 정보만 새로고침
+        delete containerMenuCache[containerId]; // 캐시 삭제
+        await loadMenusForContainer(containerId);
         
         // 성공 메시지 표시
         toast({
@@ -387,7 +411,7 @@ export default function MealPlanForm({
           variant: 'destructive'
         });
       } finally {
-        setIsLoadingMenuContainers(false); // 로딩 상태 종료
+        setContainerLoadingState(prev => ({ ...prev, [containerId]: false })); // 로딩 상태 종료
       }
     }
     
@@ -442,8 +466,10 @@ export default function MealPlanForm({
     return getMenuDetailsById(menuId, menuContainers);
   };
 
+  // 캐시된 메뉴를 우선 사용하도록 수정
   const getFilteredMenus = (containerId: string) => {
-    return getFilteredMenusForContainer(containerId, menuContainers, menuSearchTerm);
+    const cachedMenus = containerMenuCache[containerId] || [];
+    return getFilteredMenusForContainer(containerId, cachedMenus, menuSearchTerm);
   };
   
   return (
@@ -492,8 +518,7 @@ export default function MealPlanForm({
             selectedContainers={selectedContainers}
             sortedSelectedContainers={sortedSelectedContainers}
             containerMenuSelections={containerMenuSelections}
-            isLoadingMenus={isLoadingMenus}
-            isLoadingMenuContainers={isLoadingMenuContainers}
+            containerLoadingState={containerLoadingState}
             getContainerDetailsById={getContainerDetails}
             getMenuDetailsById={getMenuDetails}
             menuContainers={menuContainers}
@@ -508,6 +533,7 @@ export default function MealPlanForm({
             getFilteredMenusForContainer={getFilteredMenus}
             handleMenuSelection={handleMenuSelection}
             initialData={initialData}
+            loadMenusForContainer={loadMenusForContainer}
           />
         </TabsContent>
       </Tabs>

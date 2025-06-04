@@ -20,8 +20,7 @@ interface MealPlanMenuSelectionProps {
   selectedContainers: string[];
   sortedSelectedContainers: string[];
   containerMenuSelections: Record<string, string[]>;
-  isLoadingMenus: boolean;
-  isLoadingMenuContainers: boolean;
+  containerLoadingState: Record<string, boolean>;
   getContainerDetailsById: (containerId: string) => Container | undefined;
   getMenuDetailsById: (menuId: string) => Menu | undefined;
   menuContainers: MenuContainer[];
@@ -36,14 +35,14 @@ interface MealPlanMenuSelectionProps {
   getFilteredMenusForContainer: (containerId: string) => Menu[];
   handleMenuSelection: (containerId: string, menuId: string) => void;
   initialData: any | null;
+  loadMenusForContainer: (containerId: string) => Promise<void>;
 }
 
 export default function MealPlanMenuSelection({
   selectedContainers,
   sortedSelectedContainers,
   containerMenuSelections,
-  isLoadingMenus,
-  isLoadingMenuContainers,
+  containerLoadingState,
   getContainerDetailsById,
   getMenuDetailsById,
   menuContainers,
@@ -57,19 +56,19 @@ export default function MealPlanMenuSelection({
   setMenuSearchTerm,
   getFilteredMenusForContainer,
   handleMenuSelection,
-  initialData
+  initialData,
+  loadMenusForContainer
 }: MealPlanMenuSelectionProps) {
 
-  // 메뉴 선택 버튼 클릭 핸들러
-  const handleOpenMenuSelect = (e: MouseEvent, containerId: string) => {
+  const handleOpenMenuSelect = async (e: MouseEvent, containerId: string) => {
     e.preventDefault();
-    e.stopPropagation(); // 이벤트 버블링 방지
+    e.stopPropagation();
 
-    // 먼저 컨테이너 ID 설정
     setSelectedContainerForMenu(containerId);
-    // 검색어 초기화
     setMenuSearchTerm('');
-    // 마지막으로 모달 열기
+    
+    await loadMenusForContainer(containerId);
+    
     setTimeout(() => {
       setIsMenuSelectOpen(true);
     }, 0);
@@ -82,17 +81,17 @@ export default function MealPlanMenuSelection({
         <CardDescription>각 용기에 담을 메뉴를 선택해주세요. 각 용기에 여러 메뉴를 선택할 수 있습니다.</CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoadingMenus || isLoadingMenuContainers ? (
-          <div className="flex justify-center items-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        {selectedContainers.length === 0 ? (
+          <div className="text-center py-4 text-muted-foreground">
+            먼저 용기를 선택해주세요.
           </div>
         ) : (
           <div className="space-y-3">
             {sortedSelectedContainers.map(containerId => {
               const containerDetails = getContainerDetailsById(containerId);
               const selectedMenuIds = containerMenuSelections[containerId] || [];
+              const isContainerLoading = containerLoadingState[containerId] || false;
               
-              // 총 원가 계산
               const totalCost = selectedMenuIds.reduce((sum, menuId) => {
                 const costInfo = getCostInfoForMenuAndContainer(menuId, containerId, menuContainers);
                 return sum + costInfo.total_cost;
@@ -117,8 +116,16 @@ export default function MealPlanMenuSelection({
                       size="sm"
                       className="whitespace-nowrap"
                       onClick={(e) => handleOpenMenuSelect(e as MouseEvent, containerId)}
+                      disabled={isContainerLoading}
                     >
-                      {selectedMenuIds.length > 0 ? '메뉴 추가/변경' : '메뉴 선택'}
+                      {isContainerLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          로딩중...
+                        </>
+                      ) : (
+                        selectedMenuIds.length > 0 ? '메뉴 추가/변경' : '메뉴 선택'
+                      )}
                     </Button>
                   </div>
                   
@@ -159,12 +166,6 @@ export default function MealPlanMenuSelection({
           </div>
         )}
         
-        {selectedContainers.length === 0 && (
-          <div className="text-center py-4 text-muted-foreground">
-            먼저 용기를 선택해주세요.
-          </div>
-        )}
-        
         {selectedContainerForMenu && (
           <MenuSelection 
             isOpen={isMenuSelectOpen}
@@ -174,8 +175,8 @@ export default function MealPlanMenuSelection({
             searchTerm={menuSearchTerm}
             setSearchTerm={setMenuSearchTerm}
             filteredMenus={getFilteredMenusForContainer(selectedContainerForMenu)}
-            selectedMenuId={undefined} // 단일 메뉴 선택이 아닌 복수 메뉴 선택으로 변경
-            selectedMenuIds={containerMenuSelections[selectedContainerForMenu] || []} // 복수 메뉴 ID 전달
+            selectedMenuId={undefined}
+            selectedMenuIds={containerMenuSelections[selectedContainerForMenu] || []}
             onMenuSelect={(containerId, menuId) => handleMenuSelection(containerId, menuId)}
             menuContainers={menuContainers}
           />
