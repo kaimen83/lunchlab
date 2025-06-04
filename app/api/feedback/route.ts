@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { auth } from '@clerk/nextjs/server'
 import { isHeadAdmin } from '@/lib/clerk'
+import { sendFeedbackNotificationEmail, type FeedbackData } from '@/lib/email'
 
 export async function POST(req: Request) {
   try {
@@ -35,10 +36,25 @@ export async function POST(req: Request) {
       console.error('피드백 저장 오류:', error)
       return NextResponse.json({ error: '피드백 저장 중 오류가 발생했습니다.' }, { status: 500 })
     }
+
+    const savedFeedback = data[0]
+    
+    // 피드백 저장 성공 후 관리자들에게 이메일 알림 발송 (비동기, 실패해도 피드백 저장은 성공)
+    if (savedFeedback) {
+      // 이메일 발송을 백그라운드에서 처리 (에러가 발생해도 피드백 저장 성공 응답은 유지)
+      sendFeedbackNotificationEmail(savedFeedback as FeedbackData)
+        .then(() => {
+          console.log(`피드백 ${savedFeedback.id}에 대한 관리자 알림 이메일 발송 완료`)
+        })
+        .catch((emailError) => {
+          console.error(`피드백 ${savedFeedback.id}에 대한 관리자 알림 이메일 발송 실패:`, emailError)
+          // 이메일 발송 실패는 로그만 남기고 사용자에게는 성공 응답 반환
+        })
+    }
     
     return NextResponse.json({ 
       success: true, 
-      data: data[0] 
+      data: savedFeedback 
     })
   } catch (error) {
     console.error('피드백 API 오류:', error)
