@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Save, Plus, Trash2, ArrowUpDown } from 'lucide-react';
+import { Save, Plus, Trash2, ArrowUpDown, X } from 'lucide-react';
 import { Ingredient } from '../types';
 import { formatCurrency, formatNumber } from '../utils';
 
@@ -62,11 +62,8 @@ const EditableCell = ({ getValue, row, column, table }: any) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleSave();
-      // 마지막 행에서 Enter 시 새 행 추가
-      if (row.index === table.getRowModel().rows.length - 1) {
-        table.options.meta?.addNewRow?.();
-      } else {
-        // 다음 행의 같은 컬럼으로 이동하고 편집 모드로 진입
+      // 다음 행의 같은 컬럼으로 이동하고 편집 모드로 진입 (마지막 행이면 이동하지 않음)
+      if (row.index < table.getRowModel().rows.length - 1) {
         table.options.meta?.navigateToCell?.(row.index + 1, column.getIndex(), true);
       }
     } else if (e.key === 'Escape') {
@@ -370,6 +367,125 @@ const PriceEditableCell = ({ getValue, row, column, table }: any) => {
   );
 };
 
+// 단위 편집 셀 컴포넌트 - 키보드 네비게이션 추가
+const UnitEditableCell = ({ getValue, row, column, table }: any) => {
+  const initialValue = getValue();
+  const [editValue, setEditValue] = useState(initialValue || '');
+  const [isEditing, setIsEditing] = useState(false);
+  const selectRef = useRef<HTMLSelectElement>(null);
+
+  const unitOptions = ['g', 'EA', 'ml'];
+
+  const handleSave = useCallback(() => {
+    table.options.meta?.updateData(row.index, column.id, editValue);
+    setIsEditing(false);
+  }, [editValue, row.index, column.id, table]);
+
+  const handleCancel = useCallback(() => {
+    setEditValue(initialValue || '');
+    setIsEditing(false);
+  }, [initialValue]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSave();
+      // 마지막 행에서 Enter 시 새 행 추가
+      if (row.index === table.getRowModel().rows.length - 1) {
+        table.options.meta?.addNewRow?.();
+      } else {
+        table.options.meta?.navigateToCell?.(row.index + 1, column.getIndex(), true);
+      }
+    } else if (e.key === 'Escape') {
+      handleCancel();
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      handleSave();
+      const nextColumnIndex = e.shiftKey ? column.getIndex() - 1 : column.getIndex() + 1;
+      table.options.meta?.navigateToCell?.(row.index, nextColumnIndex, true);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      handleSave();
+      // 마지막 행에서 아래 화살표 시 새 행 추가
+      if (row.index === table.getRowModel().rows.length - 1) {
+        table.options.meta?.addNewRow?.();
+      } else {
+        table.options.meta?.navigateToCell?.(row.index + 1, column.getIndex(), true);
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      handleSave();
+      table.options.meta?.navigateToCell?.(row.index - 1, column.getIndex(), true);
+    } else if (e.key === 'ArrowRight' && !isEditing) {
+      e.preventDefault();
+      table.options.meta?.navigateToCell?.(row.index, column.getIndex() + 1, true);
+    } else if (e.key === 'ArrowLeft' && !isEditing) {
+      e.preventDefault();
+      table.options.meta?.navigateToCell?.(row.index, column.getIndex() - 1, true);
+    }
+  }, [handleSave, handleCancel, row.index, column, table, isEditing]);
+
+  // 외부에서 편집 모드 진입 요청 처리
+  React.useEffect(() => {
+    const handleCellEdit = (event: CustomEvent) => {
+      const { rowIndex, columnIndex } = event.detail;
+      if (rowIndex === row.index && columnIndex === column.getIndex()) {
+        setIsEditing(true);
+      }
+    };
+
+    window.addEventListener('editCell', handleCellEdit as EventListener);
+    return () => {
+      window.removeEventListener('editCell', handleCellEdit as EventListener);
+    };
+  }, [row.index, column]);
+
+  React.useEffect(() => {
+    setEditValue(initialValue || '');
+  }, [initialValue]);
+
+  React.useEffect(() => {
+    if (isEditing && selectRef.current) {
+      selectRef.current.focus();
+    }
+  }, [isEditing]);
+
+  if (isEditing) {
+    return (
+      <select
+        ref={selectRef}
+        value={editValue}
+        onChange={(e) => setEditValue(e.target.value)}
+        onBlur={handleSave}
+        onKeyDown={handleKeyDown}
+        className="h-8 text-sm w-full border border-gray-300 rounded px-2"
+      >
+        <option value="">선택</option>
+        {unitOptions.map(option => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+    );
+  }
+
+  return (
+    <div
+      className="h-8 px-2 py-1 cursor-pointer hover:bg-gray-50 rounded text-sm flex items-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+      onClick={() => setIsEditing(true)}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+    >
+      {initialValue ? (
+        <Badge variant="outline" className="text-xs">
+          {initialValue}
+        </Badge>
+      ) : (
+        '-'
+      )}
+    </div>
+  );
+};
+
 // 재고등급 편집 셀 컴포넌트 - 키보드 네비게이션 추가
 const StockGradeEditableCell = ({ getValue, row, column, table }: any) => {
   const initialValue = getValue();
@@ -489,7 +605,13 @@ export default function IngredientsSheetView({
 }: IngredientsSheetViewProps) {
   const { toast } = useToast();
   const [data, setData] = useState<Ingredient[]>(ingredients);
+  // 원본 데이터를 별도로 저장하여 취소 기능에 사용
+  const [originalData, setOriginalData] = useState<Ingredient[]>(ingredients);
   const [changedRows, setChangedRows] = useState<Set<number>>(new Set());
+  // 새로 추가된 행들 추적 (임시 ID 사용)
+  const [newRows, setNewRows] = useState<Set<number>>(new Set());
+  // 임시 ID 카운터 (새 행에 음수 ID 부여)
+  const [tempIdCounter, setTempIdCounter] = useState(-1);
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -500,8 +622,27 @@ export default function IngredientsSheetView({
   // 데이터가 변경될 때 로컬 상태 업데이트
   React.useEffect(() => {
     setData(ingredients);
+    setOriginalData(ingredients);
     setChangedRows(new Set());
+    setNewRows(new Set());
+    setTempIdCounter(-1);
   }, [ingredients]);
+
+  // 페이지 이탈 시 변경사항 확인
+  React.useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (changedRows.size > 0 || newRows.size > 0) {
+        e.preventDefault();
+        e.returnValue = '저장되지 않은 변경사항이 있습니다. 페이지를 나가시겠습니까?';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [changedRows.size, newRows.size]);
 
   // 컬럼 헬퍼 생성
   const columnHelper = createColumnHelper<Ingredient>();
@@ -553,65 +694,99 @@ export default function IngredientsSheetView({
     }, 0);
   }, [data.length]);
 
-  // 새 행 추가 함수 (키보드에서 호출)
-  const addNewRowFromKeyboard = useCallback(async () => {
-    try {
-      const newIngredient = {
-        name: '새 식재료',
-        code_name: '',
-        supplier: '',
-        package_amount: 1,
-        unit: 'kg',
-        pac_count: 1,
-        items_per_box: 1,
-        price: 0,
-        stock_grade: '',
-        origin: '',
-        calories: 0,
-        protein: 0,
-        fat: 0,
-        carbs: 0,
-        allergens: '',
-        memo1: '',
-        memo2: '',
-      };
+  // 새 행 추가 함수 (버튼 클릭 시 - 최상단에 추가)
+  const addNewRowAtTop = useCallback(() => {
+    const newIngredient: Ingredient = {
+      id: `temp_${Math.abs(tempIdCounter)}`, // 임시 문자열 ID 사용
+      name: '새 식재료',
+      code_name: '',
+      supplier: '',
+      package_amount: 1,
+      unit: 'g',
+      pac_count: 1,
+      items_per_box: 1,
+      price: 0,
+      stock_grade: '',
+      origin: '',
+      calories: 0,
+      protein: 0,
+      fat: 0,
+      carbs: 0,
+      allergens: '',
+      memo1: '',
+      memo2: '',
+      created_at: new Date().toISOString(), // 현재 시간으로 설정
+    };
 
-      const response = await fetch(`/api/companies/${companyId}/ingredients`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newIngredient),
-      });
+    // 로컬 데이터의 최상단에 추가
+    setData(prev => [newIngredient, ...prev]);
+    
+    // 기존 선택된 행들의 인덱스를 1씩 증가 (새 행이 최상단에 추가되었으므로)
+    setSelectedRows(prev => new Set([...prev].map(index => index + 1)));
+    
+    // 변경된 행들의 인덱스도 1씩 증가
+    setChangedRows(prev => new Set([...prev].map(index => index + 1)));
+    
+    // 새 행 추적에 추가 (0번 인덱스)
+    setNewRows(prev => new Set([...prev, 0]));
+    
+    // 임시 ID 카운터 감소
+    setTempIdCounter(prev => prev - 1);
+    
+    // 새로 추가된 행(0번 행)의 첫 번째 컬럼으로 이동하고 편집 모드로 진입
+    setTimeout(() => {
+      navigateToCell(0, 1, true); // 0번 행, 1번 컬럼(식재료명)으로 이동
+    }, 100);
+    
+    toast({
+      title: '행 추가',
+      description: '새 식재료 행이 추가되었습니다. 저장 버튼을 눌러 저장하세요.',
+    });
+  }, [tempIdCounter, navigateToCell, toast]);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || '새 식재료 추가에 실패했습니다.');
-      }
+  // 새 행 추가 함수 (키보드에서 호출 - 최하단에 추가)
+  const addNewRowFromKeyboard = useCallback(() => {
+    const newIngredient: Ingredient = {
+      id: `temp_${Math.abs(tempIdCounter)}`, // 임시 문자열 ID 사용
+      name: '새 식재료',
+      code_name: '',
+      supplier: '',
+      package_amount: 1,
+      unit: 'g',
+      pac_count: 1,
+      items_per_box: 1,
+      price: 0,
+      stock_grade: '',
+      origin: '',
+      calories: 0,
+      protein: 0,
+      fat: 0,
+      carbs: 0,
+      allergens: '',
+      memo1: '',
+      memo2: '',
+      created_at: new Date().toISOString(), // 현재 시간으로 설정
+    };
 
-      const createdIngredient = await response.json();
-      
-      // 로컬 데이터에 추가
-      setData(prev => [...prev, createdIngredient]);
-      
-      // 새로 추가된 행의 첫 번째 컬럼으로 이동하고 편집 모드로 진입
-      setTimeout(() => {
-        navigateToCell(data.length, 0, true);
-      }, 100);
-      
-      toast({
-        title: '추가 완료',
-        description: '새 식재료가 추가되었습니다.',
-      });
-    } catch (error) {
-      console.error('새 행 추가 오류:', error);
-      toast({
-        title: '추가 실패',
-        description: error instanceof Error ? error.message : '새 식재료 추가 중 오류가 발생했습니다.',
-        variant: 'destructive',
-      });
-    }
-  }, [companyId, data.length, navigateToCell, toast]);
+    // 로컬 데이터의 최하단에 추가
+    setData(prev => [...prev, newIngredient]);
+    
+    // 새 행 추적에 추가 (마지막 인덱스)
+    setNewRows(prev => new Set([...prev, data.length]));
+    
+    // 임시 ID 카운터 감소
+    setTempIdCounter(prev => prev - 1);
+    
+    // 새로 추가된 행의 첫 번째 컬럼으로 이동하고 편집 모드로 진입
+    setTimeout(() => {
+      navigateToCell(data.length, 1, true); // 마지막 행, 1번 컬럼(식재료명)으로 이동
+    }, 100);
+    
+    toast({
+      title: '행 추가',
+      description: '새 식재료 행이 추가되었습니다. 저장 버튼을 눌러 저장하세요.',
+    });
+  }, [tempIdCounter, data.length, navigateToCell, toast]);
 
   // 행 선택/해제 함수
   const toggleRowSelection = useCallback((rowIndex: number) => {
@@ -763,7 +938,7 @@ export default function IngredientsSheetView({
     {
       accessorKey: 'unit',
       header: '단위',
-      cell: EditableCell,
+      cell: UnitEditableCell,
       size: 100,
     },
     {
@@ -869,7 +1044,7 @@ export default function IngredientsSheetView({
 
   // 변경사항 저장
   const handleSaveChanges = async () => {
-    if (changedRows.size === 0) {
+    if (changedRows.size === 0 && newRows.size === 0) {
       toast({
         title: '알림',
         description: '변경된 데이터가 없습니다.',
@@ -879,37 +1054,64 @@ export default function IngredientsSheetView({
 
     setIsSaving(true);
     try {
-      const changedData = Array.from(changedRows).map(index => data[index]);
+      const promises: Promise<any>[] = [];
       
-      // API 호출하여 변경사항 저장
-      const promises = changedData.map(async (ingredient) => {
-        console.log('저장할 데이터:', ingredient); // 디버깅용 로그
+      // 새로 추가된 행들 처리 (POST)
+      const newRowsData = Array.from(newRows).map(index => data[index]);
+      for (const ingredient of newRowsData) {
+        // 임시 ID와 created_at 제거하고 서버에 전송
+        const { id, created_at, ...ingredientData } = ingredient;
         
-        const response = await fetch(`/api/companies/${companyId}/ingredients/${ingredient.id}`, {
+        const promise = fetch(`/api/companies/${companyId}/ingredients`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(ingredientData),
+        }).then(async (response) => {
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`${ingredient.name} 추가 실패: ${errorData.error || '알 수 없는 오류'}`);
+          }
+          return response.json();
+        });
+        
+        promises.push(promise);
+      }
+      
+      // 수정된 행들 처리 (PUT) - 새 행이 아닌 것만
+      const modifiedRowsData = Array.from(changedRows)
+        .filter(index => !newRows.has(index))
+        .map(index => data[index]);
+        
+      for (const ingredient of modifiedRowsData) {
+        const promise = fetch(`/api/companies/${companyId}/ingredients/${ingredient.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(ingredient),
+        }).then(async (response) => {
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`${ingredient.name} 저장 실패: ${errorData.error || '알 수 없는 오류'}`);
+          }
+          return response.json();
         });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error(`${ingredient.name} 저장 실패:`, errorData); // 디버깅용 로그
-          throw new Error(`${ingredient.name} 저장 실패: ${errorData.error || '알 수 없는 오류'}`);
-        }
-
-        return response.json();
-      });
+        
+        promises.push(promise);
+      }
 
       await Promise.all(promises);
 
+      const totalChanges = newRows.size + modifiedRowsData.length;
       toast({
         title: '저장 완료',
-        description: `${changedRows.size}개의 식재료가 성공적으로 저장되었습니다.`,
+        description: `${totalChanges}개의 식재료가 성공적으로 저장되었습니다.`,
       });
 
       setChangedRows(new Set());
+      setNewRows(new Set());
       onRefresh();
     } catch (error) {
       console.error('저장 오류:', error);
@@ -923,58 +1125,25 @@ export default function IngredientsSheetView({
     }
   };
 
-  // 새 행 추가 - 실제 API를 통해 생성
-  const handleAddRow = async () => {
-    try {
-      const newIngredient = {
-        name: '새 식재료',
-        code_name: '',
-        supplier: '',
-        package_amount: 1,
-        unit: 'kg',
-        pac_count: 1,
-        items_per_box: 1,
-        price: 0,
-        stock_grade: '',
-        origin: '',
-        calories: 0,
-        protein: 0,
-        fat: 0,
-        carbs: 0,
-        allergens: '',
-        memo1: '',
-        memo2: '',
-      };
-
-      const response = await fetch(`/api/companies/${companyId}/ingredients`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newIngredient),
-      });
-
-      if (!response.ok) {
-        throw new Error('새 식재료 추가에 실패했습니다.');
-      }
-
-      const createdIngredient = await response.json();
-      
-      // 로컬 데이터에 추가
-      setData(prev => [...prev, createdIngredient]);
-      
+  // 변경사항 취소
+  const handleCancelChanges = () => {
+    if (changedRows.size === 0 && newRows.size === 0) {
       toast({
-        title: '추가 완료',
-        description: '새 식재료가 추가되었습니다. 내용을 편집해주세요.',
+        title: '알림',
+        description: '취소할 변경사항이 없습니다.',
       });
-    } catch (error) {
-      console.error('새 행 추가 오류:', error);
-      toast({
-        title: '추가 실패',
-        description: error instanceof Error ? error.message : '새 식재료 추가 중 오류가 발생했습니다.',
-        variant: 'destructive',
-      });
+      return;
     }
+
+    // 원본 데이터로 복구 (새로 추가된 행들은 제거됨)
+    setData([...originalData]);
+    setChangedRows(new Set());
+    setNewRows(new Set());
+    
+    toast({
+      title: '취소 완료',
+      description: '변경사항이 취소되었습니다.',
+    });
   };
 
   if (isLoading) {
@@ -993,10 +1162,15 @@ export default function IngredientsSheetView({
       {/* 상단 액션 바 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h3 className="text-lg font-medium">스프레드시트 편집</h3>
+          <h3 className="text-lg font-medium">식재료 관리</h3>
+          {newRows.size > 0 && (
+            <Badge variant="default">
+              {newRows.size}개 새로 추가됨
+            </Badge>
+          )}
           {changedRows.size > 0 && (
             <Badge variant="secondary">
-              {changedRows.size}개 변경됨
+              {Array.from(changedRows).filter(index => !newRows.has(index)).length}개 변경됨
             </Badge>
           )}
           {selectedRows.size > 0 && (
@@ -1020,17 +1194,30 @@ export default function IngredientsSheetView({
           )}
           
           <Button
-            onClick={handleAddRow}
+            onClick={addNewRowAtTop}
             variant="outline"
             size="sm"
           >
             <Plus className="mr-2 h-4 w-4" />
-            행 추가
+            식재료 추가
           </Button>
+          
+          {/* 변경사항 취소 버튼 */}
+          {(changedRows.size > 0 || newRows.size > 0) && (
+            <Button
+              onClick={handleCancelChanges}
+              disabled={isSaving}
+              variant="outline"
+              size="sm"
+            >
+              <X className="mr-2 h-4 w-4" />
+              변경사항 취소
+            </Button>
+          )}
           
           <Button
             onClick={handleSaveChanges}
-            disabled={changedRows.size === 0 || isSaving}
+            disabled={(changedRows.size === 0 && newRows.size === 0) || isSaving}
             size="sm"
           >
             <Save className="mr-2 h-4 w-4" />
@@ -1068,7 +1255,8 @@ export default function IngredientsSheetView({
                 <tr
                   key={row.id}
                   className={`hover:bg-gray-50 ${
-                    changedRows.has(index) ? 'bg-blue-50' : ''
+                    newRows.has(index) ? 'bg-green-50 border-l-4 border-green-400' : 
+                    changedRows.has(index) ? 'bg-blue-50 border-l-4 border-blue-400' : ''
                   } ${
                     selectedRows.has(index) ? 'bg-yellow-50' : ''
                   }`}
@@ -1148,8 +1336,9 @@ export default function IngredientsSheetView({
           <li>• Enter 키로 저장, Esc 키로 취소할 수 있습니다</li>
           <li>• 재고등급은 자유 텍스트로 입력할 수 있습니다</li>
           <li>• 영양 정보(단백질, 지방, 탄수화물)와 알레르기 정보, 메모를 입력할 수 있습니다</li>
-          <li>• 변경된 행은 파란색으로, 선택된 행은 노란색으로 표시됩니다</li>
-          <li>• "변경사항 저장" 버튼으로 모든 변경사항을 한번에 저장할 수 있습니다</li>
+          <li>• <strong>변경사항 표시:</strong> 새로 추가된 행은 초록색, 수정된 행은 파란색, 선택된 행은 노란색으로 표시됩니다</li>
+          <li>• <strong>저장 방식:</strong> 변경사항은 "변경사항 저장" 버튼을 눌러야 서버에 저장됩니다</li>
+          <li>• <strong>취소 기능:</strong> "변경사항 취소" 버튼으로 저장하지 않은 모든 변경사항을 되돌릴 수 있습니다</li>
         </ul>
       </div>
     </div>
