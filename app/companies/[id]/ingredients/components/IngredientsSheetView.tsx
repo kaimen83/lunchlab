@@ -1414,14 +1414,15 @@ export default function IngredientsSheetView({
         <ul className="space-y-1 text-xs">
           <li>• 셀을 클릭하거나 키보드로 이동하면 바로 편집 모드로 진입합니다</li>
           <li>• <strong>키보드 네비게이션:</strong> Tab/Shift+Tab (좌우), 화살표 키 (상하좌우), Enter (아래로)</li>
-          <li>• <strong>새 행 추가:</strong> 마지막 행에서 Enter 또는 아래 화살표를 누르면 자동으로 새 행이 추가됩니다</li>
+          <li>• <strong>새 행 추가:</strong> 마지막 행에서 아래 화살표를 누르면 자동으로 새 행이 추가됩니다</li>
           <li>• <strong>행 삭제:</strong> 체크박스로 행을 선택한 후 삭제 버튼을 클릭하여 삭제할 수 있습니다</li>
-          <li>• Enter 키로 저장, Esc 키로 취소할 수 있습니다</li>
-          <li>• 재고등급은 자유 텍스트로 입력할 수 있습니다</li>
-          <li>• 영양 정보(단백질, 지방, 탄수화물)와 알레르기 정보, 메모를 입력할 수 있습니다</li>
+          <li>• <strong>편집 제어:</strong> Enter 키로 다음 행 이동, Esc 키로 편집 취소</li>
+          <li>• <strong>서버사이드 정렬:</strong> 식재료명, 코드명, 공급업체, 가격 헤더를 클릭하면 전체 데이터가 정렬됩니다</li>
+          <li>• <strong>정렬 표시:</strong> 정렬된 컬럼은 파란색 화살표(↑오름차순/↓내림차순)로 표시됩니다</li>
           <li>• <strong>변경사항 표시:</strong> 새로 추가된 행은 초록색, 수정된 행은 파란색, 선택된 행은 노란색으로 표시됩니다</li>
           <li>• <strong>저장 방식:</strong> 변경사항은 "변경사항 저장" 버튼을 눌러야 서버에 저장됩니다</li>
           <li>• <strong>취소 기능:</strong> "변경사항 취소" 버튼으로 저장하지 않은 모든 변경사항을 되돌릴 수 있습니다</li>
+          <li>• <strong>입력 가능 정보:</strong> 영양성분(칼로리, 단백질, 지방, 탄수화물), 알레르기정보, 메모 등을 입력할 수 있습니다</li>
         </ul>
       </div>
     </div>
