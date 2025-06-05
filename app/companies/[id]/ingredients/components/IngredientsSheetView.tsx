@@ -4,11 +4,9 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
-  getSortedRowModel,
   getFilteredRowModel,
   createColumnHelper,
   flexRender,
-  SortingState,
   ColumnDef,
 } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
@@ -32,6 +30,10 @@ interface IngredientsSheetViewProps {
     totalPages: number;
   };
   onPageChange?: (newPage: number) => void;
+  // 서버사이드 정렬을 위한 props 추가
+  sortField?: string;
+  sortDirection?: 'asc' | 'desc';
+  onSort?: (field: string, direction: 'asc' | 'desc') => void;
 }
 
 // 키보드 네비게이션을 위한 셀 위치 타입
@@ -601,7 +603,11 @@ export default function IngredientsSheetView({
   isOwnerOrAdmin,
   onRefresh,
   pagination,
-  onPageChange
+  onPageChange,
+  // 서버사이드 정렬을 위한 props 추가
+  sortField,
+  sortDirection,
+  onSort
 }: IngredientsSheetViewProps) {
   const { toast } = useToast();
   const [data, setData] = useState<Ingredient[]>(ingredients);
@@ -615,7 +621,6 @@ export default function IngredientsSheetView({
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [sorting, setSorting] = useState<SortingState>([]);
   const [currentCell, setCurrentCell] = useState<CellPosition>({ rowIndex: 0, columnIndex: 0 });
   const tableRef = useRef<HTMLTableElement>(null);
 
@@ -810,6 +815,15 @@ export default function IngredientsSheetView({
     }
   }, [selectedRows.size, data.length]);
 
+  // 서버사이드 정렬 핸들러
+  const handleServerSort = useCallback((field: string) => {
+    if (!onSort) return;
+    
+    // 현재 정렬 필드와 같으면 방향을 토글, 다르면 asc로 시작
+    const newDirection = sortField === field && sortDirection === 'asc' ? 'desc' : 'asc';
+    onSort(field, newDirection);
+  }, [onSort, sortField, sortDirection]);
+
   // 선택된 행들 삭제 함수
   const handleDeleteSelected = useCallback(async () => {
     if (selectedRows.size === 0) {
@@ -900,141 +914,210 @@ export default function IngredientsSheetView({
           />
         </div>
       ),
-      size: 50,
+      size: 60,
+      enableSorting: false,
     },
     {
       accessorKey: 'name',
       header: ({ column }: any) => (
         <Button
           variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-          className="h-8 px-2 font-medium"
+          onClick={() => handleServerSort('name')}
+          className="h-8 px-2 font-medium text-gray-500 hover:text-gray-700"
         >
           식재료명
-          <ArrowUpDown className="ml-2 h-3 w-3" />
+          {sortField === 'name' ? (
+            sortDirection === 'asc' ? (
+              <span className="ml-2 text-blue-600">↑</span>
+            ) : (
+              <span className="ml-2 text-blue-600">↓</span>
+            )
+          ) : (
+            <ArrowUpDown className="ml-2 h-3 w-3" />
+          )}
         </Button>
       ),
       cell: EditableCell,
-      size: 200,
+      size: 180,
+      enableSorting: false,
     },
     {
       accessorKey: 'code_name',
-      header: '코드명',
+      header: ({ column }: any) => (
+        <Button
+          variant="ghost"
+          onClick={() => handleServerSort('code_name')}
+          className="h-8 px-2 font-medium text-gray-500 hover:text-gray-700"
+        >
+          코드명
+          {sortField === 'code_name' ? (
+            sortDirection === 'asc' ? (
+              <span className="ml-2 text-blue-600">↑</span>
+            ) : (
+              <span className="ml-2 text-blue-600">↓</span>
+            )
+          ) : (
+            <ArrowUpDown className="ml-2 h-3 w-3" />
+          )}
+        </Button>
+      ),
       cell: EditableCell,
-      size: 150,
+      size: 140,
+      enableSorting: false,
     },
     {
       accessorKey: 'supplier',
-      header: '공급업체',
+      header: ({ column }: any) => (
+        <Button
+          variant="ghost"
+          onClick={() => handleServerSort('supplier')}
+          className="h-8 px-2 font-medium text-gray-500 hover:text-gray-700"
+        >
+          공급업체
+          {sortField === 'supplier' ? (
+            sortDirection === 'asc' ? (
+              <span className="ml-2 text-blue-600">↑</span>
+            ) : (
+              <span className="ml-2 text-blue-600">↓</span>
+            )
+          ) : (
+            <ArrowUpDown className="ml-2 h-3 w-3" />
+          )}
+        </Button>
+      ),
       cell: EditableCell,
-      size: 150,
+      size: 140,
+      enableSorting: false,
     },
     {
       accessorKey: 'package_amount',
       header: '포장량',
       cell: NumberEditableCell,
-      size: 100,
+      size: 80,
+      enableSorting: false,
     },
     {
       accessorKey: 'unit',
       header: '단위',
       cell: UnitEditableCell,
-      size: 100,
+      size: 70,
+      enableSorting: false,
     },
     {
       accessorKey: 'pac_count',
-      header: '팩 수량',
+      header: '팩수량',
       cell: NumberEditableCell,
-      size: 100,
+      size: 80,
+      enableSorting: false,
     },
     {
       accessorKey: 'items_per_box',
-      header: '박스당 개수',
+      header: '박스당개수',
       cell: NumberEditableCell,
-      size: 120,
+      size: 100,
+      enableSorting: false,
     },
     {
       accessorKey: 'price',
       header: ({ column }: any) => (
         <Button
           variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-          className="h-8 px-2 font-medium"
+          onClick={() => handleServerSort('price')}
+          className="h-8 px-2 font-medium text-gray-500 hover:text-gray-700"
         >
           가격
-          <ArrowUpDown className="ml-2 h-3 w-3" />
+          {sortField === 'price' ? (
+            sortDirection === 'asc' ? (
+              <span className="ml-2 text-blue-600">↑</span>
+            ) : (
+              <span className="ml-2 text-blue-600">↓</span>
+            )
+          ) : (
+            <ArrowUpDown className="ml-2 h-3 w-3" />
+          )}
         </Button>
       ),
       cell: PriceEditableCell,
-      size: 120,
+      size: 110,
+      enableSorting: false,
     },
     {
       accessorKey: 'stock_grade',
       header: '재고등급',
       cell: StockGradeEditableCell,
-      size: 120,
+      size: 100,
+      enableSorting: false,
     },
     {
       accessorKey: 'origin',
       header: '원산지',
       cell: EditableCell,
-      size: 120,
+      size: 100,
+      enableSorting: false,
     },
     {
       accessorKey: 'calories',
       header: '칼로리',
       cell: NumberEditableCell,
-      size: 100,
+      size: 80,
+      enableSorting: false,
     },
     {
       accessorKey: 'protein',
       header: '단백질(g)',
       cell: NumberEditableCell,
-      size: 110,
+      size: 90,
+      enableSorting: false,
     },
     {
       accessorKey: 'fat',
       header: '지방(g)',
       cell: NumberEditableCell,
-      size: 100,
+      size: 80,
+      enableSorting: false,
     },
     {
       accessorKey: 'carbs',
       header: '탄수화물(g)',
       cell: NumberEditableCell,
-      size: 120,
+      size: 100,
+      enableSorting: false,
     },
     {
       accessorKey: 'allergens',
-      header: '알레르기 정보',
+      header: '알레르기정보',
       cell: EditableCell,
-      size: 150,
+      size: 120,
+      enableSorting: false,
     },
     {
       accessorKey: 'memo1',
       header: '메모1',
       cell: EditableCell,
-      size: 150,
+      size: 120,
+      enableSorting: false,
     },
     {
       accessorKey: 'memo2',
       header: '메모2',
       cell: EditableCell,
-      size: 150,
+      size: 120,
+      enableSorting: false,
     },
-  ], [selectedRows, data.length, toggleAllSelection, toggleRowSelection]);
+  ], [selectedRows, data.length, toggleAllSelection, toggleRowSelection, handleServerSort, sortField]);
 
   // 테이블 인스턴스 생성
   const table = useReactTable({
     data,
     columns,
     state: {
-      sorting,
+      sorting: [], // 서버사이드 정렬을 사용하므로 클라이언트 정렬 비활성화
     },
-    onSortingChange: setSorting,
+    onSortingChange: () => {}, // 서버사이드 정렬을 사용하므로 비활성화
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    // getSortedRowModel 제거 - 서버사이드 정렬 사용
     getFilteredRowModel: getFilteredRowModel(),
+    enableSorting: false, // 클라이언트 정렬 비활성화
     meta: {
       updateData,
       navigateToCell,

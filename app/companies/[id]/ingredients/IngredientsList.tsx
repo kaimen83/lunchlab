@@ -165,6 +165,14 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
     setPagination(prev => ({ ...prev, page: newPage }));
   };
 
+  // 정렬 변경 핸들러
+  const handleSort = useCallback((field: string, direction: 'asc' | 'desc') => {
+    setSortField(field as keyof Ingredient);
+    setSortDirection(direction);
+    setPagination(prev => ({ ...prev, page: 1 })); // 정렬 변경 시 첫 페이지로
+    loadIngredients(1, debouncedSearchQuery, field, direction);
+  }, [debouncedSearchQuery, loadIngredients]);
+
   // 서버에서 이미 정렬된 상태로 받아오므로 클라이언트 측 정렬 불필요
   const sortedIngredients = ingredients;
 
@@ -193,6 +201,9 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
             onRefresh={() => loadIngredients(pagination.page, debouncedSearchQuery)}
             pagination={pagination}
             onPageChange={handlePageChange}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
           />
         </div>
       </Card>
