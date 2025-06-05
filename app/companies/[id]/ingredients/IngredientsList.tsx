@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { 
   Plus, FilePen, Trash2, Search, PackageOpen, 
   MoreVertical, LineChart, FileSpreadsheet,
-  SlidersHorizontal, ChevronRight
+  SlidersHorizontal, ChevronRight, Table, List
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -33,6 +33,7 @@ import Pagination from './components/Pagination';
 import IngredientForm from './IngredientForm';
 import IngredientPriceHistory from './IngredientPriceHistory';
 import BulkImportModal from './BulkImportModal';
+import IngredientsSheetView from './components/IngredientsSheetView';
 
 export default function IngredientsList({ companyId, userRole }: IngredientsListProps) {
   const router = useRouter();
@@ -53,6 +54,9 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   // 일괄 삭제 확인 모달 상태 추가
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  
+  // 뷰 모드 상태 추가 - 'list' 또는 'sheet'
+  const [viewMode, setViewMode] = useState<'list' | 'sheet'>('list');
   
   // 확장된 행 상태 관리
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -557,10 +561,47 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
             </span>
           )}
           
+          {/* 뷰 모드 토글 버튼 */}
+          <div className="flex border rounded-lg p-1 bg-muted">
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('list')}
+              className="h-8 px-3"
+            >
+              <List className="mr-1 h-4 w-4" />
+              <span className="hidden sm:inline">리스트</span>
+            </Button>
+            <Button
+              variant={viewMode === 'sheet' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('sheet')}
+              className="h-8 px-3"
+            >
+              <Table className="mr-1 h-4 w-4" />
+              <span className="hidden sm:inline">시트</span>
+            </Button>
+          </div>
+          
+          {/* 선택된 항목이 있을 때 삭제 버튼 표시 (관리자만) */}
+          {selectedIngredients.length > 0 && isOwnerOrAdmin && (
+            <Button
+              onClick={handleOpenBulkDelete}
+              variant="destructive"
+              size="sm"
+              className="h-8"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">{selectedIngredients.length}개 삭제</span>
+              <span className="sm:hidden">삭제</span>
+            </Button>
+          )}
+          
           {/* 식재료 추가 버튼 - 모든 사용자에게 허용 */}
           <Button onClick={handleAddIngredient} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
-            식재료 추가
+            <span className="hidden sm:inline">식재료 추가</span>
+            <span className="sm:hidden">추가</span>
           </Button>
           
           {/* 부가 기능 드롭다운 - 모든 사용자에게 허용 */}
@@ -577,79 +618,120 @@ export default function IngredientsList({ companyId, userRole }: IngredientsList
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
                 <span>일괄 추가</span>
               </DropdownMenuItem>
-              {/* 일괄 삭제는 관리자/소유자만 허용 */}
-              {isOwnerOrAdmin && (
-                <DropdownMenuItem 
-                  onClick={handleOpenBulkDelete}
-                  className={selectedIngredients.length > 0 ? "text-destructive focus:text-destructive" : ""}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  <span>일괄 삭제{selectedIngredients.length > 0 ? ` (${selectedIngredients.length})` : ''}</span>
-                </DropdownMenuItem>
-              )}
+              {/* 칼럼 표시/숨김 설정 */}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>칼럼 표시</DropdownMenuLabel>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.origin}
+                onCheckedChange={(checked) => 
+                  setVisibleColumns(prev => ({ ...prev, origin: checked }))
+                }
+              >
+                원산지
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.calories}
+                onCheckedChange={(checked) => 
+                  setVisibleColumns(prev => ({ ...prev, calories: checked }))
+                }
+              >
+                칼로리
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.nutrition}
+                onCheckedChange={(checked) => 
+                  setVisibleColumns(prev => ({ ...prev, nutrition: checked }))
+                }
+              >
+                영양정보
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={visibleColumns.allergens}
+                onCheckedChange={(checked) => 
+                  setVisibleColumns(prev => ({ ...prev, allergens: checked }))
+                }
+              >
+                알레르기
+              </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
 
-      <Card className="border border-slate-200 hover:border-slate-300 transition-colors overflow-hidden">
-        {/* 모바일 뷰 - 테이블 형태로 표시 */}
-        <div className="block sm:hidden">
-          <MobileTable
-            ingredients={sortedIngredients}
-            isLoading={isLoading}
-            searchQuery={searchQuery}
-            isOwnerOrAdmin={isOwnerOrAdmin}
-            handleAddIngredient={handleAddIngredient}
-            handleEditIngredient={handleEditIngredient}
-            handleViewPriceHistory={handleViewPriceHistory}
-            handleDeleteConfirm={handleDeleteConfirm}
-            selectedIngredients={selectedIngredients}
-            handleToggleSelect={handleToggleSelect}
-            formatCurrency={formatCurrency}
-            formatNumber={formatNumber}
-          />
-          
-          {/* 모바일 페이지네이션 */}
-          <div className="p-4 border-t">
-            <Pagination 
-              pagination={pagination}
-              onPageChange={handlePageChange}
+{viewMode === 'list' ? (
+        <Card className="border border-slate-200 hover:border-slate-300 transition-colors overflow-hidden">
+          {/* 모바일 뷰 - 테이블 형태로 표시 */}
+          <div className="block sm:hidden">
+            <MobileTable
+              ingredients={sortedIngredients}
+              isLoading={isLoading}
+              searchQuery={searchQuery}
+              isOwnerOrAdmin={isOwnerOrAdmin}
+              handleAddIngredient={handleAddIngredient}
+              handleEditIngredient={handleEditIngredient}
+              handleViewPriceHistory={handleViewPriceHistory}
+              handleDeleteConfirm={handleDeleteConfirm}
+              selectedIngredients={selectedIngredients}
+              handleToggleSelect={handleToggleSelect}
+              formatCurrency={formatCurrency}
+              formatNumber={formatNumber}
             />
+            
+            {/* 모바일 페이지네이션 */}
+            <div className="p-4 border-t">
+              <Pagination 
+                pagination={pagination}
+                onPageChange={handlePageChange}
+              />
+            </div>
           </div>
-        </div>
 
-        {/* 데스크톱 뷰 - 테이블 형태로 표시 */}
-        <div className="hidden sm:block overflow-x-auto">
-          <DesktopTable
-            ingredients={sortedIngredients}
-            isLoading={isLoading}
-            visibleColumns={visibleColumns}
-            expandedRows={expandedRows}
-            detailedIngredients={detailedIngredients}
-            loadingDetails={loadingDetails}
-            sortField={sortField}
-            sortDirection={sortDirection}
-            isOwnerOrAdmin={isOwnerOrAdmin}
-            toggleSort={toggleSort}
-            toggleRowExpand={toggleRowExpand}
-            handleEditIngredient={handleEditIngredient}
-            handleViewPriceHistory={handleViewPriceHistory}
-            handleDeleteConfirm={handleDeleteConfirm}
-            selectedIngredients={selectedIngredients}
-            handleToggleSelect={handleToggleSelect}
-            handleToggleSelectAll={handleToggleSelectAll}
-          />
-          
-          {/* 데스크톱 페이지네이션 */}
-          <div className="p-4 border-t">
-            <Pagination 
+          {/* 데스크톱 뷰 - 테이블 형태로 표시 */}
+          <div className="hidden sm:block overflow-x-auto">
+            <DesktopTable
+              ingredients={sortedIngredients}
+              isLoading={isLoading}
+              visibleColumns={visibleColumns}
+              expandedRows={expandedRows}
+              detailedIngredients={detailedIngredients}
+              loadingDetails={loadingDetails}
+              sortField={sortField}
+              sortDirection={sortDirection}
+              isOwnerOrAdmin={isOwnerOrAdmin}
+              toggleSort={toggleSort}
+              toggleRowExpand={toggleRowExpand}
+              handleEditIngredient={handleEditIngredient}
+              handleViewPriceHistory={handleViewPriceHistory}
+              handleDeleteConfirm={handleDeleteConfirm}
+              selectedIngredients={selectedIngredients}
+              handleToggleSelect={handleToggleSelect}
+              handleToggleSelectAll={handleToggleSelectAll}
+            />
+            
+            {/* 데스크톱 페이지네이션 */}
+            <div className="p-4 border-t">
+              <Pagination 
+                pagination={pagination}
+                onPageChange={handlePageChange}
+              />
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <Card className="border border-slate-200 hover:border-slate-300 transition-colors overflow-hidden">
+          <div className="p-4">
+            <IngredientsSheetView
+              companyId={companyId}
+              ingredients={sortedIngredients}
+              isLoading={isLoading}
+              isOwnerOrAdmin={isOwnerOrAdmin}
+              onRefresh={() => loadIngredients(pagination.page, debouncedSearchQuery)}
               pagination={pagination}
               onPageChange={handlePageChange}
             />
           </div>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       {/* 식재료 추가/수정 모달 */}
       <Dialog 

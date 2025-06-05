@@ -2,6 +2,7 @@
 
 export interface Ingredient {
   id: string;
+  company_id?: string;
   name: string;
   code_name?: string;
   supplier?: string;
@@ -13,6 +14,7 @@ export interface Ingredient {
   pac_count?: number;
   stock_grade?: string;
   memo1?: string;
+  memo2?: string;
   origin?: string;
   calories?: number;
   protein?: number;

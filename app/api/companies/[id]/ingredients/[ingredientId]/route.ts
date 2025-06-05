@@ -86,19 +86,43 @@ export async function PUT(request: Request, context: RouteContext) {
     }
     
     const body = await request.json();
+    console.log('받은 데이터:', body); // 디버깅용 로그 추가
+    
     const { 
       name, code_name, package_amount, unit, price, 
-      items_per_box, stock_grade, memo1, supplier_id,
-      origin, calories, protein, fat, carbs, allergens
+      items_per_box, stock_grade, memo1, memo2, supplier, supplier_id,
+      origin, calories, protein, fat, carbs, allergens, pac_count
     } = body;
     
-    // 필수 입력값 검증
-    if (!name || !package_amount || !unit || !price) {
+    // 필수 입력값 검증 - 더 관대하게 수정
+    if (!name || name.trim() === '') {
       return NextResponse.json(
-        { error: '이름, 포장량, 단위, 가격은 필수 입력 항목입니다.' }, 
+        { error: '식재료 이름은 필수 입력 항목입니다.' }, 
         { status: 400 }
       );
     }
+    
+    // 숫자 필드들의 기본값 설정
+    const validatedData = {
+      name: name.trim(),
+      code_name: code_name || null,
+      supplier: supplier || null,
+      supplier_id: supplier_id || null,
+      package_amount: package_amount || 1,
+      unit: unit || 'kg',
+      price: price || 0,
+      items_per_box: items_per_box || null,
+      pac_count: pac_count || null,
+      stock_grade: stock_grade || null,
+      memo1: memo1 || null,
+      memo2: memo2 || null,
+      origin: origin || null,
+      calories: calories || null,
+      protein: protein || null,
+      fat: fat || null,
+      carbs: carbs || null,
+      allergens: allergens || null,
+    };
     
     const supabase = createServerSupabaseClient();
     
@@ -156,21 +180,7 @@ export async function PUT(request: Request, context: RouteContext) {
     const { data: updatedIngredient, error: updateError } = await supabase
       .from('ingredients')
       .update({
-        name,
-        code_name: code_name || null,
-        supplier_id: supplier_id || null,
-        package_amount,
-        unit,
-        price,
-        items_per_box: items_per_box || null,
-        stock_grade: stock_grade || null,
-        memo1: memo1 || null,
-        origin: origin || null,
-        calories: calories || null,
-        protein: protein || null,
-        fat: fat || null,
-        carbs: carbs || null,
-        allergens: allergens || null,
+        ...validatedData,
         updated_at: new Date().toISOString()
       })
       .eq('id', ingredientId)
@@ -183,29 +193,33 @@ export async function PUT(request: Request, context: RouteContext) {
       return NextResponse.json({ error: '식재료 정보 업데이트 중 오류가 발생했습니다.' }, { status: 500 });
     }
     
-    // 가격 이력 추가
-    const { error: historyError } = await supabase
-      .from('ingredient_price_history')
-      .insert({
-        ingredient_id: ingredientId,
-        price: price,
-        recorded_at: new Date().toISOString()
-      });
+    // 가격이 실제로 변경된 경우에만 가격 이력 추가
+    if (currentIngredient && currentIngredient.price !== validatedData.price) {
+      const { error: historyError } = await supabase
+        .from('ingredient_price_history')
+        .insert({
+          ingredient_id: ingredientId,
+          price: validatedData.price,
+          recorded_at: new Date().toISOString()
+        });
 
-    if (historyError) {
-      console.error('가격 이력 추가 오류:', historyError);
-      // 이력 추가 실패는 심각한 오류가 아니므로 계속 진행
+      if (historyError) {
+        console.error('가격 이력 추가 오류:', historyError);
+        // 이력 추가 실패는 심각한 오류가 아니므로 계속 진행
+      } else {
+        console.log(`가격 변경 이력 추가: ${currentIngredient.price} → ${validatedData.price}`);
+      }
     }
     
     // 가격이 변경된 경우 관련 메뉴 컨테이너 원가 업데이트
     let costUpdateResult = null;
-    if (currentIngredient && currentIngredient.price !== price) {
+    if (currentIngredient && currentIngredient.price !== validatedData.price) {
       try {
         costUpdateResult = await updateMenuContainersForIngredient(
           ingredientId,
           currentIngredient.price,
-          price,
-          package_amount
+          validatedData.price,
+          validatedData.package_amount
         );
         
         console.log(`식재료 가격 변경으로 인한 원가 업데이트 결과:`, costUpdateResult);
