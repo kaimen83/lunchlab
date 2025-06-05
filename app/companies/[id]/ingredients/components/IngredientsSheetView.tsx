@@ -938,7 +938,7 @@ export default function IngredientsSheetView({
         </Button>
       ),
       cell: EditableCell,
-      size: 180,
+      size: 200,
       enableSorting: false,
     },
     {
@@ -962,7 +962,7 @@ export default function IngredientsSheetView({
         </Button>
       ),
       cell: EditableCell,
-      size: 140,
+      size: 120,
       enableSorting: false,
     },
     {
@@ -986,35 +986,35 @@ export default function IngredientsSheetView({
         </Button>
       ),
       cell: EditableCell,
-      size: 140,
+      size: 120,
       enableSorting: false,
     },
     {
       accessorKey: 'package_amount',
       header: '포장량',
       cell: NumberEditableCell,
-      size: 80,
+      size: 90,
       enableSorting: false,
     },
     {
       accessorKey: 'unit',
       header: '단위',
       cell: UnitEditableCell,
-      size: 70,
+      size: 80,
       enableSorting: false,
     },
     {
       accessorKey: 'pac_count',
       header: '팩수량',
       cell: NumberEditableCell,
-      size: 80,
+      size: 70,
       enableSorting: false,
     },
     {
       accessorKey: 'items_per_box',
       header: '박스당개수',
       cell: NumberEditableCell,
-      size: 100,
+      size: 70,
       enableSorting: false,
     },
     {
@@ -1038,28 +1038,28 @@ export default function IngredientsSheetView({
         </Button>
       ),
       cell: PriceEditableCell,
-      size: 110,
+      size: 120,
       enableSorting: false,
     },
     {
       accessorKey: 'stock_grade',
       header: '재고등급',
       cell: StockGradeEditableCell,
-      size: 100,
+      size: 80,
       enableSorting: false,
     },
     {
       accessorKey: 'origin',
       header: '원산지',
       cell: EditableCell,
-      size: 100,
+      size: 110,
       enableSorting: false,
     },
     {
       accessorKey: 'calories',
       header: '칼로리',
       cell: NumberEditableCell,
-      size: 80,
+      size: 90,
       enableSorting: false,
     },
     {
@@ -1073,35 +1073,35 @@ export default function IngredientsSheetView({
       accessorKey: 'fat',
       header: '지방(g)',
       cell: NumberEditableCell,
-      size: 80,
+      size: 90,
       enableSorting: false,
     },
     {
       accessorKey: 'carbs',
       header: '탄수화물(g)',
       cell: NumberEditableCell,
-      size: 100,
+      size: 90,
       enableSorting: false,
     },
     {
       accessorKey: 'allergens',
       header: '알레르기정보',
       cell: EditableCell,
-      size: 120,
+      size: 130,
       enableSorting: false,
     },
     {
       accessorKey: 'memo1',
       header: '메모1',
       cell: EditableCell,
-      size: 120,
+      size: 130,
       enableSorting: false,
     },
     {
       accessorKey: 'memo2',
       header: '메모2',
       cell: EditableCell,
-      size: 120,
+      size: 130,
       enableSorting: false,
     },
   ], [selectedRows, data.length, toggleAllSelection, toggleRowSelection, handleServerSort, sortField]);
@@ -1320,7 +1320,7 @@ export default function IngredientsSheetView({
                     <th
                       key={header.id}
                       className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 last:border-r-0"
-                      style={{ width: header.getSize() }}
+                      style={{ width: header.getSize(), minWidth: header.getSize() }}
                     >
                       {header.isPlaceholder
                         ? null
@@ -1348,7 +1348,7 @@ export default function IngredientsSheetView({
                     <td
                       key={cell.id}
                       className="px-2 py-1 whitespace-nowrap border-r border-gray-200 last:border-r-0"
-                      style={{ width: cell.column.getSize() }}
+                      style={{ width: cell.column.getSize(), minWidth: cell.column.getSize() }}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
