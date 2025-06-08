@@ -1,4 +1,5 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "buildCommand": "npm run build",
   "installCommand": "npm install --no-audit --no-fund --legacy-peer-deps",
@@ -10,5 +11,11 @@
     "app/api/**/*": {
       "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/daily-snapshot",
+      "schedule": "0 1 * * *"
+    }
+  ]
 } 
