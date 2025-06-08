@@ -18,11 +18,16 @@ interface StockHistoryPageProps {
 }
 
 export default function StockHistoryPage({ companyId }: StockHistoryPageProps) {
-  const [targetDate, setTargetDate] = useState(() => {
-    // 기본값: 어제 날짜
+  // 어제 날짜 계산 함수
+  const getYesterday = () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     return yesterday.toISOString().split('T')[0];
+  };
+
+  const [targetDate, setTargetDate] = useState(() => {
+    // 기본값: 어제 날짜
+    return getYesterday();
   });
   const [stockData, setStockData] = useState<StockAtDateResponse | null>(null);
   const [currentStockData, setCurrentStockData] = useState<any[]>([]);
@@ -154,7 +159,7 @@ export default function StockHistoryPage({ companyId }: StockHistoryPageProps) {
             날짜별 재고 조회
           </CardTitle>
           <CardDescription>
-            조회하고 싶은 날짜를 선택하고 검색 버튼을 클릭하세요.
+            조회하고 싶은 날짜를 선택하고 검색 버튼을 클릭하세요. (오늘 날짜는 선택할 수 없습니다)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -166,7 +171,7 @@ export default function StockHistoryPage({ companyId }: StockHistoryPageProps) {
                 type="date"
                 value={targetDate}
                 onChange={(e) => setTargetDate(e.target.value)}
-                max={new Date().toISOString().split('T')[0]}
+                max={getYesterday()}
               />
             </div>
             <Button 
