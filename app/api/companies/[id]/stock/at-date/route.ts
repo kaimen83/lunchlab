@@ -125,6 +125,141 @@ async function calculateRecentStock(
 ): Promise<StockAtDateResponse> {
   console.log('Using realtime calculation method');
 
+  // 1단계: 재고 항목 조회
+  let stockQuery = supabase
+    .from('stock_items')
+    .select('*')
+    .eq('company_id', companyId);
+
+  if (stockItemId) {
+    stockQuery = stockQuery.eq('id', stockItemId);
+  }
+
+  const { data: stockItems, error: stockError } = await stockQuery;
+
+  if (stockError) {
+    throw new Error(`재고 항목 조회 오류: ${stockError.message}`);
+  }
+
+  if (!stockItems || stockItems.length === 0) {
+    return {
+      items: [],
+      targetDate,
+      calculationMethod: 'realtime'
+    };
+  }
+
+  // 2단계: 배치로 식자재와 용기 정보 조회
+  const ingredientIds = stockItems
+    .filter((item: any) => item.item_type === 'ingredient')
+    .map((item: any) => item.item_id);
+  
+  const containerIds = stockItems
+    .filter((item: any) => item.item_type === 'container')
+    .map((item: any) => item.item_id);
+
+  // 병렬로 식자재와 용기 정보 조회
+  const [ingredientsResult, containersResult] = await Promise.all([
+    ingredientIds.length > 0 
+      ? supabase.from('ingredients').select('id, name, code_name, unit').in('id', ingredientIds)
+      : { data: [], error: null },
+    containerIds.length > 0 
+      ? supabase.from('containers').select('id, name, code_name, category').in('id', containerIds)
+      : { data: [], error: null }
+  ]);
+
+  if (ingredientsResult.error || containersResult.error) {
+    console.log('Batch detail query failed, falling back to individual queries');
+    return await calculateRecentStockFallback(supabase, companyId, targetDate, stockItemId);
+  }
+
+  // 조회 결과를 Map으로 변환하여 빠른 검색
+  const ingredientsMap = new Map(
+    (ingredientsResult.data || []).map((item: any) => [item.id, item])
+  );
+  const containersMap = new Map(
+    (containersResult.data || []).map((item: any) => [item.id, item])
+  );
+
+  const stockItemIds = stockItems.map((item: any) => item.id);
+
+  // targetDate 다음날 00:00:00 이후의 모든 거래 조회 (역산을 위해)
+  const nextDay = new Date(targetDate);
+  nextDay.setDate(nextDay.getDate() + 1);
+  const nextDayStr = nextDay.toISOString().split('T')[0];
+
+  const { data: transactions, error: transactionError } = await supabase
+    .from('stock_transactions')
+    .select('*')
+    .in('stock_item_id', stockItemIds)
+    .gte('transaction_date', `${nextDayStr}T00:00:00`)
+    .order('transaction_date', { ascending: true });
+
+  if (transactionError) {
+    throw new Error(`거래 내역 조회 오류: ${transactionError.message}`);
+  }
+
+    // 각 재고 항목에 대해 역산 계산
+  const items: StockItemAtDate[] = [];
+
+  for (const stockItem of stockItems) {
+    // 해당 항목의 거래만 필터링
+    const itemTransactions = transactions?.filter((t: any) => t.stock_item_id === stockItem.id) || [];
+
+    // 현재 재고에서 targetDate 이후 거래를 역산
+    let quantityAtDate = Number(stockItem.current_quantity);
+
+    for (const transaction of itemTransactions) {
+      if (transaction.transaction_type === 'incoming') {
+        quantityAtDate -= Number(transaction.quantity);
+      } else if (transaction.transaction_type === 'outgoing' || transaction.transaction_type === 'disposal') {
+        quantityAtDate += Number(transaction.quantity);
+      } else if (transaction.transaction_type === 'adjustment') {
+        quantityAtDate -= Number(transaction.quantity);
+      }
+    }
+
+    // Map에서 상세 정보 조회
+    const itemDetails: any = stockItem.item_type === 'ingredient' 
+      ? ingredientsMap.get(stockItem.item_id)
+      : containersMap.get(stockItem.item_id);
+
+    const itemName = itemDetails?.name || 'Unknown Item';
+
+    items.push({
+      stock_item_id: stockItem.id,
+      item_type: stockItem.item_type,
+      item_name: itemName,
+      quantity: Math.max(0, quantityAtDate), // 음수 방지
+      unit: stockItem.unit,
+      details: {
+        id: itemDetails?.id || stockItem.item_id,
+        name: itemName,
+        code_name: itemDetails?.code_name || undefined,
+        category: stockItem.item_type === 'container' ? itemDetails?.category || undefined : undefined,
+        unit: itemDetails?.unit || stockItem.unit
+      }
+    });
+  }
+
+  return {
+    items,
+    targetDate,
+    calculationMethod: 'realtime'
+  };
+}
+
+/**
+ * 배치 쿼리 실패 시 폴백 함수 (기존 방식)
+ */
+async function calculateRecentStockFallback(
+  supabase: any,
+  companyId: string,
+  targetDate: string,
+  stockItemId?: string | null
+): Promise<StockAtDateResponse> {
+  console.log('Using fallback method with individual queries');
+
   // 회사의 모든 재고 항목 조회 (또는 특정 항목)
   let stockQuery = supabase
     .from('stock_items')
@@ -151,7 +286,7 @@ async function calculateRecentStock(
 
   const stockItemIds = stockItems.map((item: any) => item.id);
 
-  // targetDate 이후의 모든 거래 조회
+  // targetDate 다음날 00:00:00 이후의 모든 거래 조회 (역산을 위해)
   const nextDay = new Date(targetDate);
   nextDay.setDate(nextDay.getDate() + 1);
   const nextDayStr = nextDay.toISOString().split('T')[0];
@@ -160,8 +295,7 @@ async function calculateRecentStock(
     .from('stock_transactions')
     .select('*')
     .in('stock_item_id', stockItemIds)
-    .gte('transaction_date', `${targetDate}T00:00:00`)
-    .lt('transaction_date', `${nextDayStr}T00:00:00`)
+    .gte('transaction_date', `${nextDayStr}T00:00:00`)
     .order('transaction_date', { ascending: true });
 
   if (transactionError) {
@@ -254,24 +388,97 @@ async function getStockFromSnapshot(
   if (latestSnapshotDate === targetDate) {
     const items: StockItemAtDate[] = [];
 
-    for (const snapshot of snapshotsAtDate) {
-      // stock_item_id가 아닌 실제 item_id를 사용해야 함
-      const { data: stockItem } = await supabase
-        .from('stock_items')
-        .select('item_id')
-        .eq('id', snapshot.stock_item_id)
-        .single();
-      
-      const itemDetails = await getItemDetails(supabase, snapshot.item_type, stockItem?.item_id || snapshot.stock_item_id);
-      
-      items.push({
-        stock_item_id: snapshot.stock_item_id,
-        item_type: snapshot.item_type,
-        item_name: snapshot.item_name,
-        quantity: Number(snapshot.quantity),
-        unit: snapshot.unit,
-        details: itemDetails
-      });
+    // 배치로 모든 stock_item 정보와 상세 정보를 한 번에 조회
+    const stockItemIds = snapshotsAtDate.map((s: any) => s.stock_item_id);
+    
+    const { data: stockItemsWithDetails, error: stockItemError } = await supabase
+      .from('stock_items')
+      .select(`
+        id,
+        item_id,
+        item_type,
+        unit,
+        ingredients:item_id!inner (
+          id,
+          name,
+          code_name,
+          category,
+          unit
+        ),
+        containers:item_id!inner (
+          id,
+          name,
+          code_name,
+          category
+        )
+      `)
+      .in('id', stockItemIds);
+
+    if (stockItemError) {
+      console.log('Batch query failed in snapshot, falling back to individual queries');
+      // 폴백: 개별 조회
+      for (const snapshot of snapshotsAtDate) {
+        const { data: stockItem } = await supabase
+          .from('stock_items')
+          .select('item_id')
+          .eq('id', snapshot.stock_item_id)
+          .single();
+        
+        const itemDetails = await getItemDetails(supabase, snapshot.item_type, stockItem?.item_id || snapshot.stock_item_id);
+        
+        items.push({
+          stock_item_id: snapshot.stock_item_id,
+          item_type: snapshot.item_type,
+          item_name: snapshot.item_name,
+          quantity: Number(snapshot.quantity),
+          unit: snapshot.unit,
+          details: itemDetails
+        });
+      }
+    } else {
+      // 배치 쿼리 성공: 스냅샷과 상세 정보를 매칭
+      for (const snapshot of snapshotsAtDate) {
+        const stockItemDetail = stockItemsWithDetails?.find((si: any) => si.id === snapshot.stock_item_id);
+        
+        if (stockItemDetail) {
+          const itemDetails = stockItemDetail.item_type === 'ingredient' 
+            ? stockItemDetail.ingredients?.[0] 
+            : stockItemDetail.containers?.[0];
+
+          const itemName = itemDetails?.name || snapshot.item_name || 'Unknown Item';
+
+          items.push({
+            stock_item_id: snapshot.stock_item_id,
+            item_type: snapshot.item_type,
+            item_name: itemName,
+            quantity: Number(snapshot.quantity),
+            unit: snapshot.unit,
+            details: {
+              id: itemDetails?.id || stockItemDetail.item_id,
+              name: itemName,
+                      code_name: itemDetails?.code_name || undefined,
+        category: itemDetails?.category || undefined,
+              unit: itemDetails?.unit || snapshot.unit
+            }
+          });
+        } else {
+          // 매칭되지 않는 경우 스냅샷 데이터 사용
+          items.push({
+            stock_item_id: snapshot.stock_item_id,
+            item_type: snapshot.item_type,
+            item_name: snapshot.item_name,
+            quantity: Number(snapshot.quantity),
+            unit: snapshot.unit,
+                         details: {
+               id: snapshot.stock_item_id,
+               name: snapshot.item_name,
+               code_name: undefined,
+               category: undefined,
+               unit: snapshot.unit
+             }
+          });
+        }
+      }
     }
 
     return {
