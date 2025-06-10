@@ -105,7 +105,26 @@ export default function MealPlanForm({
       }
       
       const data = await response.json();
-      setContainers(data);
+      
+      // 계층 구조의 용기 데이터를 평면화하여 모든 용기(부모와 자식 포함)를 하나의 배열로 만듦
+      const flattenContainers = (containers: Container[]): Container[] => {
+        const result: Container[] = [];
+        
+        containers.forEach(container => {
+          // 현재 용기 추가
+          result.push(container);
+          
+          // 하위 용기들이 있다면 재귀적으로 평면화하여 추가
+          if (container.children && container.children.length > 0) {
+            result.push(...flattenContainers(container.children));
+          }
+        });
+        
+        return result;
+      };
+      
+      const flattenedContainers = flattenContainers(data);
+      setContainers(flattenedContainers);
     } catch (error) {
       console.error('용기 로드 오류:', error);
       toast({
@@ -443,10 +462,11 @@ export default function MealPlanForm({
     }, 50);
   };
   
-  // 용기 검색
+  // 용기 검색 - 아이템 타입 용기만 필터링
   const filteredContainers = containers.filter(container => 
-    container.name.toLowerCase().includes(containerSearchTerm.toLowerCase()) ||
-    (container.description && container.description.toLowerCase().includes(containerSearchTerm.toLowerCase()))
+    container.container_type === 'item' && // 아이템 타입 용기만 선택 가능
+    (container.name.toLowerCase().includes(containerSearchTerm.toLowerCase()) ||
+    (container.description && container.description.toLowerCase().includes(containerSearchTerm.toLowerCase())))
   );
   
   // 컨테이너 이름으로 정렬

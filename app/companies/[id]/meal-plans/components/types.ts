@@ -13,6 +13,12 @@ export interface Container {
   name: string;
   description: string | null;
   price: number;
+  container_type: 'group' | 'item';
+  parent_container_id?: string | null;
+  sort_order?: number;
+  children?: Container[];
+  level?: number;
+  path?: string;
 }
 
 export interface MenuContainer {

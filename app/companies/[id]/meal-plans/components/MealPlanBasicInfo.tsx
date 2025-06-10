@@ -107,9 +107,11 @@ export default function MealPlanBasicInfo({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [isLoadingTemplateDetails, setIsLoadingTemplateDetails] = useState(false);
 
+  // 템플릿 용기 선택 - 아이템 타입 용기만 필터링
   const filteredTemplateContainers = filteredContainers.filter(container => 
-    container.name.toLowerCase().includes(templateContainerSearch.toLowerCase()) ||
-    (container.description && container.description.toLowerCase().includes(templateContainerSearch.toLowerCase()))
+    container.container_type === 'item' && // 아이템 타입 용기만 선택 가능
+    (container.name.toLowerCase().includes(templateContainerSearch.toLowerCase()) ||
+    (container.description && container.description.toLowerCase().includes(templateContainerSearch.toLowerCase())))
   );
 
   const toggleTemplateContainerSelection = (containerId: string) => {
@@ -631,8 +633,9 @@ export default function MealPlanBasicInfo({
                     ) : (
                       filteredContainers
                         .filter(container => 
-                          container.name.toLowerCase().includes(editTemplateContainerSearch.toLowerCase()) ||
-                          (container.description && container.description.toLowerCase().includes(editTemplateContainerSearch.toLowerCase()))
+                          container.container_type === 'item' && // 아이템 타입 용기만 선택 가능
+                          (container.name.toLowerCase().includes(editTemplateContainerSearch.toLowerCase()) ||
+                          (container.description && container.description.toLowerCase().includes(editTemplateContainerSearch.toLowerCase())))
                         )
                         .map((container) => (
                           <div key={container.id} className="flex items-start space-x-2">
