@@ -10,13 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { useToast } from "@/hooks/use-toast";
 import { 
   ClipboardCheck, 
   Plus, 
   Search, 
-  Filter, 
   CheckCircle, 
   AlertTriangle, 
   Clock,
@@ -52,7 +51,6 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
   
   // 필터 상태
   const [filters, setFilters] = useState({
-    status: 'all',
     itemType: 'all',
     search: ''
   });
@@ -107,7 +105,6 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
       const queryParams = new URLSearchParams({
         page: page.toString(),
         pageSize: pageSize.toString(),
-        status: filters.status !== 'all' ? filters.status : '',
         itemType: filters.itemType !== 'all' ? filters.itemType : '',
         search: filters.search
       });
@@ -558,7 +555,7 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
       setCurrentPage(1);
       fetchAuditDetail(currentAudit.audit.id, 1);
     }
-  }, [filters.status, filters.itemType, filters.search, currentAudit?.audit.id, fetchAuditDetail]);
+  }, [filters.itemType, filters.search, currentAudit?.audit.id, fetchAuditDetail]);
 
   // 실사 변경 시 페이지 초기화
   useEffect(() => {
@@ -727,7 +724,7 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
               <CardContent>
                 {/* 필터 및 액션 버튼 */}
                 <div className="space-y-4">
-                  <div className="flex space-x-3">
+                  <div className="flex space-x-3 items-center">
                     <div className="flex-1">
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -740,28 +737,33 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
                       </div>
                     </div>
                     
-                    <Select value={filters.status} onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}>
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">전체</SelectItem>
-                        <SelectItem value="pending">대기</SelectItem>
-                        <SelectItem value="completed">완료</SelectItem>
-                        <SelectItem value="discrepancy">차이</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    
-                    <Select value={filters.itemType} onValueChange={(value) => setFilters(prev => ({ ...prev, itemType: value }))}>
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">전체</SelectItem>
-                        <SelectItem value="ingredient">식자재</SelectItem>
-                        <SelectItem value="container">용기</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {/* 항목 타입 필터 - 버튼 형태 */}
+                    <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+                      <Button
+                        variant={filters.itemType === 'all' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setFilters(prev => ({ ...prev, itemType: 'all' }))}
+                        className="h-8 px-3"
+                      >
+                        전체
+                      </Button>
+                      <Button
+                        variant={filters.itemType === 'ingredient' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setFilters(prev => ({ ...prev, itemType: 'ingredient' }))}
+                        className="h-8 px-3"
+                      >
+                        식자재
+                      </Button>
+                      <Button
+                        variant={filters.itemType === 'container' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setFilters(prev => ({ ...prev, itemType: 'container' }))}
+                        className="h-8 px-3"
+                      >
+                        용기
+                      </Button>
+                    </div>
                   </div>
 
                   {/* 일괄 저장 버튼 */}
@@ -947,7 +949,7 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
                 
                 {currentAudit?.items.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
-                    <Filter className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                    <Search className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                     <p>조건에 맞는 항목이 없습니다.</p>
                   </div>
                 )}

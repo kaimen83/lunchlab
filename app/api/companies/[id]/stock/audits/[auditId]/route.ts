@@ -59,22 +59,16 @@ export async function GET(
     const searchParams = request.nextUrl.searchParams;
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = parseInt(searchParams.get('pageSize') || '20');
-    const status = searchParams.get('status');
     const itemType = searchParams.get('itemType');
     const search = searchParams.get('search');
 
-    // 실사 항목 조회
+    // 실사 항목 조회 (가나다 순 정렬)
     let itemsQuery = supabase
       .from('stock_audit_items')
       .select('*', { count: 'exact' })
-      .eq('audit_id', auditId)
-      .order('item_name', { ascending: true });
+      .eq('audit_id', auditId);
 
     // 필터 적용
-    if (status && status !== 'all') {
-      itemsQuery = itemsQuery.eq('status', status);
-    }
-
     if (itemType && itemType !== 'all') {
       itemsQuery = itemsQuery.eq('item_type', itemType);
     }
@@ -82,6 +76,9 @@ export async function GET(
     if (search && search.trim() !== '') {
       itemsQuery = itemsQuery.ilike('item_name', `%${search.trim()}%`);
     }
+
+    // 가나다 순 정렬 적용
+    itemsQuery = itemsQuery.order('item_name', { ascending: true });
 
     // 페이지네이션 적용
     const offset = (page - 1) * pageSize;

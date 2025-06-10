@@ -223,12 +223,13 @@ export async function POST(
       }
     }
 
-    // 2. 용기 항목 조회 (재고 정보와 함께)
+    // 2. 용기 항목 조회 (재고 정보와 함께) - 최상위 레벨만
     if (item_types.includes('container')) {
       const { data: containers, error: containersError } = await supabase
         .from('containers')
         .select('id, name, price')
-        .eq('company_id', companyId);
+        .eq('company_id', companyId)
+        .is('parent_container_id', null); // 상위 그룹이 없는 컨테이너만 조회
 
       if (containersError) {
         console.error('용기 조회 오류:', containersError);

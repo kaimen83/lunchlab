@@ -128,13 +128,14 @@ export async function GET(
       }
     }
 
-    // 2. 회사에서 사용 가능한 용기 ID 목록 조회
+    // 2. 회사에서 사용 가능한 용기 ID 목록 조회 (최상위 레벨만)
     if (shouldIncludeContainers) {
       try {
         let containerQuery = supabase
           .from('containers')
           .select('id')
-          .eq('company_id', companyId);
+          .eq('company_id', companyId)
+          .is('parent_container_id', null); // 상위 그룹이 없는 컨테이너만 조회
         
         // 검색어나 카테고리 필터가 있으면 먼저 적용
         if (searchQuery) {
@@ -143,12 +144,14 @@ export async function GET(
             .from('containers')
             .select('id')
             .eq('company_id', companyId)
+            .is('parent_container_id', null)
             .ilike('name', `%${searchQuery}%`);
             
           const codeResults = await supabase
             .from('containers')
             .select('id')
             .eq('company_id', companyId)
+            .is('parent_container_id', null)
             .ilike('code_name', `%${searchQuery}%`);
             
           // 두 결과를 합치고 중복 제거
@@ -265,7 +268,8 @@ export async function GET(
       const { count: containerCount, error: countError } = await supabase
         .from('containers')
         .select('*', { count: 'exact', head: true })
-        .in('id', availableContainerIds);
+        .in('id', availableContainerIds)
+        .is('parent_container_id', null); // 최상위 레벨 컨테이너만 카운트
       
       if (countError) {
         console.error('용기 카운트 조회 오류:', countError);
@@ -280,7 +284,8 @@ export async function GET(
       let containerQuery = supabase
         .from('containers')
         .select('*')
-        .in('id', availableContainerIds);
+        .in('id', availableContainerIds)
+        .is('parent_container_id', null); // 최상위 레벨 컨테이너만 조회
         
       // 정렬 조건 적용
       if (sortBy === 'name') {
