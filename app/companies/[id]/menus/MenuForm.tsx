@@ -42,6 +42,9 @@ interface Container {
   description?: string;
   category?: string;
   price?: number;
+  container_type?: 'group' | 'item'; // 계층 구조 지원
+  parent_container_id?: string;
+  sort_order?: number;
 }
 
 // 선택된 식재료 타입 정의
@@ -146,12 +149,22 @@ export default function MenuForm({
   useEffect(() => {
     const fetchContainers = async () => {
       try {
-        const response = await fetch(`/api/companies/${companyId}/containers`);
+        // flat=true로 플랫 구조 요청하고, 메뉴에서는 개별 용기(item)만 사용 가능
+        const response = await fetch(`/api/companies/${companyId}/containers?flat=true`);
         if (!response.ok) {
           throw new Error('용기 목록을 불러오는데 실패했습니다.');
         }
         const data = await response.json();
-        setContainers(data);
+        
+        // 그룹이 아닌 개별 용기(item)만 필터링하여 메뉴에서 사용
+        const itemContainers = data.filter((container: any) => container.container_type === 'item');
+        
+        // 용기 이름을 가나다 순으로 정렬
+        const sortedContainers = itemContainers.sort((a: Container, b: Container) => 
+          a.name.localeCompare(b.name, 'ko', { numeric: true })
+        );
+        
+        setContainers(sortedContainers);
       } catch (error) {
         console.error('용기 목록 로드 오류:', error);
         toast({
@@ -773,6 +786,9 @@ export default function MenuForm({
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
         <div className="md:col-span-4 bg-slate-50 p-4 rounded-md border">
           <h3 className="font-semibold mb-2">용기 선택</h3>
+          <p className="text-xs text-slate-600 mb-3">
+            메뉴에 사용할 개별 용기를 선택하세요. (그룹은 선택할 수 없습니다)
+          </p>
           <div className="space-y-2 max-h-[300px] overflow-y-auto">
             {containers.map(container => (
               <Card key={container.id} className="cursor-pointer hover:bg-slate-100 transition-colors">
