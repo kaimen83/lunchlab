@@ -137,11 +137,24 @@ export async function GET(
           } else if (stockItem.item_type === 'container') {
             const { data: container } = await supabase
               .from('containers')
-              .select('id, name, code_name')
+              .select('id, name, code_name, parent_container_id')
               .eq('id', stockItem.item_id)
               .single();
             
-            itemDetails = container;
+            // 최상위 그룹이 있는 경우 그룹 정보를 조회, 없으면 자기 자신
+            if (container?.parent_container_id) {
+              // 상위 그룹 정보 조회
+              const { data: parentContainer } = await supabase
+                .from('containers')
+                .select('id, name, code_name')
+                .eq('id', container.parent_container_id)
+                .is('parent_container_id', null) // 최상위 레벨만
+                .single();
+              
+              itemDetails = parentContainer || container; // 상위 그룹이 있으면 그룹 정보, 없으면 원래 정보
+            } else {
+              itemDetails = container; // 이미 최상위 레벨인 경우
+            }
             // 용기는 항상 '개' 단위 사용
           }
         }
@@ -173,14 +186,45 @@ export async function GET(
       })
     );
 
+    // 같은 날짜, 같은 그룹, 같은 거래유형의 거래들을 그룹화하고 최대 수량만 표시
+    const groupedTransactions = new Map();
+    
+    transactionsWithDetails.forEach(transaction => {
+      // 날짜를 YYYY-MM-DD 형식으로 변환 (시간 제거)
+      const transactionDate = new Date(transaction.created_at).toISOString().split('T')[0];
+      
+      // 그룹화 키: 날짜 + 아이템명 + 거래유형
+      const groupKey = `${transactionDate}_${transaction.stock_item.details.name}_${transaction.transaction_type}`;
+      
+      if (!groupedTransactions.has(groupKey)) {
+        // 새로운 그룹이면 그대로 추가
+        groupedTransactions.set(groupKey, transaction);
+      } else {
+        // 이미 존재하는 그룹이면 수량이 더 큰 것으로 교체
+        const existingTransaction = groupedTransactions.get(groupKey);
+        if (transaction.quantity > existingTransaction.quantity) {
+          groupedTransactions.set(groupKey, transaction);
+        }
+      }
+    });
+
+    // Map에서 배열로 변환하고 날짜순 정렬
+    const finalTransactions = Array.from(groupedTransactions.values())
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    // 페이지네이션을 위한 최종 거래 목록 슬라이스
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedTransactions = finalTransactions.slice(startIndex, endIndex);
+
     // 응답 반환
     return NextResponse.json({
-      transactions: transactionsWithDetails,
+      transactions: paginatedTransactions,
       pagination: {
-        total: count || 0,
+        total: finalTransactions.length, // 그룹화된 거래 수를 기준으로 페이지네이션
         page,
         pageSize,
-        pageCount: count ? Math.ceil(count / pageSize) : 0,
+        pageCount: Math.ceil(finalTransactions.length / pageSize),
       },
     });
   } catch (error) {

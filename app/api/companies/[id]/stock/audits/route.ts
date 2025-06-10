@@ -263,18 +263,79 @@ export async function POST(
           );
         }
 
-        // 용기 항목들을 실사 항목 형태로 변환
-        for (const container of containers) {
-          const stockItem = stockItems?.find(stock => stock.item_id === container.id);
-          allItems.push({
-            id: stockItem?.id || null,
-            item_type: 'container',
-            item_id: container.id,
-            item_name: container.name,
-            unit: '개', // 용기는 기본적으로 '개' 단위
-            current_quantity: stockItem?.current_quantity || 0,
-            has_stock_record: !!stockItem
-          });
+        // 하위 컨테이너들을 상위 그룹별로 그룹화하고 최대 수량으로 집계
+        const containerMap = new Map();
+        
+        // 먼저 모든 하위 컨테이너들을 조회하여 상위 그룹별로 분류
+        for (const topContainer of containers) {
+          const { data: subContainers, error: subError } = await supabase
+            .from('containers')
+            .select('id, name, parent_container_id')
+            .eq('company_id', companyId)
+            .eq('parent_container_id', topContainer.id);
+
+          if (subError) {
+            console.error('하위 컨테이너 조회 오류:', subError);
+            continue;
+          }
+
+          // 하위 컨테이너들이 있으면 각각의 재고를 확인
+          if (subContainers && subContainers.length > 0) {
+            const subContainerIds = subContainers.map(sub => sub.id);
+            const { data: subStockItems, error: subStockError } = await supabase
+              .from('stock_items')
+              .select('id, item_id, current_quantity')
+              .eq('company_id', companyId)
+              .eq('item_type', 'container')
+              .in('item_id', subContainerIds);
+
+            if (subStockError) {
+              console.error('하위 컨테이너 재고 조회 오류:', subStockError);
+              continue;
+            }
+
+            // 하위 컨테이너들의 최대 재고량 찾기
+            let maxQuantity = Number.NEGATIVE_INFINITY; // 음수 포함하여 진짜 최대값 찾기
+            let maxStockItem = null;
+            
+            for (const subContainer of subContainers) {
+              const subStockItem = subStockItems?.find(stock => stock.item_id === subContainer.id);
+              const quantity = subStockItem?.current_quantity || 0;
+              
+              if (quantity > maxQuantity) {
+                maxQuantity = quantity;
+                maxStockItem = subStockItem;
+              }
+            }
+            
+            // 하위 아이템이 없거나 모든 재고가 0인 경우 처리
+            if (maxQuantity === Number.NEGATIVE_INFINITY) {
+              maxQuantity = 0;
+            }
+
+            // 상위 그룹으로 항목 추가 (최대 수량 사용)
+            allItems.push({
+              id: maxStockItem?.id || null,
+              item_type: 'container',
+              item_id: topContainer.id, // 상위 그룹 ID 사용
+              item_name: topContainer.name, // 상위 그룹명 사용
+              unit: '개',
+              current_quantity: maxQuantity, // 하위 중 최대 수량
+              has_stock_record: !!maxStockItem
+            });
+          } else {
+            // 하위 컨테이너가 없으면 그 자체로 처리
+            const stockItem = stockItems?.find(stock => stock.item_id === topContainer.id);
+            allItems.push({
+              id: stockItem?.id || null,
+              item_type: 'container',
+              item_id: topContainer.id,
+              item_name: topContainer.name,
+              unit: '개',
+              current_quantity: stockItem?.current_quantity || 0,
+              has_stock_record: !!stockItem
+            });
+          }
         }
       }
     }

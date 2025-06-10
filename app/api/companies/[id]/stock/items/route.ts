@@ -162,8 +162,8 @@ export async function GET(
           if (combinedIds.length > 0) {
             containerQuery = containerQuery.in('id', combinedIds);
           } else {
-            // 검색 결과가 없으면 빈 결과 반환
-            containerQuery = containerQuery.eq('id', 'no-match');
+            // 검색 결과가 없으면 빈 배열 설정하고 건너뛰기
+            availableContainerIds = [];
           }
         }
         
@@ -318,27 +318,90 @@ export async function GET(
           console.error('재고 항목 조회 오류:', stockItemsError);
         }
         
-        // 용기 정보와 재고 항목 정보 결합
-        for (const container of containers) {
-          // 이 용기에 대한 재고 항목 찾기
-          const stockItem = stockItems && stockItems.find(item => item.item_id === container.id);
-          
-          // 재고 정보가 있으면 그 정보를 사용하고, 없으면 기본값 사용
-          allItems.push({
-            id: stockItem?.id || `temp_container_${container.id}`,
-            company_id: companyId,
-            item_type: 'container',
-            item_id: container.id,
-            current_quantity: stockItem?.current_quantity || 0,
-            unit: stockItem?.unit || '개', // 용기는 기본적으로 '개' 단위 사용
-            last_updated: stockItem?.last_updated || new Date().toISOString(),
-            created_at: stockItem?.created_at || new Date().toISOString(),
-            details: {
-              ...container,
-              price: container.price || undefined
-            },
-            name: container.name || '알 수 없음'
-          });
+        // 하위 컨테이너들을 상위 그룹별로 그룹화하고 최대 수량으로 집계
+        for (const topContainer of containers) {
+          // 하위 컨테이너들 조회
+          const { data: subContainers, error: subError } = await supabase
+            .from('containers')
+            .select('id, name, parent_container_id')
+            .eq('company_id', companyId)
+            .eq('parent_container_id', topContainer.id);
+
+          if (subError) {
+            console.error('하위 컨테이너 조회 오류:', subError);
+            continue;
+          }
+
+          // 하위 컨테이너들이 있으면 각각의 재고를 확인하여 최대값 찾기
+          if (subContainers && subContainers.length > 0) {
+            const subContainerIds = subContainers.map(sub => sub.id);
+            const { data: subStockItems, error: subStockError } = await supabase
+              .from('stock_items')
+              .select('*')
+              .eq('company_id', companyId)
+              .eq('item_type', 'container')
+              .in('item_id', subContainerIds);
+
+            if (subStockError) {
+              console.error('하위 컨테이너 재고 조회 오류:', subStockError);
+              continue;
+            }
+
+            // 하위 컨테이너들의 최대 재고량 찾기
+            let maxQuantity = Number.NEGATIVE_INFINITY; // 음수 포함하여 진짜 최대값 찾기
+            let maxStockItem = null;
+            
+            for (const subContainer of subContainers) {
+              const subStockItem = subStockItems?.find(stock => stock.item_id === subContainer.id);
+              const quantity = subStockItem?.current_quantity || 0;
+              
+              if (quantity > maxQuantity) {
+                maxQuantity = quantity;
+                maxStockItem = subStockItem;
+              }
+            }
+            
+            // 하위 아이템이 없거나 모든 재고가 0인 경우 처리
+            if (maxQuantity === Number.NEGATIVE_INFINITY) {
+              maxQuantity = 0;
+            }
+
+            // 상위 그룹으로 항목 추가 (최대 수량 사용)
+            allItems.push({
+              id: maxStockItem?.id || `temp_container_${topContainer.id}`,
+              company_id: companyId,
+              item_type: 'container',
+              item_id: topContainer.id, // 상위 그룹 ID 사용
+              current_quantity: maxQuantity, // 하위 중 최대 수량
+              unit: maxStockItem?.unit || '개',
+              last_updated: maxStockItem?.last_updated || new Date().toISOString(),
+              created_at: maxStockItem?.created_at || new Date().toISOString(),
+              details: {
+                ...topContainer,
+                price: topContainer.price || undefined
+              },
+              name: topContainer.name || '알 수 없음' // 상위 그룹명 사용
+            });
+          } else {
+            // 하위 컨테이너가 없으면 그 자체로 처리
+            const stockItem = stockItems && stockItems.find(item => item.item_id === topContainer.id);
+            
+            allItems.push({
+              id: stockItem?.id || `temp_container_${topContainer.id}`,
+              company_id: companyId,
+              item_type: 'container',
+              item_id: topContainer.id,
+              current_quantity: stockItem?.current_quantity || 0,
+              unit: stockItem?.unit || '개',
+              last_updated: stockItem?.last_updated || new Date().toISOString(),
+              created_at: stockItem?.created_at || new Date().toISOString(),
+              details: {
+                ...topContainer,
+                price: topContainer.price || undefined
+              },
+              name: topContainer.name || '알 수 없음'
+            });
+          }
         }
       }
     }
