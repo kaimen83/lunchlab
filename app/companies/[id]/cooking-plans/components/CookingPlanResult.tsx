@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
 import { CookingPlan, MenuPortion, IngredientRequirement, ExtendedCookingPlan, ContainerRequirement } from '../types';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -114,6 +115,9 @@ interface ContainerInfo {
 export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, onStockReflection, onTabChange, activeTab = 'menu-portions' }: CookingPlanResultProps) {
   // 메뉴 확장 상태 관리
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
+  
+  // 발주량 상태 관리 - 각 식재료의 인덱스를 키로 사용
+  const [orderQuantities, setOrderQuantities] = useState<Record<number, string>>({});
 
   // 메뉴 확장 상태 토글
   const toggleMenuExpand = (menuId: string, containerId: string | null) => {
@@ -121,6 +125,14 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
     setExpandedMenus(prev => ({
       ...prev,
       [key]: !prev[key]
+    }));
+  };
+
+  // 발주량 변경 핸들러
+  const handleOrderQuantityChange = (index: number, value: string) => {
+    setOrderQuantities(prev => ({
+      ...prev,
+      [index]: value
     }));
   };
 
@@ -700,9 +712,13 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                     <TableHead>품목코드</TableHead>
                     <TableHead>식재료 업체</TableHead>
                     <TableHead className="text-right">필요 수량</TableHead>
-                    <TableHead className="text-right">현재 재고량 {formatStockReferenceDate()}</TableHead>
+                    <TableHead className="text-right">
+                      <div>현재 재고량</div>
+                      <div className="text-xs text-gray-500 font-normal">{formatStockReferenceDate()}</div>
+                    </TableHead>
                     <TableHead className="text-right">포장단위</TableHead>
                     <TableHead className="text-right">투입량</TableHead>
+                    <TableHead className="text-center">발주량</TableHead>
                     <TableHead className="text-right">포장당 가격 (원)</TableHead>
                     <TableHead className="text-right">총 원가 (원)</TableHead>
                   </TableRow>
@@ -718,10 +734,16 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                       (item.total_amount / packageAmount).toFixed(1) : 
                       "포장단위 정보 없음";
                     
-                    // 투입량과 포장단위 가격으로 총 원가 직접 계산
+                    // 발주량 가져오기 (초기값은 투입량과 동일)
+                    const orderQuantity = orderQuantities[index] !== undefined 
+                      ? orderQuantities[index] 
+                      : (unitsRequired !== "포장단위 정보 없음" ? unitsRequired : "0");
+                    
+                    // 발주량 기준으로 총 원가 계산
                     let calculatedTotalPrice = item.total_price;
                     if (packageAmount && unitsRequired !== "포장단위 정보 없음") {
-                      calculatedTotalPrice = parseFloat(unitsRequired) * item.unit_price;
+                      const orderQty = parseFloat(orderQuantity) || 0;
+                      calculatedTotalPrice = orderQty * item.unit_price;
                     }
                     
                     return (
@@ -741,6 +763,23 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                         <TableCell className="text-right font-bold">
                           {unitsRequired}
                         </TableCell>
+                        <TableCell className="text-right">
+                          {unitsRequired !== "포장단위 정보 없음" ? (
+                            <div className="flex justify-end">
+                              <Input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                value={orderQuantity}
+                                onChange={(e) => handleOrderQuantityChange(index, e.target.value)}
+                                className="w-20 text-right"
+                                placeholder="0.0"
+                              />
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right">{formatUnitPrice(item.unit_price, item.unit)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(calculatedTotalPrice)}</TableCell>
                       </TableRow>
@@ -755,10 +794,13 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                 * 투입량은 필요 수량을 포장단위로 나눈 값입니다. 포장단위가 없으면 계산할 수 없습니다.
               </p>
               <p className="text-xs text-gray-500">
+                * 발주량은 실제 주문할 수량으로 초기값은 투입량과 동일하며, 사용자가 직접 수정할 수 있습니다.
+              </p>
+              <p className="text-xs text-gray-500">
                 * 포장단위 가격은 식재료 마스터에 등록된 식재료의 포장 단위당 가격입니다.
               </p>
               <p className="text-xs text-gray-500">
-                * 총 원가는 투입량과 포장단위 가격을 곱한 값입니다.
+                * 총 원가는 발주량과 포장단위 가격을 곱한 값입니다.
               </p>
               <p className="text-xs text-gray-500">
                 * 식재료 업체는 식재료 마스터에 등록된 공급업체 정보입니다.
@@ -785,7 +827,10 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                     <TableHead>용기명</TableHead>
                     <TableHead>품목코드</TableHead>
                     <TableHead className="text-right">필요 수량</TableHead>
-                    <TableHead className="text-right">현재 재고량 {formatStockReferenceDate()}</TableHead>
+                    <TableHead className="text-right">
+                      <div>현재 재고량</div>
+                      <div className="text-xs text-gray-500 font-normal">{formatStockReferenceDate()}</div>
+                    </TableHead>
                     <TableHead className="text-right">단가 (원)</TableHead>
                     <TableHead className="text-right">총 비용 (원)</TableHead>
                   </TableRow>
