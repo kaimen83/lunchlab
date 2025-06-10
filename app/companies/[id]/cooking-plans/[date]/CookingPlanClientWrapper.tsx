@@ -381,34 +381,60 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
     return excelData;
   };
 
-  // 엑셀 다운로드 처리
+  // 메뉴 조리지시서 시트 데이터 생성
+  const generateMenuPortionsSheet = () => {
+    const excelData: any[] = [];
+    
+    // 제목 및 기본 정보
+    excelData.push([`메뉴 조리지시서 - ${format(new Date(cookingPlan.date), 'yyyy년 MM월 dd일 (EEEE)', { locale: ko })}`]);
+    excelData.push(['']);
+    
+    // 메뉴 조리지시서 데이터 추가
+    const menuPortionsData = generateMenuPortionsExcel();
+    excelData.push(...menuPortionsData);
+    
+    return excelData;
+  };
+
+  // 발주서 시트 데이터 생성
+  const generateOrderSheet = () => {
+    const excelData: any[] = [];
+    
+    // 제목 및 기본 정보
+    excelData.push([`발주서 - ${format(new Date(cookingPlan.date), 'yyyy년 MM월 dd일 (EEEE)', { locale: ko })}`]);
+    excelData.push(['']);
+    
+    // 발주서 데이터 추가
+    const ingredientsData = generateIngredientsExcel();
+    excelData.push(...ingredientsData);
+    
+    return excelData;
+  };
+
+  // 엑셀 다운로드 처리 - 조리지시서와 발주서를 각각의 시트로 분리
   const handleDownload = () => {
     try {
-      let excelData: any[] = [];
-      let fileName = '';
-      
-      // 현재 활성화된 탭에 따라 다운로드할 데이터 결정
-      if (activeTab === 'menu-portions') {
-        excelData = generateMenuPortionsExcel();
-        fileName = `조리계획서_식단별식수_${cookingPlan.date}.xlsx`;
-      } else {
-        excelData = generateIngredientsExcel();
-        fileName = `조리계획서_필요식재료_${cookingPlan.date}.xlsx`;
-      }
-      
-      // 워크시트 생성
-      const ws = XLSX.utils.aoa_to_sheet(excelData);
+      const fileName = `조리계획서_${cookingPlan.date}.xlsx`;
       
       // 워크북 생성
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+      
+      // 1. 메뉴 조리지시서 시트 생성
+      const menuPortionsData = generateMenuPortionsSheet();
+      const menuWs = XLSX.utils.aoa_to_sheet(menuPortionsData);
+      XLSX.utils.book_append_sheet(wb, menuWs, '메뉴 조리지시서');
+      
+      // 2. 발주서 시트 생성
+      const orderData = generateOrderSheet();
+      const orderWs = XLSX.utils.aoa_to_sheet(orderData);
+      XLSX.utils.book_append_sheet(wb, orderWs, '발주서');
       
       // 엑셀 파일 다운로드
       XLSX.writeFile(wb, fileName);
       
       toast({
         title: '다운로드 완료',
-        description: '조리계획서 파일이 다운로드되었습니다.',
+        description: '조리계획서 파일이 다운로드되었습니다. (메뉴 조리지시서, 발주서 시트 포함)',
       });
     } catch (error) {
       console.error('다운로드 오류:', error);

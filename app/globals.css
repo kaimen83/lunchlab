@@ -85,3 +85,22 @@
     scrollbar-width: none;  /* Firefox */
   }
 }
+
+/* 인쇄용 스타일 */
+@media print {
+  /* 인쇄 시 페이지 여백 설정 */
+  @page {
+    margin: 0.5in;
+  }
+  
+  /* 인쇄 시 배경색 제거 */
+  body {
+    background: white !important;
+  }
+  
+  /* 인쇄 시 색상 강제 적용 */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

@@ -13,15 +13,8 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Search, Calendar as CalendarIcon, X } from "lucide-react";
-import { format } from "date-fns";
-import { ko } from "date-fns/locale";
+import { Input } from "@/components/ui/input";
+import { Search, X } from "lucide-react";
 
 interface StockTransactionsPageProps {
   companyId: string;
@@ -40,8 +33,7 @@ export default function StockTransactionsPage({ companyId }: StockTransactionsPa
   const [filters, setFilters] = useState({
     transactionType: "all",
     stockItemId: "",
-    startDate: "",
-    endDate: "",
+    selectedDate: "",
   });
 
   // 거래 내역 목록 조회
@@ -55,8 +47,7 @@ export default function StockTransactionsPage({ companyId }: StockTransactionsPa
 
       if (filters.transactionType && filters.transactionType !== "all") queryParams.set("transactionType", filters.transactionType);
       if (filters.stockItemId) queryParams.set("stockItemId", filters.stockItemId);
-      if (filters.startDate) queryParams.set("startDate", filters.startDate);
-      if (filters.endDate) queryParams.set("endDate", filters.endDate);
+      if (filters.selectedDate) queryParams.set("selectedDate", filters.selectedDate);
 
       const response = await fetch(
         `/api/companies/${companyId}/stock/transactions?${queryParams.toString()}`
@@ -87,15 +78,10 @@ export default function StockTransactionsPage({ companyId }: StockTransactionsPa
     setPagination((prev) => ({ ...prev, page: 1 })); // 필터 변경 시 1페이지로 이동
   };
 
-  // 날짜 필터 변경 핸들러
-  const handleDateChange = (name: string, date: Date | undefined) => {
-    if (!date) {
-      handleFilterChange(name, "");
-      return;
-    }
-    
-    const formattedDate = date.toISOString().split("T")[0];
-    handleFilterChange(name, formattedDate);
+  // 날짜 필터 변경 핸들러 - HTML5 date input 사용
+  const handleDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedDate = event.target.value; // YYYY-MM-DD 형식으로 자동 반환
+    handleFilterChange("selectedDate", selectedDate);
   };
 
   // 필터 초기화 핸들러
@@ -103,8 +89,7 @@ export default function StockTransactionsPage({ companyId }: StockTransactionsPa
     setFilters({
       transactionType: "all",
       stockItemId: "",
-      startDate: "",
-      endDate: "",
+      selectedDate: "",
     });
   };
 
@@ -121,7 +106,7 @@ export default function StockTransactionsPage({ companyId }: StockTransactionsPa
   return (
     <div className="space-y-4">
       <Card className="p-4">
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="transactionType">거래 유형</Label>
             <Select
@@ -142,59 +127,15 @@ export default function StockTransactionsPage({ companyId }: StockTransactionsPa
           </div>
 
           <div className="space-y-2">
-            <Label>시작일</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-left font-normal"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {filters.startDate ? (
-                    format(new Date(filters.startDate), "PPP", { locale: ko })
-                  ) : (
-                    <span>시작일 선택</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  locale={ko}
-                  selected={filters.startDate ? new Date(filters.startDate) : undefined}
-                  onSelect={(date) => handleDateChange("startDate", date)}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <div className="space-y-2">
-            <Label>종료일</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-left font-normal"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {filters.endDate ? (
-                    format(new Date(filters.endDate), "PPP", { locale: ko })
-                  ) : (
-                    <span>종료일 선택</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  locale={ko}
-                  selected={filters.endDate ? new Date(filters.endDate) : undefined}
-                  onSelect={(date) => handleDateChange("endDate", date)}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+            <Label htmlFor="selectedDate">거래 날짜</Label>
+            <Input
+              id="selectedDate"
+              type="date"
+              value={filters.selectedDate}
+              onChange={handleDateChange}
+              className="w-full"
+              placeholder="날짜를 선택하세요"
+            />
           </div>
 
           <div className="flex items-end space-x-2">

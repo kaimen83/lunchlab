@@ -47,8 +47,7 @@ export async function GET(
     const searchParams = request.nextUrl.searchParams;
     const stockItemId = searchParams.get('stockItemId');
     const transactionType = searchParams.get('transactionType');
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
+    const selectedDate = searchParams.get('selectedDate'); // startDate, endDate 대신 selectedDate 사용
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = parseInt(searchParams.get('pageSize') || '20');
 
@@ -90,12 +89,11 @@ export async function GET(
       query = query.eq('transaction_type', transactionType);
     }
 
-    if (startDate) {
-      query = query.gte('transaction_date', startDate);
-    }
-
-    if (endDate) {
-      query = query.lte('transaction_date', endDate);
+    // 특정 날짜의 거래내역만 조회 (해당 날짜 00:00:00 ~ 23:59:59)
+    if (selectedDate) {
+      const startOfDay = `${selectedDate}T00:00:00.000Z`;
+      const endOfDay = `${selectedDate}T23:59:59.999Z`;
+      query = query.gte('transaction_date', startOfDay).lte('transaction_date', endOfDay);
     }
 
     // 정렬 적용

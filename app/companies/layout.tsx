@@ -24,21 +24,21 @@ export default async function CompaniesLayout({
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden">
-      {/* 모바일용 사이드바 - 모바일에서만 표시 */}
-      <div className="md:hidden w-full bg-[#19171D] flex-shrink-0">
+      {/* 모바일용 사이드바 - 모바일에서만 표시, 인쇄 시 숨김 */}
+      <div className="md:hidden w-full bg-[#19171D] flex-shrink-0 print:hidden">
         <CompanySidebar 
           companies={companies}
           isMobile={true}
         />
       </div>
       
-      {/* 데스크톱용 사이드바 - 태블릿/데스크톱에서만 표시 */}
-      <div className="hidden md:block w-60 bg-[#19171D] border-r border-gray-700 flex-shrink-0 overflow-y-auto">
+      {/* 데스크톱용 사이드바 - 태블릿/데스크톱에서만 표시, 인쇄 시 숨김 */}
+      <div className="hidden md:block w-60 bg-[#19171D] border-r border-gray-700 flex-shrink-0 overflow-y-auto print:hidden">
         <CompanySidebar companies={companies} />
       </div>
       
-      {/* 오른쪽 콘텐츠 영역 */}
-      <div className="flex-1 overflow-y-auto bg-white">
+      {/* 오른쪽 콘텐츠 영역 - 인쇄 시 전체 너비 사용 */}
+      <div className="flex-1 overflow-y-auto bg-white print:w-full">
         {children}
       </div>
     </div>

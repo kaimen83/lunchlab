@@ -279,8 +279,8 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
     
     return (
       <div className="flex flex-col h-full w-full bg-gray-50">
-        {/* 페이지 헤더 */}
-        <header className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+        {/* 페이지 헤더 - 인쇄 시 숨김 */}
+        <header className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm print:hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center space-x-3">
@@ -300,10 +300,10 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
           </div>
         </header>
         
-        {/* 페이지 콘텐츠 */}
-        <main className="flex-1 overflow-y-auto py-6">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-white rounded-lg shadow p-6">
+        {/* 페이지 콘텐츠 - 인쇄 시 최적화 */}
+        <main className="flex-1 overflow-y-auto py-6 print:py-0">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 print:px-0 print:max-w-none">
+            <div className="bg-white rounded-lg shadow p-6 print:shadow-none print:rounded-none print:p-4">
               <CookingPlanClientWrapper cookingPlan={cookingPlan} />
             </div>
           </div>

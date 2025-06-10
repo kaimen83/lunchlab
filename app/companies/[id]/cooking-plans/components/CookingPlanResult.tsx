@@ -471,10 +471,6 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
           </p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" size="sm" onClick={onPrint}>
-            <Printer className="h-4 w-4 mr-1" />
-            인쇄
-          </Button>
           <Button variant="outline" size="sm" onClick={onDownload}>
             <Download className="h-4 w-4 mr-1" />
             다운로드
