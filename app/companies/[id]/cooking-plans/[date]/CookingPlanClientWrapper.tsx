@@ -344,16 +344,25 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
   const generateIngredientsExcel = () => {
     const excelData: any[] = [];
     
-    // 총 원가 계산
-    const totalIngredientsCost = cookingPlan.ingredient_requirements.reduce(
-      (sum, item) => sum + item.total_price, 0
-    );
+    // 총 원가 계산 - 투입량과 포장단위 가격 기준
+    const totalIngredientsCost = cookingPlan.ingredient_requirements.reduce((sum, item) => {
+      // 포장단위가 없는 경우 원가 계산 불가
+      if (!item.package_amount || item.package_amount <= 0) return sum;
+      
+      // 투입량 계산
+      const unitsRequired = item.total_amount / item.package_amount;
+      
+      // 투입량과 포장단위 가격으로 총 원가 계산
+      const itemTotalPrice = unitsRequired * item.unit_price;
+      
+      return sum + itemTotalPrice;
+    }, 0);
     
     // 헤더 행 추가
     excelData.push(['식재료 목록']);
     excelData.push([`총 ${cookingPlan.ingredient_requirements.length}개 품목 / 예상 원가: ${formatCurrency(totalIngredientsCost)}`]);
     excelData.push(['']);
-    excelData.push(['식재료명', '품목코드', '필요 수량', '포장단위', '투입량', '단가', '총 원가']);
+    excelData.push(['식재료명', '품목코드', '필요 수량', '포장단위', '투입량', '발주량', '단가', '총 원가']);
     
     // 식재료 데이터 추가
     cookingPlan.ingredient_requirements.forEach(item => {
@@ -365,14 +374,25 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
         (item.total_amount / packageAmount).toFixed(1) : 
         "-";
       
+      // 발주량 (저장된 발주량이 있으면 우선, 없으면 투입량과 동일)
+      const orderQuantity = item.order_quantity !== undefined 
+        ? item.order_quantity.toString() 
+        : unitsRequired;
+        
+      // 투입량 기준 총 원가 계산
+      const calculatedTotalPrice = packageAmount && unitsRequired !== "-" 
+        ? parseFloat(unitsRequired) * item.unit_price 
+        : 0;
+      
       excelData.push([
         item.ingredient_name,
         item.code_name || "-",
         `${formatAmount(item.total_amount)} ${item.unit}`,
         packageAmount ? `${packageAmount} ${item.unit}` : "-",
         unitsRequired,
+        orderQuantity,
         formatUnitPrice(item.unit_price, item.unit),
-        formatCurrency(item.total_price)
+        formatCurrency(calculatedTotalPrice)
       ]);
     });
     
@@ -405,6 +425,8 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
     excelData.push(['']);
     excelData.push(['* 포장단위는 식재료 마스터에 등록된 정보입니다. 정보가 없는 경우 "-"로 표시됩니다.']);
     excelData.push(['* 투입량은 필요 수량을 포장단위로 나눈 값입니다. 포장단위가 없으면 계산할 수 없습니다.']);
+    excelData.push(['* 발주량은 실제 주문할 수량으로 초기값은 투입량과 동일하며, 사용자가 직접 수정할 수 있습니다.']);
+    excelData.push(['* 총 원가는 투입량과 포장단위 가격을 곱한 값입니다.']);
     excelData.push(['* 용기 단가는 용기 마스터에 등록된 정보입니다. 가격 정보가 없는 경우 "-"로 표시됩니다.']);
     excelData.push(['* 필요 수량은 해당 날짜의 조리계획에서 각 용기가 필요한 총 수량입니다.']);
     

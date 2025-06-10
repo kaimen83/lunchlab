@@ -817,11 +817,11 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                       ? orderQuantities[index] 
                       : (unitsRequired !== "포장단위 정보 없음" ? unitsRequired : "0");
                     
-                    // 발주량 기준으로 총 원가 계산
+                    // 투입량 기준으로 총 원가 계산
                     let calculatedTotalPrice = item.total_price;
                     if (packageAmount && unitsRequired !== "포장단위 정보 없음") {
-                      const orderQty = parseFloat(orderQuantity) || 0;
-                      calculatedTotalPrice = orderQty * item.unit_price;
+                      const inputQty = parseFloat(unitsRequired) || 0;
+                      calculatedTotalPrice = inputQty * item.unit_price;
                     }
                     
                     return (
