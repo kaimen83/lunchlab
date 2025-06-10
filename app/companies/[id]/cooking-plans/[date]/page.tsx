@@ -268,13 +268,58 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
       }
     });
     
+    // 4. 재고 정보 조회 및 매칭
+    const stockReferenceDate = new Date().toISOString();
+    
+    // 식재료 재고 정보 조회
+    if (ingredientIds.length > 0) {
+      const { data: ingredientStocks, error: ingredientStockError } = await supabase
+        .from('stock_items')
+        .select('item_id, current_quantity, unit, last_updated')
+        .eq('company_id', companyId)
+        .eq('item_type', 'ingredient')
+        .in('item_id', ingredientIds);
+      
+      if (!ingredientStockError && ingredientStocks) {
+        // 식재료 요구사항에 재고 정보 추가
+        for (const stock of ingredientStocks) {
+          if (ingredientRequirements[stock.item_id]) {
+            ingredientRequirements[stock.item_id].current_stock = stock.current_quantity;
+            ingredientRequirements[stock.item_id].stock_updated_at = stock.last_updated;
+          }
+        }
+      }
+    }
+    
+    // 용기 재고 정보 조회를 위한 용기 ID 수집
+    const containerIds = [...new Set(menuPortions
+      .filter(portion => portion.container_id)
+      .map(portion => portion.container_id!)
+    )];
+    
+    // 용기 재고 정보 조회 (나중에 용기 요구사항에 추가할 예정)
+    let containerStocks: any[] = [];
+    if (containerIds.length > 0) {
+      const { data: containerStockData, error: containerStockError } = await supabase
+        .from('stock_items')
+        .select('item_id, current_quantity, unit, last_updated')
+        .eq('company_id', companyId)
+        .eq('item_type', 'container')
+        .in('item_id', containerIds);
+      
+      if (!containerStockError && containerStockData) {
+        containerStocks = containerStockData;
+      }
+    }
+    
     // 결과 데이터 구성
     const cookingPlan: CookingPlan = {
       date,
       meal_portions: mealPortions,
       meal_plans: mealPlans,
       menu_portions: menuPortions,
-      ingredient_requirements: Object.values(ingredientRequirements)
+      ingredient_requirements: Object.values(ingredientRequirements),
+      stock_reference_date: stockReferenceDate
     };
     
     return (
@@ -304,7 +349,7 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
         <main className="flex-1 overflow-y-auto py-6 print:py-0">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 print:px-0 print:max-w-none">
             <div className="bg-white rounded-lg shadow p-6 print:shadow-none print:rounded-none print:p-4">
-              <CookingPlanClientWrapper cookingPlan={cookingPlan} />
+              <CookingPlanClientWrapper cookingPlan={cookingPlan} containerStocks={containerStocks} companyId={companyId} />
             </div>
           </div>
         </main>

@@ -11,6 +11,8 @@ import * as XLSX from 'xlsx';
 
 interface CookingPlanClientWrapperProps {
   cookingPlan: CookingPlan;
+  containerStocks?: any[];
+  companyId: string;
 }
 
 // 메뉴 인터페이스 추가
@@ -57,7 +59,7 @@ interface Container {
   price?: number;
 }
 
-export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanClientWrapperProps) {
+export default function CookingPlanClientWrapper({ cookingPlan, containerStocks = [], companyId }: CookingPlanClientWrapperProps) {
   const { toast } = useToast();
   // 현재 활성화된 탭 상태 관리
   const [activeTab, setActiveTab] = useState<'menu-portions' | 'ingredients'>('menu-portions');
@@ -68,12 +70,7 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
   // 재고반영 모달 상태 추가
   const [isStockModalOpen, setIsStockModalOpen] = useState<boolean>(false);
   
-  // URL에서 회사 ID 추출하는 함수
-  const getCompanyId = useCallback(() => {
-    const pathParts = window.location.pathname.split('/');
-    const companyIdIndex = pathParts.findIndex(part => part === 'companies') + 1;
-    return pathParts[companyIdIndex];
-  }, []);
+  // 회사 ID는 props로 전달받으므로 더 이상 URL에서 추출할 필요 없음
 
   // 재고반영 핸들러
   const handleStockReflection = useCallback(() => {
@@ -93,12 +90,7 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
   useEffect(() => {
     const fetchContainers = async () => {
       setIsLoading(true);
-      try {
-        // URL에서 회사 ID 추출
-        const pathParts = window.location.pathname.split('/');
-        const companyIdIndex = pathParts.findIndex(part => part === 'companies') + 1;
-        const companyId = pathParts[companyIdIndex];
-        
+      try {        
         if (!companyId) {
           console.error('회사 ID를 찾을 수 없습니다.');
           return;
@@ -126,7 +118,7 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
     };
     
     fetchContainers();
-  }, [toast]);
+  }, [toast, companyId]);
   
   // 용기별 필요 수량 계산 함수
   const calculateContainerRequirements = (menuPortions: typeof cookingPlan.menu_portions): ContainerRequirement[] => {
@@ -181,6 +173,15 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
           if (container.price) {
             container.total_price = container.price * container.needed_quantity;
           }
+          
+          // 재고 정보가 없다면 추가 (이미 있는 경우는 유지)
+          if (container.current_stock === undefined) {
+            const containerStock = containerStocks.find(stock => stock.item_id === containerId);
+            if (containerStock) {
+              container.current_stock = containerStock.current_quantity;
+              container.stock_updated_at = containerStock.last_updated;
+            }
+          }
         } else {
           // 용기 가격 정보 가져오기
           let containerPrice: number | undefined = undefined;
@@ -202,6 +203,9 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
           // 용기 코드명 찾기
           const codeName = findContainerCodeName(containerId);
           
+          // 용기 재고 정보 찾기
+          const containerStock = containerStocks.find(stock => stock.item_id === containerId);
+          
           // 용기 정보 저장
           containerMap.set(containerId, {
             container_id: containerId,
@@ -209,7 +213,9 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
             code_name: codeName,
             needed_quantity: mealPlan.headcount,
             price: containerPrice,
-            total_price: containerPrice ? containerPrice * mealPlan.headcount : 0
+            total_price: containerPrice ? containerPrice * mealPlan.headcount : 0,
+            current_stock: containerStock?.current_quantity,
+            stock_updated_at: containerStock?.last_updated
           });
         }
       });
@@ -719,7 +725,7 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
       <CookingPlanImportModal
         open={isStockModalOpen}
         onOpenChange={setIsStockModalOpen}
-        companyId={getCompanyId()}
+        companyId={companyId}
         onImportComplete={handleStockReflectionComplete}
         initialDate={cookingPlan.date}
       />

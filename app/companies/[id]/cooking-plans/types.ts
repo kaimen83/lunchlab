@@ -32,6 +32,8 @@ export interface IngredientRequirement {
   package_amount?: number;
   code_name?: string;
   supplier?: string;
+  current_stock?: number;
+  stock_updated_at?: string;
 }
 
 // 용기별 필요량 계산 결과
@@ -42,6 +44,8 @@ export interface ContainerRequirement {
   needed_quantity: number; // 필요한 용기 수량
   price?: number; // 용기 단가
   total_price: number; // 총 비용
+  current_stock?: number;
+  stock_updated_at?: string;
 }
 
 // 조리계획서 전체 타입
@@ -51,6 +55,7 @@ export interface CookingPlan {
   meal_plans: MealPlan[];
   menu_portions: MenuPortion[];
   ingredient_requirements: IngredientRequirement[];
+  stock_reference_date?: string;
 }
 
 // 확장된 조리계획서 타입 (용기 요구사항 포함)

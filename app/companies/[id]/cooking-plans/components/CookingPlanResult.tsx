@@ -458,6 +458,36 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
     return containersInfo.map(info => `${info.name}: ${info.headcount}명`).join(', ');
   };
 
+  // 재고 기준 날짜 포맷팅 함수
+  const formatStockReferenceDate = () => {
+    if (!cookingPlan.stock_reference_date) return '';
+    
+    const date = new Date(cookingPlan.stock_reference_date);
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    return `(${month}/${day} 기준)`;
+  };
+
+  // 재고량 포맷팅 함수 (식재료용 - kg 단위로 변환하여 소수점 첫째자리까지)
+  const formatIngredientStockQuantity = (quantity: number | undefined, unit: string) => {
+    if (quantity === undefined || quantity === null) return '-';
+    
+    // g 단위인 경우 kg로 변환
+    if (unit === 'g') {
+      const kgQuantity = quantity / 1000;
+      return `${kgQuantity.toFixed(1)} kg`;
+    }
+    
+    // 기타 단위는 그대로 표시
+    return `${quantity.toFixed(1)} ${unit}`;
+  };
+
+  // 재고량 포맷팅 함수 (용기용 - 정수 부분만)
+  const formatContainerStockQuantity = (quantity: number | undefined, unit: string) => {
+    if (quantity === undefined || quantity === null) return '-';
+    return `${Math.floor(quantity)} ${unit}`;
+  };
+
   return (
     <div className="space-y-6">
       {/* 헤더 */}
@@ -670,6 +700,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                     <TableHead>품목코드</TableHead>
                     <TableHead>식재료 업체</TableHead>
                     <TableHead className="text-right">필요 수량</TableHead>
+                    <TableHead className="text-right">현재 재고량 {formatStockReferenceDate()}</TableHead>
                     <TableHead className="text-right">포장단위</TableHead>
                     <TableHead className="text-right">투입량</TableHead>
                     <TableHead className="text-right">포장당 가격 (원)</TableHead>
@@ -702,6 +733,9 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                           {formatIngredientAmount(item.total_amount, item.unit)}
                         </TableCell>
                         <TableCell className="text-right">
+                          {formatIngredientStockQuantity(item.current_stock, item.unit)}
+                        </TableCell>
+                        <TableCell className="text-right">
                           {formatPackageAmount(packageAmount, item.unit)}
                         </TableCell>
                         <TableCell className="text-right font-bold">
@@ -729,6 +763,9 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
               <p className="text-xs text-gray-500">
                 * 식재료 업체는 식재료 마스터에 등록된 공급업체 정보입니다.
               </p>
+              <p className="text-xs text-gray-500">
+                * 현재 재고량은 조회 시점의 재고 정보입니다. 재고 정보가 없는 경우 "-"로 표시됩니다.
+              </p>
             </CardContent>
           </Card>
           
@@ -748,6 +785,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                     <TableHead>용기명</TableHead>
                     <TableHead>품목코드</TableHead>
                     <TableHead className="text-right">필요 수량</TableHead>
+                    <TableHead className="text-right">현재 재고량 {formatStockReferenceDate()}</TableHead>
                     <TableHead className="text-right">단가 (원)</TableHead>
                     <TableHead className="text-right">총 비용 (원)</TableHead>
                   </TableRow>
@@ -762,6 +800,9 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                           {item.needed_quantity}개
                         </TableCell>
                         <TableCell className="text-right">
+                          {formatContainerStockQuantity(item.current_stock, '개')}
+                        </TableCell>
+                        <TableCell className="text-right">
                           {item.price ? formatCurrency(item.price) : "-"}
                         </TableCell>
                         <TableCell className="text-right">{formatCurrency(item.total_price)}</TableCell>
@@ -769,7 +810,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                         등록된 용기가 없습니다.
                       </TableCell>
                     </TableRow>
@@ -781,6 +822,9 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
               </p>
               <p className="text-xs text-gray-500">
                 * 필요 수량은 해당 날짜의 조리계획에서 각 용기가 필요한 총 수량입니다.
+              </p>
+              <p className="text-xs text-gray-500">
+                * 현재 재고량은 조회 시점의 재고 정보입니다. 재고 정보가 없는 경우 "-"로 표시됩니다.
               </p>
             </CardContent>
           </Card>
