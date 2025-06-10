@@ -10,8 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { CookingPlan, MenuPortion, IngredientRequirement, ExtendedCookingPlan, ContainerRequirement } from '../types';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { useParams } from 'next/navigation';
 
 // 확장된 식재료 요구사항 타입 정의 - 외부에서 import하는 IngredientRequirement 사용
 interface ExtendedIngredientRequirement extends IngredientRequirement {}
@@ -113,11 +114,18 @@ interface ContainerInfo {
 }
 
 export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, onStockReflection, onTabChange, activeTab = 'menu-portions' }: CookingPlanResultProps) {
+  const params = useParams();
+  const companyId = params.id as string;
+  const date = cookingPlan.date;
+  
   // 메뉴 확장 상태 관리
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
   
   // 발주량 상태 관리 - 각 식재료의 인덱스를 키로 사용
   const [orderQuantities, setOrderQuantities] = useState<Record<number, string>>({});
+  
+  // 발주량 변경 사항 추적
+  const [pendingChanges, setPendingChanges] = useState<Record<string, number>>({});
 
   // 메뉴 확장 상태 토글
   const toggleMenuExpand = (menuId: string, containerId: string | null) => {
@@ -128,13 +136,83 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
     }));
   };
 
+  // 발주량 초기값 설정 (저장된 발주량 우선, 없으면 투입량 사용)
+  useEffect(() => {
+    const initialOrderQuantities: Record<number, string> = {};
+    
+    cookingPlan.ingredient_requirements.forEach((item, index) => {
+      const packageAmount = item.package_amount;
+      
+      // 투입량 계산
+      const unitsRequired = packageAmount ? 
+        (item.total_amount / packageAmount).toFixed(1) : 
+        "0";
+      
+      // 저장된 발주량이 있으면 우선 사용, 없으면 투입량 사용
+      if (item.order_quantity !== undefined) {
+        initialOrderQuantities[index] = item.order_quantity.toString();
+      } else if (unitsRequired !== "포장단위 정보 없음") {
+        initialOrderQuantities[index] = unitsRequired;
+      } else {
+        initialOrderQuantities[index] = "0";
+      }
+    });
+    
+    setOrderQuantities(initialOrderQuantities);
+  }, [cookingPlan.ingredient_requirements]);
+
+  // 발주량 저장 함수 (debounced)
+  const saveOrderQuantities = useCallback(async (changes: Record<string, number>) => {
+    try {
+      const orderQuantitiesToSave = Object.entries(changes).map(([ingredientId, orderQuantity]) => ({
+        ingredient_id: ingredientId,
+        order_quantity: orderQuantity
+      }));
+
+      const response = await fetch(`/api/companies/${companyId}/cooking-plans/${date}/order-quantities`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          order_quantities: orderQuantitiesToSave
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('발주량 저장 실패:', await response.text());
+      }
+    } catch (error) {
+      console.error('발주량 저장 중 오류:', error);
+    }
+  }, [companyId, date]);
+
   // 발주량 변경 핸들러
-  const handleOrderQuantityChange = (index: number, value: string) => {
+  const handleOrderQuantityChange = (index: number, value: string, ingredientId: string) => {
     setOrderQuantities(prev => ({
       ...prev,
       [index]: value
     }));
+
+    // 변경 사항을 pendingChanges에 추가
+    const numericValue = parseFloat(value) || 0;
+    setPendingChanges(prev => ({
+      ...prev,
+      [ingredientId]: numericValue
+    }));
   };
+
+  // 발주량 변경 시 자동 저장 (debounce 적용)
+  useEffect(() => {
+    if (Object.keys(pendingChanges).length === 0) return;
+
+    const timeoutId = setTimeout(() => {
+      saveOrderQuantities(pendingChanges);
+      setPendingChanges({});
+    }, 1000); // 1초 후 저장
+
+    return () => clearTimeout(timeoutId);
+  }, [pendingChanges, saveOrderQuantities]);
 
   // 식사 시간별로 그룹화
   const menusByMealTime = cookingPlan.menu_portions.reduce((acc, menu) => {
@@ -771,7 +849,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                                 step="0.1"
                                 min="0"
                                 value={orderQuantity}
-                                onChange={(e) => handleOrderQuantityChange(index, e.target.value)}
+                                onChange={(e) => handleOrderQuantityChange(index, e.target.value, item.ingredient_id)}
                                 className="w-20 text-right"
                                 placeholder="0.0"
                               />
@@ -794,7 +872,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                 * 투입량은 필요 수량을 포장단위로 나눈 값입니다. 포장단위가 없으면 계산할 수 없습니다.
               </p>
               <p className="text-xs text-gray-500">
-                * 발주량은 실제 주문할 수량으로 초기값은 투입량과 동일하며, 사용자가 직접 수정할 수 있습니다.
+                * 발주량은 실제 주문할 수량으로 초기값은 투입량과 동일하며, 사용자가 직접 수정할 수 있습니다. 변경 시 자동으로 저장됩니다.
               </p>
               <p className="text-xs text-gray-500">
                 * 포장단위 가격은 식재료 마스터에 등록된 식재료의 포장 단위당 가격입니다.

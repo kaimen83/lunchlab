@@ -312,6 +312,25 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
       }
     }
     
+    // 5. 발주량 정보 조회 및 추가
+    if (ingredientIds.length > 0) {
+      const { data: orderQuantities, error: orderQuantitiesError } = await supabase
+        .from('order_quantities')
+        .select('ingredient_id, order_quantity')
+        .eq('company_id', companyId)
+        .eq('date', date)
+        .in('ingredient_id', ingredientIds);
+      
+      if (!orderQuantitiesError && orderQuantities) {
+        // 식재료 요구사항에 발주량 정보 추가
+        for (const orderQty of orderQuantities) {
+          if (ingredientRequirements[orderQty.ingredient_id]) {
+            ingredientRequirements[orderQty.ingredient_id].order_quantity = orderQty.order_quantity;
+          }
+        }
+      }
+    }
+    
     // 결과 데이터 구성
     const cookingPlan: CookingPlan = {
       date,

@@ -34,6 +34,7 @@ export interface IngredientRequirement {
   supplier?: string;
   current_stock?: number;
   stock_updated_at?: string;
+  order_quantity?: number; // 저장된 발주량
 }
 
 // 용기별 필요량 계산 결과
