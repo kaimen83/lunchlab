@@ -400,18 +400,50 @@ export async function POST(
     let { 
       stockItemIds, 
       quantities, 
+      transactionItems,
+      stockAdjustments,
       requestType, 
       notes = '', 
       referenceId = null, 
-      referenceType = null 
+      referenceType = null,
+      isGroupedTransaction = false
     } = requestData;
 
-    // 요청 유효성 검사
-    if (!stockItemIds || !quantities || !requestType || !Array.isArray(stockItemIds) || !Array.isArray(quantities)) {
-      return NextResponse.json(
-        { error: '필수 필드가 누락되었거나 형식이 올바르지 않습니다.' },
-        { status: 400 }
-      );
+    // 새로운 그룹화된 거래 형식 지원
+    if (isGroupedTransaction && transactionItems && stockAdjustments) {
+      // 새로운 형식: 개별 거래 기록과 실제 재고 차감 분리
+      if (!Array.isArray(transactionItems) || !Array.isArray(stockAdjustments)) {
+        return NextResponse.json(
+          { error: '그룹화된 거래 데이터 형식이 올바르지 않습니다.' },
+          { status: 400 }
+        );
+      }
+    } else {
+      // 기존 형식: 호환성 유지
+      if (!stockItemIds || !quantities || !requestType || !Array.isArray(stockItemIds) || !Array.isArray(quantities)) {
+        return NextResponse.json(
+          { error: '필수 필드가 누락되었거나 형식이 올바르지 않습니다.' },
+          { status: 400 }
+        );
+      }
+
+      if (stockItemIds.length !== quantities.length) {
+        return NextResponse.json(
+          { error: '항목 ID와 수량의 개수가 일치하지 않습니다.' },
+          { status: 400 }
+        );
+      }
+
+      // 기존 형식을 새로운 형식으로 변환
+      transactionItems = stockItemIds.map((id: string, index: number) => ({
+        stockItemId: id,
+        quantity: quantities[index],
+        itemName: `항목 ${index + 1}`
+      }));
+      stockAdjustments = stockItemIds.map((id: string, index: number) => ({
+        stockItemId: id,
+        quantity: quantities[index]
+      }));
     }
 
     if (!['incoming', 'outgoing', 'disposal'].includes(requestType)) {
@@ -421,16 +453,23 @@ export async function POST(
       );
     }
 
-    if (stockItemIds.length !== quantities.length) {
-      return NextResponse.json(
-        { error: '항목 ID와 수량의 개수가 일치하지 않습니다.' },
-        { status: 400 }
-      );
-    }
-
-    // 임시 ID 처리
+    // 임시 ID 처리 (거래 기록용과 재고 차감용 모두)
     try {
-      stockItemIds = await processTemporaryIds(supabase, stockItemIds, companyId, userId);
+      const transactionStockItemIds = transactionItems.map((item: any) => item.stockItemId);
+      const adjustmentStockItemIds = stockAdjustments.map((item: any) => item.stockItemId);
+      
+      const processedTransactionIds = await processTemporaryIds(supabase, transactionStockItemIds, companyId, userId);
+      const processedAdjustmentIds = await processTemporaryIds(supabase, adjustmentStockItemIds, companyId, userId);
+      
+      // 처리된 ID로 업데이트
+      transactionItems = transactionItems.map((item: any, index: number) => ({
+        ...item,
+        stockItemId: processedTransactionIds[index]
+      }));
+      stockAdjustments = stockAdjustments.map((item: any, index: number) => ({
+        ...item,
+        stockItemId: processedAdjustmentIds[index]
+      }));
     } catch (error: any) {
       return NextResponse.json(
         { error: `임시 재고 항목 처리 중 오류가 발생했습니다: ${error.message}` },
@@ -439,10 +478,15 @@ export async function POST(
     }
 
     // 모든 항목이 이 회사의 소유인지 확인
+    const allStockItemIds = [...new Set([
+      ...transactionItems.map((item: any) => item.stockItemId),
+      ...stockAdjustments.map((item: any) => item.stockItemId)
+    ])];
+
     const { data: stockItems, error: stockItemsError } = await supabase
       .from('stock_items')
       .select('id, company_id')
-      .in('id', stockItemIds);
+      .in('id', allStockItemIds);
 
     if (stockItemsError) {
       console.error('재고 항목 조회 오류:', stockItemsError);
@@ -466,69 +510,85 @@ export async function POST(
     // 트랜잭션 시작
     if (isAdminOrOwner && requestData.directProcess === true) {
       // 관리자/소유자가 직접 처리하는 경우
-      const transactionPromises = stockItemIds.map(async (stockItemId: string, index: number) => {
-        const quantity = quantities[index];
-        
-        // 거래 내역 생성
+      
+      // 1. 모든 개별 거래 내역 생성 (transactionItems 기준)
+      const transactionPromises = transactionItems.map(async (item: any) => {
         const { data: transaction, error: transactionError } = await supabase
           .from('stock_transactions')
           .insert({
-            stock_item_id: stockItemId,
+            stock_item_id: item.stockItemId,
             transaction_type: requestType,
-            quantity,
+            quantity: item.quantity,
             transaction_date: new Date().toISOString(),
             user_id: userId,
             reference_id: referenceId,
             reference_type: referenceType,
-            notes
+            notes: isGroupedTransaction ? 
+              `${notes} - ${item.itemName}` : 
+              notes
           })
           .select()
           .single();
 
         if (transactionError) {
-          throw new Error(`거래 내역 생성 오류: ${transactionError.message}`);
+          throw new Error(`거래 내역 생성 오류 (${item.itemName}): ${transactionError.message}`);
         }
 
-        // 재고 수량 업데이트
+        return transaction;
+      });
+
+      // 2. 실제 재고 수량 업데이트 (stockAdjustments 기준)
+      const stockUpdatePromises = stockAdjustments.map(async (adjustment: any) => {
+        // 현재 재고 수량 조회
         const { data: stockItem } = await supabase
           .from('stock_items')
           .select('current_quantity')
-          .eq('id', stockItemId)
+          .eq('id', adjustment.stockItemId)
           .single();
         
-        let newQuantity;
-        
         if (!stockItem) {
-          throw new Error(`재고 항목을 찾을 수 없습니다: ${stockItemId}`);
+          throw new Error(`재고 항목을 찾을 수 없습니다: ${adjustment.stockItemId}`);
         }
         
+        let newQuantity;
         if (requestType === 'incoming') {
-          newQuantity = Number(stockItem.current_quantity) + Number(quantity);
+          newQuantity = Number(stockItem.current_quantity) + Number(adjustment.quantity);
         } else if (requestType === 'outgoing' || requestType === 'disposal') {
-          newQuantity = Number(stockItem.current_quantity) - Number(quantity);
+          newQuantity = Number(stockItem.current_quantity) - Number(adjustment.quantity);
         }
 
+        // 재고 수량 업데이트
         const { error: updateError } = await supabase
           .from('stock_items')
           .update({ 
             current_quantity: newQuantity,
             last_updated: new Date().toISOString()
           })
-          .eq('id', stockItemId);
+          .eq('id', adjustment.stockItemId);
 
         if (updateError) {
           throw new Error(`재고 수량 업데이트 오류: ${updateError.message}`);
         }
 
-        return transaction;
+        return { stockItemId: adjustment.stockItemId, oldQuantity: stockItem.current_quantity, newQuantity };
       });
 
       try {
-        const transactions = await Promise.all(transactionPromises);
+        // 모든 작업을 병렬로 실행
+        const [transactions, stockUpdates] = await Promise.all([
+          Promise.all(transactionPromises),
+          Promise.all(stockUpdatePromises)
+        ]);
+
+        const message = isGroupedTransaction ? 
+          `${transactions.length}개 거래 기록, ${stockUpdates.length}개 재고 항목 업데이트 (그룹별 최적화 적용)` :
+          '거래가 성공적으로 처리되었습니다.';
+
         return NextResponse.json({
           success: true,
-          message: '거래가 성공적으로 처리되었습니다.',
-          transactions
+          message,
+          transactions,
+          stockUpdates: isGroupedTransaction ? stockUpdates : undefined
         });
       } catch (err: any) {
         console.error('거래 처리 오류:', err);
@@ -560,12 +620,12 @@ export async function POST(
         );
       }
 
-      // 승인 요청 항목 생성
-      const approvalItems = stockItemIds.map((stockItemId: string, index: number) => ({
+      // 승인 요청 항목 생성 (개별 거래 기록 기준)
+      const approvalItems = transactionItems.map((item: any) => ({
         approval_request_id: approvalRequest.id,
-        stock_item_id: stockItemId,
-        quantity: quantities[index],
-        notes: notes
+        stock_item_id: item.stockItemId,
+        quantity: item.quantity,
+        notes: isGroupedTransaction ? `${notes} - ${item.itemName}` : notes
       }));
 
       const { error: approvalItemsError } = await supabase

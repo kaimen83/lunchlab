@@ -205,7 +205,8 @@ export function CookingPlanImportModal({
       if (addItemType === 'ingredient') {
         endpoint = `/api/companies/${companyId}/ingredients?search=${encodeURIComponent(searchQuery)}&limit=20`;
       } else {
-        endpoint = `/api/companies/${companyId}/stock/items?itemType=container&query=${encodeURIComponent(searchQuery)}&pageSize=20`;
+        // 용기의 경우 플랫 구조로 조회한 후 개별 용기만 필터링
+        endpoint = `/api/companies/${companyId}/containers?flat=true`;
       }
 
       const response = await fetch(endpoint);
@@ -218,7 +219,18 @@ export function CookingPlanImportModal({
       if (addItemType === 'ingredient') {
         setSearchResults(data.ingredients || []);
       } else {
-        setSearchResults(data.items?.filter((item: any) => item.item_type === 'container') || []);
+        // 용기 검색: 개별 아이템만 필터링하고 검색어 적용
+        const containers = data || [];
+        const individualContainers = containers.filter((container: any) => {
+          // 그룹이 아닌 개별 용기만 (parent_container_id가 있거나 container_type이 'item')
+          const isIndividualItem = container.parent_container_id !== null || container.container_type === 'item';
+          // 검색어 매칭
+          const matchesSearch = container.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                               container.code_name?.toLowerCase().includes(searchQuery.toLowerCase());
+          
+          return isIndividualItem && matchesSearch;
+        });
+        setSearchResults(individualContainers);
       }
     } catch (error) {
       console.error('항목 검색 오류:', error);
@@ -410,23 +422,28 @@ export function CookingPlanImportModal({
     try {
       const selectedItemsData = allItems.filter(item => selectedItems.has(item.id));
 
-      // 선택된 항목들의 재고 항목 ID를 찾기
-      const stockItemIds: string[] = [];
-      const quantities: number[] = [];
+      // 개별 거래 기록용 데이터
+      const transactionItems: { stockItemId: string; quantity: number; itemName: string; }[] = [];
+      // 실제 재고 차감용 데이터 (그룹별 최대값)
+      const stockAdjustments: { stockItemId: string; quantity: number; }[] = [];
+      // 용기 그룹별 수량 추적
+      const containerGroups: Map<string, { maxQuantity: number; stockItemId: string; items: string[]; }> = new Map();
       const failedItems: string[] = [];
 
       for (const item of selectedItemsData) {
         try {
           let targetItemId = item.id;
           let searchName = item.name;
+          let parentId: string | null = null;
           
           // 용기 타입인 경우 parent 확인
           if (item.item_type === 'container') {
-            const { parentId, parentName } = await getContainerParentInfo(item.id);
-            if (parentId && parentName) {
+            const parentInfo = await getContainerParentInfo(item.id);
+            if (parentInfo.parentId && parentInfo.parentName) {
               // parent가 있으면 parent 그룹의 재고에서 차감하도록 설정
-              targetItemId = parentId;
-              searchName = parentName;
+              targetItemId = parentInfo.parentId;
+              searchName = parentInfo.parentName;
+              parentId = parentInfo.parentId;
             }
           }
 
@@ -445,30 +462,67 @@ export function CookingPlanImportModal({
             si.details?.name === searchName || si.name === searchName
           );
 
+          let finalStockItemId: string;
           if (!stockItem) {
             // 재고 항목이 없으면 임시 ID 생성
-            // targetItemId를 사용하여 임시 ID 생성
             let tempId;
             if (targetItemId.startsWith('temp_')) {
-              tempId = targetItemId; // 이미 temp_ 형태면 그대로 사용
+              tempId = targetItemId;
             } else {
               tempId = `temp_${item.item_type}_${targetItemId}`;
             }
-            stockItemIds.push(tempId);
-            quantities.push(getActualQuantity(item));
-            continue;
+            finalStockItemId = tempId;
+          } else {
+            finalStockItemId = stockItem.id;
           }
 
-          stockItemIds.push(stockItem.id);
-          // 수정된 수량이 있으면 수정된 수량 사용, 없으면 원래 수량 사용
-          quantities.push(getActualQuantity(item));
+          const quantity = getActualQuantity(item);
+
+          // 개별 거래 기록 추가 (모든 항목)
+          transactionItems.push({
+            stockItemId: finalStockItemId,
+            quantity,
+            itemName: item.name
+          });
+
+          // 용기 그룹별 처리
+          if (item.item_type === 'container' && parentId) {
+            // 같은 parent를 가진 용기들을 그룹핑
+            const groupKey = `${parentId}_${finalStockItemId}`;
+            
+            if (containerGroups.has(groupKey)) {
+              const group = containerGroups.get(groupKey)!;
+              group.maxQuantity = Math.max(group.maxQuantity, quantity);
+              group.items.push(item.name);
+            } else {
+              containerGroups.set(groupKey, {
+                maxQuantity: quantity,
+                stockItemId: finalStockItemId,
+                items: [item.name]
+              });
+            }
+          } else {
+            // 식자재이거나 독립적인 용기는 개별 처리
+            stockAdjustments.push({
+              stockItemId: finalStockItemId,
+              quantity
+            });
+          }
         } catch (error) {
           console.error(`${item.name} 처리 오류:`, error);
           failedItems.push(`${item.name} (처리 오류)`);
         }
       }
 
-      if (stockItemIds.length === 0) {
+      // 용기 그룹별 최대 수량을 재고 차감에 추가
+      containerGroups.forEach(group => {
+        stockAdjustments.push({
+          stockItemId: group.stockItemId,
+          quantity: group.maxQuantity
+        });
+      });
+
+      if (transactionItems.length === 0) {
         toast({
           title: '처리할 수 있는 항목이 없습니다',
           description: failedItems.length > 0 ? `실패한 항목: ${failedItems.join(', ')}` : '모든 항목 처리에 실패했습니다.',
@@ -486,11 +540,12 @@ export function CookingPlanImportModal({
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            stockItemIds,
-            quantities,
+            transactionItems, // 개별 거래 기록용
+            stockAdjustments, // 실제 재고 차감용
             requestType: 'outgoing',
-            notes: `조리계획서 기반 출고 (${cookingPlanData?.date || format(selectedDate!, 'yyyy-MM-dd')}) - 수량 수정됨`,
-            directProcess: true, // 직접 처리 플래그
+            notes: `조리계획서 기반 출고 (${cookingPlanData?.date || format(selectedDate!, 'yyyy-MM-dd')}) - 그룹별 최대 수량 적용`,
+            directProcess: true,
+            isGroupedTransaction: true // 그룹화된 거래임을 표시
           }),
         }
       );
@@ -500,8 +555,17 @@ export function CookingPlanImportModal({
         throw new Error(errorData.error || '일괄 출고 처리에 실패했습니다');
       }
 
-      const successful = stockItemIds.length;
+      const successful = transactionItems.length;
       const failed = failedItems.length;
+
+      // 그룹화 정보 표시
+      let groupInfo = '';
+      if (containerGroups.size > 0) {
+        const groupDetails = Array.from(containerGroups.values()).map(group => 
+          `${group.items.join(', ')} → 최대 ${group.maxQuantity}개`
+        ).join('; ');
+        groupInfo = `용기 그룹 최적화: ${groupDetails}`;
+      }
 
       if (failed > 0) {
         toast({
@@ -511,7 +575,7 @@ export function CookingPlanImportModal({
       } else {
         toast({
           title: '일괄 출고 완료',
-          description: `${successful}개 항목이 성공적으로 출고 처리되었습니다.`,
+          description: `${successful}개 항목이 성공적으로 출고 처리되었습니다.${groupInfo ? ` ${groupInfo}` : ''}`,
         });
       }
 
