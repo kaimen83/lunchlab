@@ -340,8 +340,8 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
     return excelData;
   };
 
-  // 발주서 탭 데이터로 엑셀 생성
-  const generateIngredientsExcel = () => {
+  // 발주서 탭 데이터로 엑셀 생성 - 수정된 발주량 정보 포함
+  const generateIngredientsExcel = (orderQuantities?: Record<number, string>) => {
     const excelData: any[] = [];
     
     // 총 원가 계산 - 투입량과 포장단위 가격 기준
@@ -365,7 +365,7 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
     excelData.push(['식재료명', '품목코드', '필요 수량', '포장단위', '투입량', '발주량', '단가', '총 원가']);
     
     // 식재료 데이터 추가
-    cookingPlan.ingredient_requirements.forEach(item => {
+    cookingPlan.ingredient_requirements.forEach((item, index) => {
       // 식재료 포장단위 정보 가져오기
       const packageAmount = item.package_amount;
       
@@ -374,10 +374,15 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
         (item.total_amount / packageAmount).toFixed(1) : 
         "-";
       
-      // 발주량 (저장된 발주량이 있으면 우선, 없으면 투입량과 동일)
-      const orderQuantity = item.order_quantity !== undefined 
-        ? item.order_quantity.toString() 
-        : unitsRequired;
+      // 수정된 발주량이 있으면 사용, 없으면 기본 발주량 사용
+      let orderQuantity: string;
+      if (orderQuantities && orderQuantities[index] !== undefined) {
+        orderQuantity = orderQuantities[index];
+      } else if (item.order_quantity !== undefined) {
+        orderQuantity = item.order_quantity.toString();
+      } else {
+        orderQuantity = unitsRequired;
+      }
         
       // 투입량 기준 총 원가 계산
       const calculatedTotalPrice = packageAmount && unitsRequired !== "-" 
@@ -448,8 +453,8 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
     return excelData;
   };
 
-  // 발주서 시트 데이터 생성
-  const generateOrderSheet = () => {
+  // 발주서 시트 데이터 생성 - 수정된 발주량 정보 포함
+  const generateOrderSheet = (orderQuantities?: Record<number, string>) => {
     const excelData: any[] = [];
     
     // 제목 및 기본 정보
@@ -457,7 +462,7 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
     excelData.push(['']);
     
     // 발주서 데이터 추가
-    const ingredientsData = generateIngredientsExcel();
+    const ingredientsData = generateIngredientsExcel(orderQuantities);
     excelData.push(...ingredientsData);
     
     return excelData;
@@ -476,7 +481,7 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
       const menuWs = XLSX.utils.aoa_to_sheet(menuPortionsData);
       XLSX.utils.book_append_sheet(wb, menuWs, '메뉴 조리지시서');
       
-      // 2. 발주서 시트 생성
+      // 2. 발주서 시트 생성 (기본 발주량으로)
       const orderData = generateOrderSheet();
       const orderWs = XLSX.utils.aoa_to_sheet(orderData);
       XLSX.utils.book_append_sheet(wb, orderWs, '발주서');
@@ -487,6 +492,41 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
       toast({
         title: '다운로드 완료',
         description: '조리계획서 파일이 다운로드되었습니다. (메뉴 조리지시서, 발주서 시트 포함)',
+      });
+    } catch (error) {
+      console.error('다운로드 오류:', error);
+      toast({
+        title: '다운로드 실패',
+        description: '파일 다운로드 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // 수정된 발주량을 포함한 엑셀 다운로드 처리
+  const handleDownloadWithOrderQuantities = (orderQuantities: Record<number, string>) => {
+    try {
+      const fileName = `조리계획서_${cookingPlan.date}.xlsx`;
+      
+      // 워크북 생성
+      const wb = XLSX.utils.book_new();
+      
+      // 1. 메뉴 조리지시서 시트 생성
+      const menuPortionsData = generateMenuPortionsSheet();
+      const menuWs = XLSX.utils.aoa_to_sheet(menuPortionsData);
+      XLSX.utils.book_append_sheet(wb, menuWs, '메뉴 조리지시서');
+      
+      // 2. 발주서 시트 생성 (수정된 발주량 포함)
+      const orderData = generateOrderSheet(orderQuantities);
+      const orderWs = XLSX.utils.aoa_to_sheet(orderData);
+      XLSX.utils.book_append_sheet(wb, orderWs, '발주서');
+      
+      // 엑셀 파일 다운로드
+      XLSX.writeFile(wb, fileName);
+      
+      toast({
+        title: '다운로드 완료',
+        description: '조리계획서 파일이 다운로드되었습니다. (수정된 발주량 반영)',
       });
     } catch (error) {
       console.error('다운로드 오류:', error);
@@ -738,6 +778,7 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
         cookingPlan={extendedCookingPlan} 
         onPrint={handlePrint} 
         onDownload={handleDownload}
+        onDownloadWithOrderQuantities={handleDownloadWithOrderQuantities}
         onStockReflection={handleStockReflection}
         onTabChange={(value: string) => setActiveTab(value as 'menu-portions' | 'ingredients')}
         activeTab={activeTab}

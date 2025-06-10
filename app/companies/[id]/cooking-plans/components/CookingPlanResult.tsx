@@ -23,6 +23,7 @@ interface CookingPlanResultProps {
   cookingPlan: ExtendedCookingPlan;
   onPrint: () => void;
   onDownload: () => void;
+  onDownloadWithOrderQuantities: (orderQuantities: Record<number, string>) => void;
   onStockReflection?: () => void;
   onTabChange?: (value: string) => void;
   activeTab?: 'menu-portions' | 'ingredients';
@@ -113,7 +114,7 @@ interface ContainerInfo {
   }[] | undefined
 }
 
-export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, onStockReflection, onTabChange, activeTab = 'menu-portions' }: CookingPlanResultProps) {
+export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, onDownloadWithOrderQuantities, onStockReflection, onTabChange, activeTab = 'menu-portions' }: CookingPlanResultProps) {
   const params = useParams();
   const companyId = params.id as string;
   const date = cookingPlan.date;
@@ -592,7 +593,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
           </p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" size="sm" onClick={onDownload}>
+          <Button variant="outline" size="sm" onClick={() => onDownloadWithOrderQuantities(orderQuantities)}>
             <Download className="h-4 w-4 mr-1" />
             다운로드
           </Button>
@@ -796,7 +797,10 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                     </TableHead>
                     <TableHead className="text-right">포장단위</TableHead>
                     <TableHead className="text-right">투입량</TableHead>
-                    <TableHead className="text-center">발주량</TableHead>
+                    <TableHead className="text-center">
+                      <div>발주량</div>
+                      <div className="text-xs text-gray-500 font-normal">(수정시 <span className="bg-yellow-100 px-1 rounded">노란색</span>)</div>
+                    </TableHead>
                     <TableHead className="text-right">포장당 가격 (원)</TableHead>
                     <TableHead className="text-right">총 원가 (원)</TableHead>
                   </TableRow>
@@ -850,7 +854,12 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                                 min="0"
                                 value={orderQuantity}
                                 onChange={(e) => handleOrderQuantityChange(index, e.target.value, item.ingredient_id)}
-                                className="w-20 text-right"
+                                className={`w-20 text-right ${
+                                  // 발주량이 투입량과 다르면 배경색 변경
+                                  parseFloat(orderQuantity) !== parseFloat(unitsRequired) 
+                                    ? 'bg-yellow-50 border-yellow-300 focus:border-yellow-500 focus:ring-yellow-500' 
+                                    : ''
+                                }`}
                                 placeholder="0.0"
                               />
                             </div>
@@ -872,7 +881,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                 * 투입량은 필요 수량을 포장단위로 나눈 값입니다. 포장단위가 없으면 계산할 수 없습니다.
               </p>
               <p className="text-xs text-gray-500">
-                * 발주량은 실제 주문할 수량으로 초기값은 투입량과 동일하며, 사용자가 직접 수정할 수 있습니다. 변경 시 자동으로 저장됩니다.
+                * 발주량은 실제 주문할 수량으로 초기값은 투입량과 동일하며, 사용자가 직접 수정할 수 있습니다. 투입량과 다르게 수정된 경우 노란색으로 표시되며, 변경 시 자동으로 저장됩니다.
               </p>
               <p className="text-xs text-gray-500">
                 * 포장단위 가격은 식재료 마스터에 등록된 식재료의 포장 단위당 가격입니다.
