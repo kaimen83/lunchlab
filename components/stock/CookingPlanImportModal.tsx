@@ -424,7 +424,7 @@ export function CookingPlanImportModal({
           if (item.item_type === 'container') {
             const { parentId, parentName } = await getContainerParentInfo(item.id);
             if (parentId && parentName) {
-              // parent가 있으면 parent의 정보를 사용하여 최상위 카테고리에서 재고 차감
+              // parent가 있으면 parent 그룹의 재고에서 차감하도록 설정
               targetItemId = parentId;
               searchName = parentName;
             }

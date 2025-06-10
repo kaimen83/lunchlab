@@ -248,7 +248,7 @@ export async function GET(
             company_id: companyId,
             item_type: 'ingredient',
             item_id: ingredient.id,
-            current_quantity: stockItem?.current_quantity || 0,
+            current_quantity: stockItem?.current_quantity ?? 0,
             unit: stockItem?.unit || ingredient.unit || '개',
             last_updated: stockItem?.last_updated || new Date().toISOString(),
             created_at: stockItem?.created_at || new Date().toISOString(),
@@ -349,7 +349,7 @@ export async function GET(
 
             // 상위 그룹 자체의 재고 확인
             const parentStockItem = stockItems && stockItems.find(item => item.item_id === topContainer.id);
-            const parentQuantity = parentStockItem?.current_quantity || 0;
+            const parentQuantity = parentStockItem?.current_quantity ?? 0;
             
             // 하위 컨테이너들의 최대 재고량 찾기
             let maxSubQuantity = 0;
@@ -357,7 +357,7 @@ export async function GET(
             
             for (const subContainer of subContainers) {
               const subStockItem = subStockItems?.find(stock => stock.item_id === subContainer.id);
-              const quantity = subStockItem?.current_quantity || 0;
+              const quantity = subStockItem?.current_quantity ?? 0;
               
               if (quantity > maxSubQuantity) {
                 maxSubQuantity = quantity;
@@ -366,28 +366,30 @@ export async function GET(
             }
             
             // 상위 그룹 재고와 하위 컨테이너들의 최대 재고 중 더 큰 값 사용
+            // 단, 상위 그룹에 실제 재고 데이터가 있으면 그것을 우선 사용
             let finalQuantity = parentQuantity;
             let finalStockItem = parentStockItem;
             
-            if (maxSubQuantity > parentQuantity) {
+            // 상위 그룹에 재고 데이터가 없고, 하위 컨테이너에 재고가 있는 경우에만 하위 데이터 사용
+            if (!parentStockItem && maxSubStockItem) {
               finalQuantity = maxSubQuantity;
               finalStockItem = maxSubStockItem;
             }
             
             // 최종 사용할 재고 정보 설정
-            const maxQuantity = finalQuantity;
-            const maxStockItem = finalStockItem;
+            const finalQuantityToUse = finalQuantity;
+            const finalStockItemToUse = finalStockItem;
 
-            // 상위 그룹으로 항목 추가 (최대 수량 사용)
+            // 상위 그룹으로 항목 추가 (실제 재고 수량 사용)
             allItems.push({
-              id: maxStockItem?.id || `temp_container_${topContainer.id}`,
+              id: finalStockItemToUse?.id || `temp_container_${topContainer.id}`,
               company_id: companyId,
               item_type: 'container',
               item_id: topContainer.id, // 상위 그룹 ID 사용
-              current_quantity: maxQuantity, // 하위 중 최대 수량
-              unit: maxStockItem?.unit || '개',
-              last_updated: maxStockItem?.last_updated || new Date().toISOString(),
-              created_at: maxStockItem?.created_at || new Date().toISOString(),
+              current_quantity: finalQuantityToUse, // 실제 재고 수량 (마이너스 값 포함)
+              unit: finalStockItemToUse?.unit || '개',
+              last_updated: finalStockItemToUse?.last_updated || new Date().toISOString(),
+              created_at: finalStockItemToUse?.created_at || new Date().toISOString(),
               details: {
                 ...topContainer,
                 price: topContainer.price || undefined
@@ -403,7 +405,7 @@ export async function GET(
               company_id: companyId,
               item_type: 'container',
               item_id: topContainer.id,
-              current_quantity: stockItem?.current_quantity || 0,
+              current_quantity: stockItem?.current_quantity ?? 0, // null/undefined만 0으로 처리
               unit: stockItem?.unit || '개',
               last_updated: stockItem?.last_updated || new Date().toISOString(),
               created_at: stockItem?.created_at || new Date().toISOString(),
