@@ -297,18 +297,59 @@ export default async function CookingPlanDetailPage({ params }: CookingPlanDetai
       .map(portion => portion.container_id!)
     )];
     
-    // 용기 재고 정보 조회 (나중에 용기 요구사항에 추가할 예정)
+    // 용기 재고 정보 조회 - 상위 그룹의 재고량을 표시하도록 수정
     let containerStocks: any[] = [];
     if (containerIds.length > 0) {
-      const { data: containerStockData, error: containerStockError } = await supabase
-        .from('stock_items')
-        .select('item_id, current_quantity, unit, last_updated')
-        .eq('company_id', companyId)
-        .eq('item_type', 'container')
-        .in('item_id', containerIds);
+      // 1. 먼저 용기 정보를 조회하여 parent_container_id 확인
+      const { data: containerInfo, error: containerInfoError } = await supabase
+        .from('containers')
+        .select('id, parent_container_id, container_type')
+        .in('id', containerIds);
       
-      if (!containerStockError && containerStockData) {
-        containerStocks = containerStockData;
+      if (!containerInfoError && containerInfo) {
+        // 2. 각 용기별로 재고를 조회할 대상 ID 결정
+        const stockQueries = new Map<string, string>(); // original_id -> stock_target_id
+        
+        for (const container of containerInfo) {
+          // parent가 있는 경우 parent의 재고를, 없는 경우 자신의 재고를 조회
+          const targetId = container.parent_container_id || container.id;
+          stockQueries.set(container.id, targetId);
+        }
+        
+        // 3. 실제 재고를 조회할 ID 목록 (중복 제거)
+        const stockTargetIds = [...new Set(stockQueries.values())];
+        
+        // 4. 재고 정보 조회
+        const { data: stockData, error: stockError } = await supabase
+          .from('stock_items')
+          .select('item_id, current_quantity, unit, last_updated')
+          .eq('company_id', companyId)
+          .eq('item_type', 'container')
+          .in('item_id', stockTargetIds);
+        
+        if (!stockError && stockData) {
+          // 5. 재고 데이터를 원래 용기 ID 기준으로 매핑
+          const stockMap = new Map<string, any>();
+          for (const stock of stockData) {
+            stockMap.set(stock.item_id, stock);
+          }
+          
+          // 6. 결과 데이터 구성 (original container_id를 기준으로)
+          containerStocks = containerIds.map(containerId => {
+            const targetId = stockQueries.get(containerId);
+            const stockInfo = targetId ? stockMap.get(targetId) : null;
+            
+            return {
+              item_id: containerId, // 원래 용기 ID 유지
+              current_quantity: stockInfo?.current_quantity || 0,
+              unit: stockInfo?.unit || '개',
+              last_updated: stockInfo?.last_updated || null,
+              // 추가 정보: 어떤 그룹의 재고인지 표시
+              stock_source_id: targetId,
+              is_group_stock: targetId !== containerId
+            };
+          }).filter(stock => stock !== null);
+        }
       }
     }
     
