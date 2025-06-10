@@ -366,7 +366,32 @@ export function CookingPlanImportModal({
     });
   }, [cookingPlanData, additionalItems, selectedItems, safeSetState]);
 
-  // 일괄 출고 처리 (수정된 수량 반영)
+  // 용기의 parent 정보를 가져오는 함수 (ID와 이름 모두 반환)
+  const getContainerParentInfo = async (containerId: string): Promise<{parentId: string | null, parentName: string | null}> => {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/containers?flat=true`);
+      if (!response.ok) return { parentId: null, parentName: null };
+      
+      const containers = await response.json();
+      const container = containers.find((c: any) => c.id === containerId);
+      
+      if (!container?.parent_container_id) {
+        return { parentId: null, parentName: null };
+      }
+      
+      // parent 정보 찾기
+      const parentContainer = containers.find((c: any) => c.id === container.parent_container_id);
+      
+      return {
+        parentId: container.parent_container_id,
+        parentName: parentContainer?.name || null
+      };
+    } catch (error) {
+      console.error('용기 parent 정보 조회 오류:', error);
+      return { parentId: null, parentName: null };
+    }
+  };
+
   const processBulkOutgoing = async () => {
     if (selectedItems.size === 0) {
       toast({
@@ -392,9 +417,22 @@ export function CookingPlanImportModal({
 
       for (const item of selectedItemsData) {
         try {
+          let targetItemId = item.id;
+          let searchName = item.name;
+          
+          // 용기 타입인 경우 parent 확인
+          if (item.item_type === 'container') {
+            const { parentId, parentName } = await getContainerParentInfo(item.id);
+            if (parentId && parentName) {
+              // parent가 있으면 parent의 정보를 사용하여 최상위 카테고리에서 재고 차감
+              targetItemId = parentId;
+              searchName = parentName;
+            }
+          }
+
           // 해당 항목의 재고 항목 ID를 찾기
           const stockItemResponse = await fetch(
-            `/api/companies/${companyId}/stock/items?itemType=${item.item_type}&query=${encodeURIComponent(item.name)}&stockGrade=all`
+            `/api/companies/${companyId}/stock/items?itemType=${item.item_type}&query=${encodeURIComponent(searchName)}&stockGrade=all`
           );
           
           if (!stockItemResponse.ok) {
@@ -404,17 +442,17 @@ export function CookingPlanImportModal({
 
           const stockData = await stockItemResponse.json();
           const stockItem = stockData.items.find((si: any) => 
-            si.details?.name === item.name || si.name === item.name
+            si.details?.name === searchName || si.name === searchName
           );
 
           if (!stockItem) {
             // 재고 항목이 없으면 임시 ID 생성
-            // item.id가 이미 temp_ 형태인지 확인
+            // targetItemId를 사용하여 임시 ID 생성
             let tempId;
-            if (item.id.startsWith('temp_')) {
-              tempId = item.id; // 이미 temp_ 형태면 그대로 사용
+            if (targetItemId.startsWith('temp_')) {
+              tempId = targetItemId; // 이미 temp_ 형태면 그대로 사용
             } else {
-              tempId = `temp_${item.item_type}_${item.id}`;
+              tempId = `temp_${item.item_type}_${targetItemId}`;
             }
             stockItemIds.push(tempId);
             quantities.push(getActualQuantity(item));
