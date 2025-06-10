@@ -3,7 +3,7 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { FileText, Download, Printer, ChevronDown, ChevronUp } from 'lucide-react';
+import { FileText, Download, Printer, ChevronDown, ChevronUp, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -21,6 +21,7 @@ interface CookingPlanResultProps {
   cookingPlan: ExtendedCookingPlan;
   onPrint: () => void;
   onDownload: () => void;
+  onStockReflection?: () => void;
   onTabChange?: (value: string) => void;
   activeTab?: 'menu-portions' | 'ingredients';
 }
@@ -110,7 +111,7 @@ interface ContainerInfo {
   }[] | undefined
 }
 
-export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, onTabChange, activeTab = 'menu-portions' }: CookingPlanResultProps) {
+export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, onStockReflection, onTabChange, activeTab = 'menu-portions' }: CookingPlanResultProps) {
   // 메뉴 확장 상태 관리
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
 
@@ -475,6 +476,12 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
             <Download className="h-4 w-4 mr-1" />
             다운로드
           </Button>
+          {onStockReflection && (
+            <Button variant="outline" size="sm" onClick={onStockReflection}>
+              <Package className="h-4 w-4 mr-1" />
+              재고반영
+            </Button>
+          )}
         </div>
       </div>
 

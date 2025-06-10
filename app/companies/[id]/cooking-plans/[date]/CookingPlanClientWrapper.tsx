@@ -6,6 +6,7 @@ import { ko } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import CookingPlanResult from '../components/CookingPlanResult';
 import { CookingPlan, MenuPortion, ExtendedCookingPlan, ContainerRequirement } from '../types';
+import { CookingPlanImportModal } from '@/components/stock/CookingPlanImportModal';
 import * as XLSX from 'xlsx';
 
 interface CookingPlanClientWrapperProps {
@@ -64,6 +65,29 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
   const [containers, setContainers] = useState<Container[]>([]);
   // 로딩 상태
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  // 재고반영 모달 상태 추가
+  const [isStockModalOpen, setIsStockModalOpen] = useState<boolean>(false);
+  
+  // URL에서 회사 ID 추출하는 함수
+  const getCompanyId = useCallback(() => {
+    const pathParts = window.location.pathname.split('/');
+    const companyIdIndex = pathParts.findIndex(part => part === 'companies') + 1;
+    return pathParts[companyIdIndex];
+  }, []);
+
+  // 재고반영 핸들러
+  const handleStockReflection = useCallback(() => {
+    setIsStockModalOpen(true);
+  }, []);
+
+  // 재고반영 완료 핸들러
+  const handleStockReflectionComplete = useCallback(() => {
+    toast({
+      title: '재고반영 완료',
+      description: '조리계획서의 식재료가 재고에 반영되었습니다.',
+    });
+    // 필요시 페이지 새로고침이나 데이터 갱신 로직 추가
+  }, [toast]);
   
   // 모든 용기 정보 가져오기
   useEffect(() => {
@@ -681,12 +705,24 @@ export default function CookingPlanClientWrapper({ cookingPlan }: CookingPlanCli
   };
 
   return (
-    <CookingPlanResult 
-      cookingPlan={extendedCookingPlan} 
-      onPrint={handlePrint} 
-      onDownload={handleDownload}
-      onTabChange={(value: string) => setActiveTab(value as 'menu-portions' | 'ingredients')}
-      activeTab={activeTab}
-    />
+    <>
+      <CookingPlanResult 
+        cookingPlan={extendedCookingPlan} 
+        onPrint={handlePrint} 
+        onDownload={handleDownload}
+        onStockReflection={handleStockReflection}
+        onTabChange={(value: string) => setActiveTab(value as 'menu-portions' | 'ingredients')}
+        activeTab={activeTab}
+      />
+      
+      {/* 재고반영 모달 */}
+      <CookingPlanImportModal
+        open={isStockModalOpen}
+        onOpenChange={setIsStockModalOpen}
+        companyId={getCompanyId()}
+        onImportComplete={handleStockReflectionComplete}
+        initialDate={cookingPlan.date}
+      />
+    </>
   );
 } 

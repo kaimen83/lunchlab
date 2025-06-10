@@ -62,6 +62,7 @@ interface CookingPlanImportModalProps {
   onOpenChange: (open: boolean) => void;
   companyId: string;
   onImportComplete: () => void;
+  initialDate?: string;
 }
 
 export function CookingPlanImportModal({
@@ -69,6 +70,7 @@ export function CookingPlanImportModal({
   onOpenChange,
   companyId,
   onImportComplete,
+  initialDate,
 }: CookingPlanImportModalProps) {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<Date>();
@@ -103,6 +105,27 @@ export function CookingPlanImportModal({
       isMountedRef.current = false;
     };
   }, []);
+
+  // 초기 날짜 설정 효과
+  useEffect(() => {
+    if (open && initialDate && !selectedDate) {
+      // initialDate가 있고 모달이 열렸을 때, 아직 날짜가 선택되지 않았다면 초기 날짜 설정
+      try {
+        const date = new Date(initialDate);
+        if (!isNaN(date.getTime())) {
+          setSelectedDate(date);
+          // 초기 날짜가 설정되면 자동으로 조리계획서 데이터 로드
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              fetchCookingPlan();
+            }
+          }, 100);
+        }
+      } catch (error) {
+        console.error('초기 날짜 설정 오류:', error);
+      }
+    }
+  }, [open, initialDate, selectedDate]);
 
   // 모달이 닫힐 때 상태 초기화
   useEffect(() => {
@@ -259,7 +282,7 @@ export function CookingPlanImportModal({
   };
 
   // 조리계획서 조회
-  const fetchCookingPlan = async () => {
+  const fetchCookingPlan = useCallback(async () => {
     if (!selectedDate) {
       toast({
         title: '날짜를 선택해주세요',
@@ -312,7 +335,7 @@ export function CookingPlanImportModal({
     } finally {
       safeSetState(() => setIsLoading(false));
     }
-  };
+  }, [selectedDate, companyId, toast, safeSetState]);
 
   // 항목 선택/해제
   const toggleItemSelection = useCallback((itemId: string) => {
