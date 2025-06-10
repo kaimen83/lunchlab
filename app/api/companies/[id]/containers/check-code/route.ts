@@ -14,120 +14,137 @@ interface RouteContext {
 // 용기 코드명 중복 확인 API
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const { id: companyId } = await context.params;
-    const session = await auth();
-    
-    if (!session || !session.userId) {
-      return Response.json({ error: '인증되지 않은 요청입니다.' }, { status: 401 });
+    const { userId } = await auth();
+    if (!userId) {
+      return Response.json({ error: '로그인이 필요합니다.' }, { status: 401 });
     }
-    
-    const userId = session.userId;
 
-    // 회사 정보 조회
+    const { id: companyId } = await context.params;
+    const { searchParams } = new URL(request.url);
+    const code = searchParams.get('code');
+    const excludeId = searchParams.get('excludeId'); // 수정 시 자기 자신 제외
+    const containerType = searchParams.get('type') || 'item'; // 기본값은 item
+
+    if (!code) {
+      return Response.json({ error: '코드명을 입력해주세요.' }, { status: 400 });
+    }
+
+    // 회사 확인 및 권한 체크
     const company = await getServerCompany(companyId);
     if (!company) {
       return Response.json({ error: '회사를 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    // 멤버십 확인
     const membership = await getUserMembership({ userId, companyId });
     if (!membership) {
-      return Response.json({ error: '이 회사에 접근할 권한이 없습니다.' }, { status: 403 });
+      return Response.json({ error: '회사 멤버가 아닙니다.' }, { status: 403 });
     }
 
-    // 기능 활성화 확인
-    const isEnabled = await isFeatureEnabled('menus', companyId);
-    if (!isEnabled) {
-      return Response.json({ error: '메뉴 기능이 활성화되지 않았습니다.' }, { status: 403 });
+    // 메뉴 기능이 활성화되어 있는지 확인 (용기는 메뉴 기능의 일부)
+    const hasMenusFeature = await isFeatureEnabled('menus', companyId);
+    if (!hasMenusFeature) {
+      return Response.json({ error: '메뉴 기능이 비활성화되어 있습니다.' }, { status: 403 });
     }
 
-    // URL에서 코드명 파라미터 추출
-    const url = new URL(request.url);
-    const code = url.searchParams.get('code');
-    const excludeId = url.searchParams.get('excludeId'); // 수정 시 현재 아이템 제외
-    
-    console.log('[API] 용기 코드명 중복 확인 요청:', { companyId, code, excludeId });
-    
-    if (!code) {
-      return Response.json({ error: '코드명 파라미터가 필요합니다.' }, { status: 400 });
-    }
-
-    // Supabase 클라이언트 생성
     const supabase = createServerSupabaseClient();
 
-    // 1. containers 테이블에서 중복 코드명 확인
+    // 1. 동일한 타입에서 코드명 중복 체크
     let containersQuery = supabase
       .from('containers')
-      .select('id, name, code_name', { count: 'exact' })
+      .select('id, name, container_type')
       .eq('company_id', companyId)
-      .eq('code_name', code);
-    
-    // 수정 모드인 경우 현재 아이템은 제외
+      .eq('code_name', code)
+      .eq('container_type', containerType);
+
+    // 수정 모드인 경우 자기 자신 제외
     if (excludeId) {
       containersQuery = containersQuery.neq('id', excludeId);
     }
-    
-    // 쿼리 실행 (한 개만 있는지 확인하면 되므로 limit 1)
-    const { data: containersData, error: containersError, count: containersCount } = await containersQuery.limit(1);
+
+    const { data: existingContainers, error: containersError } = await containersQuery;
 
     if (containersError) {
-      console.error('[API] containers 코드명 중복 확인 오류:', containersError);
-      return Response.json({ 
-        error: '코드명 확인 중 오류가 발생했습니다.',
-        details: containersError.message 
-      }, { status: 500 });
+      console.error('용기 코드명 조회 오류:', containersError);
+      return Response.json({ error: '코드명 확인 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
-    // 2. ingredients 테이블에서 중복 코드명 확인
-    const { data: ingredientsData, error: ingredientsError, count: ingredientsCount } = await supabase
+    // 2. 식재료에서도 코드명 중복 체크 (전체 시스템에서 유니크해야 함)
+    let ingredientsQuery = supabase
       .from('ingredients')
-      .select('id, name, code_name', { count: 'exact' })
+      .select('id, name')
       .eq('company_id', companyId)
-      .eq('code_name', code)
-      .limit(1);
+      .eq('code_name', code);
+
+    const { data: existingIngredients, error: ingredientsError } = await ingredientsQuery;
 
     if (ingredientsError) {
-      console.error('[API] ingredients 코드명 중복 확인 오류:', ingredientsError);
-      return Response.json({ 
-        error: '코드명 확인 중 오류가 발생했습니다.',
-        details: ingredientsError.message 
-      }, { status: 500 });
+      console.error('식재료 코드명 조회 오류:', ingredientsError);
+      return Response.json({ error: '코드명 확인 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
-    // containers 또는 ingredients 테이블에 중복 코드명이 있는지 확인
-    const containersExists = containersCount !== null && containersCount > 0;
-    const ingredientsExists = ingredientsCount !== null && ingredientsCount > 0;
-    const exists = containersExists || ingredientsExists;
+    // 3. 다른 타입의 용기에서도 코드명 중복 체크
+    const otherContainerType = containerType === 'group' ? 'item' : 'group';
+    let otherTypeContainersQuery = supabase
+      .from('containers')
+      .select('id, name, container_type')
+      .eq('company_id', companyId)
+      .eq('code_name', code)
+      .eq('container_type', otherContainerType);
+
+    const { data: otherTypeContainers, error: otherTypeError } = await otherTypeContainersQuery;
+
+    if (otherTypeError) {
+      console.error('다른 타입 용기 코드명 조회 오류:', otherTypeError);
+      return Response.json({ error: '코드명 확인 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+
+    // 결과 분석
+    const sameTypeExists = existingContainers && existingContainers.length > 0;
+    const ingredientsExists = existingIngredients && existingIngredients.length > 0;
+    const otherTypeExists = otherTypeContainers && otherTypeContainers.length > 0;
     
-    console.log('[API] 용기 코드명 중복 결과:', { 
-      exists, 
-      containersExists,
-      ingredientsExists,
-      containersCount, 
-      ingredientsCount,
-      containersData,
-      ingredientsData
-    });
-    
-    return Response.json({ 
+    const exists = sameTypeExists || ingredientsExists || otherTypeExists;
+
+    // 상세한 중복 정보 반환
+    let conflictInfo = null;
+    if (exists) {
+      if (sameTypeExists) {
+        const conflictItem = existingContainers[0];
+        conflictInfo = {
+          type: containerType === 'group' ? '그룹' : '용기',
+          name: conflictItem.name,
+          category: 'container'
+        };
+      } else if (ingredientsExists) {
+        const conflictItem = existingIngredients[0];
+        conflictInfo = {
+          type: '식재료',
+          name: conflictItem.name,
+          category: 'ingredient'
+        };
+      } else if (otherTypeExists) {
+        const conflictItem = otherTypeContainers[0];
+        conflictInfo = {
+          type: conflictItem.container_type === 'group' ? '그룹' : '용기',
+          name: conflictItem.name,
+          category: 'container'
+        };
+      }
+    }
+
+    return Response.json({
       exists,
-      containersExists,
-      ingredientsExists,
-      containersCount: containersCount || 0,
-      ingredientsCount: ingredientsCount || 0,
-      containersData,
-      ingredientsData,
-      message: exists ? 
-        ingredientsExists ? 
-          '이미 식재료 코드명으로 사용 중입니다.' : 
-          '이미 용기 코드명으로 사용 중입니다.' : 
-        '사용 가능한 코드명입니다.'
+      conflictInfo,
+      // 기존 호환성을 위한 필드들
+      containersExists: sameTypeExists || otherTypeExists,
+      ingredientsExists
     });
+
   } catch (error) {
-    console.error('[API] 용기 코드명 중복 확인 API 오류:', error);
-    return Response.json({ 
-      error: '서버 오류가 발생했습니다.',
-      details: error instanceof Error ? error.message : '알 수 없는 오류'
-    }, { status: 500 });
+    console.error('코드명 중복 체크 오류:', error);
+    return Response.json(
+      { error: '코드명 확인 중 서버 오류가 발생했습니다.' },
+      { status: 500 }
+    );
   }
 } 
