@@ -423,11 +423,16 @@ export function CookingPlanImportModal({
       const selectedItemsData = allItems.filter(item => selectedItems.has(item.id));
 
       // 개별 거래 기록용 데이터
-      const transactionItems: { stockItemId: string; quantity: number; itemName: string; }[] = [];
+      const transactionItems: { stockItemId: string; quantity: number; itemName: string; isMaxInGroup?: boolean; }[] = [];
       // 실제 재고 차감용 데이터 (그룹별 최대값)
       const stockAdjustments: { stockItemId: string; quantity: number; }[] = [];
-      // 용기 그룹별 수량 추적
-      const containerGroups: Map<string, { maxQuantity: number; stockItemId: string; items: string[]; }> = new Map();
+      // 용기 그룹별 수량 추적 (parentId를 키로 사용)
+      const containerGroups: Map<string, { 
+        maxQuantity: number; 
+        stockItemId: string; 
+        items: { name: string; quantity: number; stockItemId: string; }[];
+        maxItem: string;
+      }> = new Map();
       const failedItems: string[] = [];
 
       for (const item of selectedItemsData) {
@@ -478,31 +483,41 @@ export function CookingPlanImportModal({
 
           const quantity = getActualQuantity(item);
 
-          // 개별 거래 기록 추가 (모든 항목)
-          transactionItems.push({
-            stockItemId: finalStockItemId,
-            quantity,
-            itemName: item.name
-          });
-
           // 용기 그룹별 처리
           if (item.item_type === 'container' && parentId) {
-            // 같은 parent를 가진 용기들을 그룹핑
-            const groupKey = `${parentId}_${finalStockItemId}`;
+            // 같은 parent를 가진 용기들을 그룹핑 (parentId를 키로 사용)
+            const groupKey = parentId;
+            
+            // parent의 재고 아이템 ID는 이미 finalStockItemId가 parent 기준으로 조회됨
+            // (위에서 searchName이 parent 이름으로 설정되었기 때문)
+            const parentStockItemId = finalStockItemId;
             
             if (containerGroups.has(groupKey)) {
               const group = containerGroups.get(groupKey)!;
-              group.maxQuantity = Math.max(group.maxQuantity, quantity);
-              group.items.push(item.name);
+              group.items.push({ name: item.name, quantity, stockItemId: parentStockItemId });
+              
+              // 최대 수량 업데이트
+              if (quantity > group.maxQuantity) {
+                group.maxQuantity = quantity;
+                group.maxItem = item.name;
+              }
             } else {
               containerGroups.set(groupKey, {
                 maxQuantity: quantity,
-                stockItemId: finalStockItemId,
-                items: [item.name]
+                stockItemId: parentStockItemId, // parent의 재고 아이템 ID 사용
+                items: [{ name: item.name, quantity, stockItemId: parentStockItemId }],
+                maxItem: item.name
               });
             }
           } else {
             // 식자재이거나 독립적인 용기는 개별 처리
+            transactionItems.push({
+              stockItemId: finalStockItemId,
+              quantity,
+              itemName: item.name,
+              isMaxInGroup: true // 독립 항목은 항상 표시
+            });
+            
             stockAdjustments.push({
               stockItemId: finalStockItemId,
               quantity
@@ -514,8 +529,19 @@ export function CookingPlanImportModal({
         }
       }
 
-      // 용기 그룹별 최대 수량을 재고 차감에 추가
+      // 용기 그룹별 처리: 모든 아이템을 transactionItems에 추가하되, 최대값만 표시용으로 마킹
       containerGroups.forEach(group => {
+        // 모든 그룹 아이템을 거래 기록에 추가
+        group.items.forEach(item => {
+          transactionItems.push({
+            stockItemId: item.stockItemId,
+            quantity: item.quantity,
+            itemName: item.name,
+            isMaxInGroup: item.name === group.maxItem // 최대값 아이템만 표시용으로 마킹
+          });
+        });
+        
+        // 최대 수량만 실제 재고 차감에 추가
         stockAdjustments.push({
           stockItemId: group.stockItemId,
           quantity: group.maxQuantity
@@ -540,7 +566,7 @@ export function CookingPlanImportModal({
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            transactionItems, // 개별 거래 기록용
+            transactionItems, // 개별 거래 기록용 (isMaxInGroup 정보 포함)
             stockAdjustments, // 실제 재고 차감용
             requestType: 'outgoing',
             notes: `조리계획서 기반 출고 (${cookingPlanData?.date || format(selectedDate!, 'yyyy-MM-dd')}) - 그룹별 최대 수량 적용`,
@@ -562,7 +588,7 @@ export function CookingPlanImportModal({
       let groupInfo = '';
       if (containerGroups.size > 0) {
         const groupDetails = Array.from(containerGroups.values()).map(group => 
-          `${group.items.join(', ')} → 최대 ${group.maxQuantity}개`
+          `${group.items.map(item => item.name).join(', ')} → 최대 ${group.maxQuantity}개 (${group.maxItem})`
         ).join('; ');
         groupInfo = `용기 그룹 최적화: ${groupDetails}`;
       }

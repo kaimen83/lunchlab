@@ -512,10 +512,39 @@ export async function POST(
     if (isAdminOrOwner && requestData.directProcess === true) {
       // 관리자/소유자가 직접 처리하는 경우
       
+      // 동일한 재고 아이템의 중복 거래 감지 및 처리
+      const itemGroups = new Map();
+      
+      transactionItems.forEach((item: any, index: number) => {
+        const stockItemId = item.stockItemId;
+        const quantity = Math.abs(item.quantity);
+        
+        if (itemGroups.has(stockItemId)) {
+          const group = itemGroups.get(stockItemId);
+          group.items.push({ item, index });
+          if (quantity > group.maxQuantity) {
+            group.maxQuantity = quantity;
+            group.maxIndex = index;
+          }
+        } else {
+          itemGroups.set(stockItemId, {
+            maxQuantity: quantity,
+            maxIndex: index,
+            items: [{ item, index }]
+          });
+        }
+      });
+
       // 1. 모든 개별 거래 내역 생성 (transactionItems 기준)
-      const transactionPromises = transactionItems.map(async (item: any) => {
+      const transactionPromises = transactionItems.map(async (item: any, index: number) => {
         // 실제 재고 차감에 사용되는 거래인지 확인
         const isActualStockChange = stockAdjustments.find((adj: any) => adj.stockItemId === item.stockItemId);
+        // 그룹 내 최대값인지 확인 (표시 여부 결정)
+        const isMaxInGroup = item.isMaxInGroup !== false; // 기본값은 true (호환성)
+        
+        // 동일 재고 아이템 그룹에서 최대 수량인지 확인
+        const itemGroup = itemGroups.get(item.stockItemId);
+        const isMaxQuantityInGroup = itemGroup && index === itemGroup.maxIndex;
         
         const { data: transaction, error: transactionError } = await supabase
           .from('stock_transactions')
@@ -528,7 +557,7 @@ export async function POST(
             reference_id: referenceId,
             reference_type: referenceType,
             notes: isGroupedTransaction ? 
-              (isActualStockChange ? 
+              (isMaxInGroup && isMaxQuantityInGroup ? 
                 `${notes} - ${item.itemName} [ACTUAL_STOCK_CHANGE]` : 
                 `${notes} - ${item.itemName} [DISPLAY_HIDDEN]`) : 
               notes
