@@ -186,18 +186,24 @@ export async function GET(
       })
     );
 
-    // 날짜순으로 정렬 (그룹화 제거)
-    const finalTransactions = transactionsWithDetails
+    // 그룹화된 거래에서 숨겨야 할 거래 필터링
+    const visibleTransactions = transactionsWithDetails.filter(transaction => {
+      // DISPLAY_HIDDEN 마커가 있는 거래는 숨김
+      return !transaction.notes.includes('[DISPLAY_HIDDEN]');
+    });
+
+    // 날짜순으로 정렬
+    const finalTransactions = visibleTransactions
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    // 응답 반환 (그룹화 없이 모든 거래 표시)
+    // 응답 반환 (숨겨진 거래 제외)
     return NextResponse.json({
       transactions: finalTransactions,
       pagination: {
-        total: count || 0, // 실제 거래 수를 기준으로 페이지네이션
+        total: visibleTransactions.length, // 표시되는 거래 수를 기준으로 페이지네이션
         page,
         pageSize,
-        pageCount: Math.ceil((count || 0) / pageSize),
+        pageCount: Math.ceil(visibleTransactions.length / pageSize),
       },
     });
   } catch (error) {
@@ -513,6 +519,9 @@ export async function POST(
       
       // 1. 모든 개별 거래 내역 생성 (transactionItems 기준)
       const transactionPromises = transactionItems.map(async (item: any) => {
+        // 실제 재고 차감에 사용되는 거래인지 확인
+        const isActualStockChange = stockAdjustments.find((adj: any) => adj.stockItemId === item.stockItemId);
+        
         const { data: transaction, error: transactionError } = await supabase
           .from('stock_transactions')
           .insert({
@@ -524,7 +533,9 @@ export async function POST(
             reference_id: referenceId,
             reference_type: referenceType,
             notes: isGroupedTransaction ? 
-              `${notes} - ${item.itemName}` : 
+              (isActualStockChange ? 
+                `${notes} - ${item.itemName} [ACTUAL_STOCK_CHANGE]` : 
+                `${notes} - ${item.itemName} [DISPLAY_HIDDEN]`) : 
               notes
           })
           .select()
