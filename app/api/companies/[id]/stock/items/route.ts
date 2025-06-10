@@ -347,24 +347,36 @@ export async function GET(
               continue;
             }
 
+            // 상위 그룹 자체의 재고 확인
+            const parentStockItem = stockItems && stockItems.find(item => item.item_id === topContainer.id);
+            const parentQuantity = parentStockItem?.current_quantity || 0;
+            
             // 하위 컨테이너들의 최대 재고량 찾기
-            let maxQuantity = Number.NEGATIVE_INFINITY; // 음수 포함하여 진짜 최대값 찾기
-            let maxStockItem = null;
+            let maxSubQuantity = 0;
+            let maxSubStockItem = null;
             
             for (const subContainer of subContainers) {
               const subStockItem = subStockItems?.find(stock => stock.item_id === subContainer.id);
               const quantity = subStockItem?.current_quantity || 0;
               
-              if (quantity > maxQuantity) {
-                maxQuantity = quantity;
-                maxStockItem = subStockItem;
+              if (quantity > maxSubQuantity) {
+                maxSubQuantity = quantity;
+                maxSubStockItem = subStockItem;
               }
             }
             
-            // 하위 아이템이 없거나 모든 재고가 0인 경우 처리
-            if (maxQuantity === Number.NEGATIVE_INFINITY) {
-              maxQuantity = 0;
+            // 상위 그룹 재고와 하위 컨테이너들의 최대 재고 중 더 큰 값 사용
+            let finalQuantity = parentQuantity;
+            let finalStockItem = parentStockItem;
+            
+            if (maxSubQuantity > parentQuantity) {
+              finalQuantity = maxSubQuantity;
+              finalStockItem = maxSubStockItem;
             }
+            
+            // 최종 사용할 재고 정보 설정
+            const maxQuantity = finalQuantity;
+            const maxStockItem = finalStockItem;
 
             // 상위 그룹으로 항목 추가 (최대 수량 사용)
             allItems.push({
