@@ -78,7 +78,8 @@ export async function GET(
           item_id
         )
       `, { count: 'exact' })
-      .in('stock_item_id', stockItemIds);
+      .in('stock_item_id', stockItemIds)
+      .not('notes', 'like', '%[DISPLAY_HIDDEN]%'); // DB 레벨에서 숨겨진 거래 필터링
 
     // 필터 적용
     if (stockItemId) {
@@ -99,7 +100,7 @@ export async function GET(
     // 정렬 적용
     query = query.order('transaction_date', { ascending: false });
 
-    // 페이지네이션 적용
+    // 페이지네이션 적용 (필터링 후 적용)
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
     query = query.range(from, to);
@@ -186,24 +187,18 @@ export async function GET(
       })
     );
 
-    // 그룹화된 거래에서 숨겨야 할 거래 필터링
-    const visibleTransactions = transactionsWithDetails.filter(transaction => {
-      // DISPLAY_HIDDEN 마커가 있는 거래는 숨김
-      return !transaction.notes.includes('[DISPLAY_HIDDEN]');
-    });
-
-    // 날짜순으로 정렬
-    const finalTransactions = visibleTransactions
+    // 날짜순으로 정렬 (DB에서 이미 정렬했지만 안전을 위해)
+    const finalTransactions = transactionsWithDetails
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    // 응답 반환 (숨겨진 거래 제외)
+    // 응답 반환 (count는 이미 필터링된 총 개수)
     return NextResponse.json({
       transactions: finalTransactions,
       pagination: {
-        total: visibleTransactions.length, // 표시되는 거래 수를 기준으로 페이지네이션
+        total: count || 0, // DB에서 계산된 정확한 총 개수 사용
         page,
         pageSize,
-        pageCount: Math.ceil(visibleTransactions.length / pageSize),
+        pageCount: Math.ceil((count || 0) / pageSize),
       },
     });
   } catch (error) {
