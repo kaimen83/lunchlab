@@ -346,7 +346,13 @@ export function StockTable({
                     <TableCell>
                       {item.details?.code_name || "-"}
                     </TableCell>
-                    <TableCell>{formatQuantity(item.current_quantity, item.unit)} {item.unit}</TableCell>
+                    <TableCell>
+                      {formatQuantity(item.current_quantity, item.unit)} {
+                        item.unit === "g" ? "kg" : 
+                        item.unit === "ml" ? "l" : 
+                        item.unit
+                      }
+                    </TableCell>
                     <TableCell>{formatPrice(price)}</TableCell>
                     <TableCell>{formatPrice(totalValue)}</TableCell>
                     <TableCell>

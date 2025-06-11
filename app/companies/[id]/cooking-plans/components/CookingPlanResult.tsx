@@ -911,12 +911,19 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
       }
     }
     
+    // EA 입력 단위 처리
+    if (inputUnit === 'EA') {
+      if (ingredientUnit === 'EA' || ingredientUnit === 'ea' || ingredientUnit === '개') {
+        return quantity; // EA to EA (no conversion)
+      }
+    }
+    
     // 환산 불가능한 경우 원본 값 반환
     return quantity;
   };
 
   // 단위 환산 가능 여부 확인
-  const isConversionPossible = (inputUnit: 'kg' | 'g' | 'l' | 'ml', ingredientUnit: string): boolean => {
+  const isConversionPossible = (inputUnit: 'kg' | 'g' | 'l' | 'ml' | 'EA', ingredientUnit: string): boolean => {
     // 무게 단위 그룹
     if (inputUnit === 'kg' || inputUnit === 'g') {
       return ingredientUnit === 'g' || ingredientUnit === 'gram' || ingredientUnit === 'kg';
@@ -925,11 +932,15 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
     if (inputUnit === 'l' || inputUnit === 'ml') {
       return ingredientUnit === 'ml' || ingredientUnit === 'milliliter' || ingredientUnit === 'l' || ingredientUnit === 'liter';
     }
+    // 개수 단위 그룹
+    if (inputUnit === 'EA') {
+      return ingredientUnit === 'EA' || ingredientUnit === 'ea' || ingredientUnit === '개';
+    }
     return false;
   };
 
   // 식재료 단위에 따른 사용 가능한 입력 단위 목록
-  const getAvailableInputUnits = (ingredientUnit: string): ('kg' | 'g' | 'l' | 'ml')[] => {
+  const getAvailableInputUnits = (ingredientUnit: string): ('kg' | 'g' | 'l' | 'ml' | 'EA')[] => {
     // 무게 단위인 경우
     if (ingredientUnit === 'g' || ingredientUnit === 'gram' || ingredientUnit === 'kg') {
       return ['kg', 'g'];
@@ -938,12 +949,16 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
     if (ingredientUnit === 'ml' || ingredientUnit === 'milliliter' || ingredientUnit === 'l' || ingredientUnit === 'liter') {
       return ['l', 'ml'];
     }
+    // 개수 단위인 경우
+    if (ingredientUnit === 'EA' || ingredientUnit === 'ea' || ingredientUnit === '개') {
+      return ['EA'];
+    }
     // 기타 단위인 경우 기본값
     return ['kg', 'g'];
   };
 
   // 식재료 선택 시 기본 입력 단위 설정
-  const getDefaultInputUnit = (ingredientUnit: string): 'kg' | 'g' | 'l' | 'ml' => {
+  const getDefaultInputUnit = (ingredientUnit: string): 'kg' | 'g' | 'l' | 'ml' | 'EA' => {
     // 무게 단위인 경우 kg를 기본으로
     if (ingredientUnit === 'g' || ingredientUnit === 'gram' || ingredientUnit === 'kg') {
       return 'kg';
@@ -951,6 +966,10 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
     // 부피 단위인 경우 l을 기본으로
     if (ingredientUnit === 'ml' || ingredientUnit === 'milliliter' || ingredientUnit === 'l' || ingredientUnit === 'liter') {
       return 'l';
+    }
+    // 개수 단위인 경우 EA를 기본으로
+    if (ingredientUnit === 'EA' || ingredientUnit === 'ea' || ingredientUnit === '개') {
+      return 'EA';
     }
     // 기타 단위인 경우 기본값
     return 'kg';
@@ -1244,7 +1263,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                                 />
                                 <Select 
                                   value={ingredientInputUnit} 
-                                  onValueChange={(value: 'kg' | 'g' | 'l' | 'ml') => setIngredientInputUnit(value)}
+                                  onValueChange={(value: 'kg' | 'g' | 'l' | 'ml' | 'EA') => setIngredientInputUnit(value)}
                                 >
                                   <SelectTrigger className="w-20">
                                     <SelectValue />
