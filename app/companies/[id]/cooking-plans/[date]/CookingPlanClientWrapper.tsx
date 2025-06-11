@@ -341,7 +341,7 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
   };
 
   // 발주서 탭 데이터로 엑셀 생성 - 수정된 발주량 정보 포함
-  const generateIngredientsExcel = (orderQuantities?: Record<number, string>) => {
+  const generateIngredientsExcel = (orderQuantities?: Record<number, string>, additionalItems?: { ingredients: any[], containers: any[] }) => {
     const excelData: any[] = [];
     
     // 총 원가 계산 - 투입량과 포장단위 가격 기준
@@ -358,13 +358,27 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
       return sum + itemTotalPrice;
     }, 0);
     
+    // 추가된 식재료 원가 계산
+    const additionalIngredientsCost = additionalItems?.ingredients.reduce((sum, item) => {
+      const packageAmount = item.ingredient?.package_amount;
+      if (!packageAmount || packageAmount <= 0) return sum;
+      
+      const unitsRequired = item.quantity / packageAmount;
+      const itemTotalPrice = unitsRequired * (item.ingredient?.price || 0);
+      
+      return sum + itemTotalPrice;
+    }, 0) || 0;
+    
+    const totalCost = totalIngredientsCost + additionalIngredientsCost;
+    const totalItemCount = cookingPlan.ingredient_requirements.length + (additionalItems?.ingredients.length || 0);
+    
     // 헤더 행 추가
     excelData.push(['식재료 목록']);
-    excelData.push([`총 ${cookingPlan.ingredient_requirements.length}개 품목 / 예상 원가: ${formatCurrency(totalIngredientsCost)}`]);
+    excelData.push([`총 ${totalItemCount}개 품목 / 예상 원가: ${formatCurrency(totalCost)}`]);
     excelData.push(['']);
-    excelData.push(['식재료명', '품목코드', '필요 수량', '포장단위', '투입량', '발주량', '단가', '총 원가']);
+    excelData.push(['식재료명', '품목코드', '필요 수량', '포장단위', '투입량', '발주량', '단가', '총 원가', '구분']);
     
-    // 식재료 데이터 추가
+    // 기존 식재료 데이터 추가
     cookingPlan.ingredient_requirements.forEach((item, index) => {
       // 식재료 포장단위 정보 가져오기
       const packageAmount = item.package_amount;
@@ -397,9 +411,39 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
         unitsRequired,
         orderQuantity,
         formatUnitPrice(item.unit_price, item.unit),
-        formatCurrency(calculatedTotalPrice)
+        formatCurrency(calculatedTotalPrice),
+        "조리계획"
       ]);
     });
+
+    // 추가된 식재료 데이터 추가
+    if (additionalItems?.ingredients && additionalItems.ingredients.length > 0) {
+      additionalItems.ingredients.forEach((item) => {
+        const ingredient = item.ingredient;
+        if (!ingredient) return;
+        
+        const packageAmount = ingredient.package_amount;
+        const unitsRequired = packageAmount ? 
+          (item.quantity / packageAmount).toFixed(1) : 
+          "-";
+        
+        const calculatedTotalPrice = packageAmount && unitsRequired !== "-" 
+          ? parseFloat(unitsRequired) * (ingredient.price || 0)
+          : 0;
+        
+        excelData.push([
+          ingredient.name,
+          ingredient.code_name || "-",
+          `${formatAmount(item.quantity)} ${ingredient.unit}`,
+          packageAmount ? `${packageAmount} ${ingredient.unit}` : "-",
+          unitsRequired,
+          unitsRequired, // 추가 항목은 투입량과 발주량이 동일
+          formatUnitPrice(ingredient.price || 0, ingredient.unit),
+          formatCurrency(calculatedTotalPrice),
+          "추가"
+        ]);
+      });
+    }
     
     // 빈 행 추가 (구분용)
     excelData.push(['']);
@@ -410,21 +454,50 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
       (sum, item) => sum + item.total_price, 0
     );
     
-    excelData.push(['필요 용기 목록']);
-    excelData.push([`총 ${extendedCookingPlan.container_requirements.length}개 품목 / 예상 비용: ${formatCurrency(totalContainerCost)}`]);
-    excelData.push(['']);
-    excelData.push(['용기명', '품목코드', '필요 수량', '단가', '총 비용']);
+    // 추가된 용기 비용 계산
+    const additionalContainerCost = additionalItems?.containers.reduce((sum, item) => {
+      const price = item.container?.price || 0;
+      return sum + (price * item.quantity);
+    }, 0) || 0;
     
-    // 용기 데이터 추가
+    const totalContainerCostWithAdditional = totalContainerCost + additionalContainerCost;
+    const totalContainerCount = extendedCookingPlan.container_requirements.length + (additionalItems?.containers.length || 0);
+    
+    excelData.push(['필요 용기 목록']);
+    excelData.push([`총 ${totalContainerCount}개 품목 / 예상 비용: ${formatCurrency(totalContainerCostWithAdditional)}`]);
+    excelData.push(['']);
+    excelData.push(['용기명', '품목코드', '필요 수량', '단가', '총 비용', '구분']);
+    
+    // 기존 용기 데이터 추가
     extendedCookingPlan.container_requirements.forEach(item => {
       excelData.push([
         item.container_name,
         item.code_name || "-",
         `${item.needed_quantity}개`,
         item.price ? formatCurrency(item.price) : "-",
-        formatCurrency(item.total_price)
+        formatCurrency(item.total_price),
+        "조리계획"
       ]);
     });
+
+    // 추가된 용기 데이터 추가
+    if (additionalItems?.containers && additionalItems.containers.length > 0) {
+      additionalItems.containers.forEach((item) => {
+        const container = item.container;
+        if (!container) return;
+        
+        const totalPrice = (container.price || 0) * item.quantity;
+        
+        excelData.push([
+          container.name,
+          container.code_name || "-",
+          `${item.quantity}개`,
+          container.price ? formatCurrency(container.price) : "-",
+          formatCurrency(totalPrice),
+          "추가"
+        ]);
+      });
+    }
     
     // 주석 행 추가
     excelData.push(['']);
@@ -454,7 +527,7 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
   };
 
   // 발주서 시트 데이터 생성 - 수정된 발주량 정보 포함
-  const generateOrderSheet = (orderQuantities?: Record<number, string>) => {
+  const generateOrderSheet = (orderQuantities?: Record<number, string>, additionalItems?: { ingredients: any[], containers: any[] }) => {
     const excelData: any[] = [];
     
     // 제목 및 기본 정보
@@ -462,16 +535,43 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
     excelData.push(['']);
     
     // 발주서 데이터 추가
-    const ingredientsData = generateIngredientsExcel(orderQuantities);
+    const ingredientsData = generateIngredientsExcel(orderQuantities, additionalItems);
     excelData.push(...ingredientsData);
     
     return excelData;
   };
 
+  // 추가된 식재료와 용기 데이터 가져오기
+  const fetchAdditionalItems = async () => {
+    try {
+      const [ingredientsResponse, containersResponse] = await Promise.all([
+        fetch(`/api/companies/${companyId}/cooking-plans/${cookingPlan.date}/additional-ingredients`),
+        fetch(`/api/companies/${companyId}/cooking-plans/${cookingPlan.date}/additional-containers`)
+      ]);
+
+      const additionalIngredients = ingredientsResponse.ok ? await ingredientsResponse.json() : [];
+      const additionalContainers = containersResponse.ok ? await containersResponse.json() : [];
+
+      return {
+        ingredients: additionalIngredients,
+        containers: additionalContainers
+      };
+    } catch (error) {
+      console.error('추가 항목 조회 오류:', error);
+      return {
+        ingredients: [],
+        containers: []
+      };
+    }
+  };
+
   // 엑셀 다운로드 처리 - 조리지시서와 발주서를 각각의 시트로 분리
-  const handleDownload = () => {
+  const handleDownload = async () => {
     try {
       const fileName = `조리계획서_${cookingPlan.date}.xlsx`;
+      
+      // 추가된 식재료와 용기 데이터 가져오기
+      const additionalItems = await fetchAdditionalItems();
       
       // 워크북 생성
       const wb = XLSX.utils.book_new();
@@ -481,8 +581,8 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
       const menuWs = XLSX.utils.aoa_to_sheet(menuPortionsData);
       XLSX.utils.book_append_sheet(wb, menuWs, '메뉴 조리지시서');
       
-      // 2. 발주서 시트 생성 (기본 발주량으로)
-      const orderData = generateOrderSheet();
+      // 2. 발주서 시트 생성 (기본 발주량으로, 추가 항목 포함)
+      const orderData = generateOrderSheet(undefined, additionalItems);
       const orderWs = XLSX.utils.aoa_to_sheet(orderData);
       XLSX.utils.book_append_sheet(wb, orderWs, '발주서');
       
@@ -491,7 +591,7 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
       
       toast({
         title: '다운로드 완료',
-        description: '조리계획서 파일이 다운로드되었습니다. (메뉴 조리지시서, 발주서 시트 포함)',
+        description: '조리계획서 파일이 다운로드되었습니다. (추가된 식재료/용기 포함)',
       });
     } catch (error) {
       console.error('다운로드 오류:', error);
@@ -504,9 +604,12 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
   };
 
   // 수정된 발주량을 포함한 엑셀 다운로드 처리
-  const handleDownloadWithOrderQuantities = (orderQuantities: Record<number, string>) => {
+  const handleDownloadWithOrderQuantities = async (orderQuantities: Record<number, string>) => {
     try {
       const fileName = `조리계획서_${cookingPlan.date}.xlsx`;
+      
+      // 추가된 식재료와 용기 데이터 가져오기
+      const additionalItems = await fetchAdditionalItems();
       
       // 워크북 생성
       const wb = XLSX.utils.book_new();
@@ -516,8 +619,8 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
       const menuWs = XLSX.utils.aoa_to_sheet(menuPortionsData);
       XLSX.utils.book_append_sheet(wb, menuWs, '메뉴 조리지시서');
       
-      // 2. 발주서 시트 생성 (수정된 발주량 포함)
-      const orderData = generateOrderSheet(orderQuantities);
+      // 2. 발주서 시트 생성 (수정된 발주량 포함, 추가 항목 포함)
+      const orderData = generateOrderSheet(orderQuantities, additionalItems);
       const orderWs = XLSX.utils.aoa_to_sheet(orderData);
       XLSX.utils.book_append_sheet(wb, orderWs, '발주서');
       
@@ -526,7 +629,7 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
       
       toast({
         title: '다운로드 완료',
-        description: '조리계획서 파일이 다운로드되었습니다. (수정된 발주량 반영)',
+        description: '조리계획서 파일이 다운로드되었습니다. (수정된 발주량 및 추가 항목 반영)',
       });
     } catch (error) {
       console.error('다운로드 오류:', error);

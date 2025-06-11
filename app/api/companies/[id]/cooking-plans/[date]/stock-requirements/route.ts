@@ -248,12 +248,88 @@ export async function GET(
       }
     }
     
+    // 6. 추가된 식재료와 용기 조회
+    const { data: additionalIngredients, error: additionalIngredientsError } = await supabase
+      .from('cooking_plan_additional_ingredients')
+      .select(`
+        id,
+        quantity,
+        ingredient:ingredients(
+          id,
+          name,
+          unit,
+          price,
+          package_amount,
+          supplier,
+          code_name,
+          stock_grade
+        )
+      `)
+      .eq('company_id', companyId)
+      .eq('date', date);
+
+    const { data: additionalContainers, error: additionalContainersError } = await supabase
+      .from('cooking_plan_additional_containers')
+      .select(`
+        id,
+        quantity,
+        container:containers(
+          id,
+          name,
+          price,
+          code_name,
+          description
+        )
+      `)
+      .eq('company_id', companyId)
+      .eq('date', date);
+
+    // 추가된 식재료를 결과에 포함
+    const additionalIngredientRequirements: StockRequirement[] = [];
+    if (!additionalIngredientsError && additionalIngredients) {
+      for (const item of additionalIngredients) {
+        const ingredient = item.ingredient as any;
+        if (ingredient) {
+          additionalIngredientRequirements.push({
+            id: `additional_ingredient_${ingredient.id}`,
+            name: ingredient.name,
+            item_type: 'ingredient',
+            total_amount: item.quantity,
+            unit: ingredient.unit,
+            code_name: ingredient.code_name,
+            supplier: ingredient.supplier,
+            stock_grade: ingredient.stock_grade,
+            price: ingredient.price
+          });
+        }
+      }
+    }
+
+    // 추가된 용기를 결과에 포함
+    const additionalContainerRequirements: StockRequirement[] = [];
+    if (!additionalContainersError && additionalContainers) {
+      for (const item of additionalContainers) {
+        const container = item.container as any;
+        if (container) {
+          additionalContainerRequirements.push({
+            id: `additional_container_${container.id}`,
+            name: container.name,
+            item_type: 'container',
+            total_amount: item.quantity,
+            unit: '개',
+            code_name: container.code_name,
+            price: container.price
+          });
+        }
+      }
+    }
+    
     return NextResponse.json({
       success: true,
       data: {
         date,
-        ingredients: Object.values(ingredientRequirements),
-        containers: Object.values(containerRequirements)
+        ingredients: [...Object.values(ingredientRequirements), ...additionalIngredientRequirements],
+        containers: [...Object.values(containerRequirements), ...additionalContainerRequirements]
       }
     });
     
