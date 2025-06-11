@@ -361,51 +361,149 @@ export async function POST(
     if (itemsWithoutStock.length > 0) {
       console.log(`${itemsWithoutStock.length}개 항목에 대해 재고 레코드 생성 중...`);
       
-      const stockItemsToCreate = itemsWithoutStock.map(item => ({
-        company_id: companyId,
+      // 이미 존재하는 stock_items를 다시 한번 확인 (동시성 문제 방지)
+      const itemTypesAndIds = itemsWithoutStock.map(item => ({
         item_type: item.item_type,
-        item_id: item.item_id,
-        current_quantity: 0,
-        unit: item.unit
+        item_id: item.item_id
       }));
 
-      const { data: createdStockItems, error: stockItemsCreateError } = await supabase
-        .from('stock_items')
-        .insert(stockItemsToCreate)
-        .select('id, item_type, item_id');
+      // 현재 존재하는 stock_items를 타입별로 조회
+      const ingredientIds = itemTypesAndIds
+        .filter(item => item.item_type === 'ingredient')
+        .map(item => item.item_id);
+      const containerIds = itemTypesAndIds
+        .filter(item => item.item_type === 'container')
+        .map(item => item.item_id);
 
-      if (stockItemsCreateError) {
-        console.error('재고 레코드 생성 오류:', stockItemsCreateError);
-        // 실사 세션도 삭제
-        await supabase
-          .from('stock_audits')
-          .delete()
-          .eq('id', audit.id);
+      let existingStockItems = [];
 
-        return NextResponse.json(
-          { 
-            error: '재고 레코드를 생성하는데 실패했습니다.',
-            details: stockItemsCreateError.message 
-          },
-          { status: 500 }
-        );
+      // 식자재 재고 레코드 조회
+      if (ingredientIds.length > 0) {
+        const { data: ingredientStockItems, error: ingredientStockError } = await supabase
+          .from('stock_items')
+          .select('id, item_type, item_id, current_quantity')
+          .eq('company_id', companyId)
+          .eq('item_type', 'ingredient')
+          .in('item_id', ingredientIds);
+
+        if (ingredientStockError) {
+          console.error('기존 식자재 재고 레코드 확인 오류:', ingredientStockError);
+          await supabase.from('stock_audits').delete().eq('id', audit.id);
+          return NextResponse.json(
+            { 
+              error: '기존 식자재 재고 레코드를 확인하는데 실패했습니다.',
+              details: ingredientStockError.message 
+            },
+            { status: 500 }
+          );
+        }
+
+        if (ingredientStockItems) {
+          existingStockItems.push(...ingredientStockItems);
+        }
       }
 
-      // 생성된 stock_item_id를 allItems에 업데이트
-      if (createdStockItems) {
-        for (const createdItem of createdStockItems) {
+      // 용기 재고 레코드 조회
+      if (containerIds.length > 0) {
+        const { data: containerStockItems, error: containerStockError } = await supabase
+          .from('stock_items')
+          .select('id, item_type, item_id, current_quantity')
+          .eq('company_id', companyId)
+          .eq('item_type', 'container')
+          .in('item_id', containerIds);
+
+        if (containerStockError) {
+          console.error('기존 용기 재고 레코드 확인 오류:', containerStockError);
+          await supabase.from('stock_audits').delete().eq('id', audit.id);
+          return NextResponse.json(
+            { 
+              error: '기존 용기 재고 레코드를 확인하는데 실패했습니다.',
+              details: containerStockError.message 
+            },
+            { status: 500 }
+          );
+        }
+
+        if (containerStockItems) {
+          existingStockItems.push(...containerStockItems);
+        }
+      }
+
+
+
+      // 기존 재고 레코드를 allItems에 반영
+      if (existingStockItems && existingStockItems.length > 0) {
+        for (const existingItem of existingStockItems) {
           const targetItem = allItems.find(item => 
-            item.item_type === createdItem.item_type && 
-            item.item_id === createdItem.item_id
+            item.item_type === existingItem.item_type && 
+            item.item_id === existingItem.item_id
           );
           if (targetItem) {
-            targetItem.id = createdItem.id;
+            targetItem.id = existingItem.id;
             targetItem.has_stock_record = true;
+            targetItem.current_quantity = existingItem.current_quantity;
           }
         }
       }
 
-      console.log(`재고 레코드 생성 완료: ${createdStockItems?.length || 0}개`);
+      // 여전히 재고 레코드가 없는 항목들만 필터링
+      const finalItemsToCreate = itemsWithoutStock.filter(item => {
+        const targetItem = allItems.find(ai => 
+          ai.item_type === item.item_type && 
+          ai.item_id === item.item_id
+        );
+        return targetItem && !targetItem.has_stock_record;
+      });
+
+      if (finalItemsToCreate.length > 0) {
+        const stockItemsToCreate = finalItemsToCreate.map(item => ({
+          company_id: companyId,
+          item_type: item.item_type,
+          item_id: item.item_id,
+          current_quantity: 0,
+          unit: item.unit
+        }));
+
+        const { data: createdStockItems, error: stockItemsCreateError } = await supabase
+          .from('stock_items')
+          .insert(stockItemsToCreate)
+          .select('id, item_type, item_id');
+
+        if (stockItemsCreateError) {
+          console.error('재고 레코드 생성 오류:', stockItemsCreateError);
+          // 실사 세션도 삭제
+          await supabase
+            .from('stock_audits')
+            .delete()
+            .eq('id', audit.id);
+
+          return NextResponse.json(
+            { 
+              error: '재고 레코드를 생성하는데 실패했습니다.',
+              details: stockItemsCreateError.message 
+            },
+            { status: 500 }
+          );
+        }
+
+        // 생성된 stock_item_id를 allItems에 업데이트
+        if (createdStockItems) {
+          for (const createdItem of createdStockItems) {
+            const targetItem = allItems.find(item => 
+              item.item_type === createdItem.item_type && 
+              item.item_id === createdItem.item_id
+            );
+            if (targetItem) {
+              targetItem.id = createdItem.id;
+              targetItem.has_stock_record = true;
+            }
+          }
+        }
+
+        console.log(`재고 레코드 생성 완료: ${createdStockItems?.length || 0}개`);
+      } else {
+        console.log('모든 항목이 이미 재고 레코드를 가지고 있어 생성 건너뜀');
+      }
     }
 
     // 실사 항목 데이터 준비
