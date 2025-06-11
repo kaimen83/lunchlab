@@ -129,6 +129,14 @@ export function StockItemDetailModal({
     
     setIsTransacting(true);
     try {
+      // 입력된 수량을 원래 단위로 변환
+      let convertedQuantity = transactionData.quantity;
+      if (item.unit === "g") {
+        convertedQuantity = transactionData.quantity * 1000; // kg → g
+      } else if (item.unit === "ml") {
+        convertedQuantity = transactionData.quantity * 1000; // l → ml
+      }
+      
       const response = await fetch(
         `/api/companies/${companyId}/stock/transactions`,
         {
@@ -139,7 +147,7 @@ export function StockItemDetailModal({
           body: JSON.stringify({
             stockItemId: itemId,
             transactionType: transactionData.type,
-            quantity: transactionData.quantity,
+            quantity: convertedQuantity,
             notes: transactionData.notes,
           }),
         }
@@ -289,7 +297,11 @@ export function StockItemDetailModal({
                       <h3 className="text-sm font-medium text-muted-foreground">현재 수량</h3>
                       <div className="flex items-center mt-1">
                         <span className="text-xl font-semibold mr-2">
-                          {formatQuantity(item.current_quantity, item.unit)} {item.unit}
+                          {formatQuantity(item.current_quantity, item.unit)} {
+                            item.unit === "g" ? "kg" : 
+                            item.unit === "ml" ? "l" : 
+                            item.unit
+                          }
                         </span>
                         {getQuantityBadge()}
                       </div>
@@ -412,7 +424,9 @@ export function StockItemDetailModal({
                         }
                       />
                       <span className="text-sm text-muted-foreground w-10">
-                        {item.unit}
+                        {item.unit === "g" ? "kg" : 
+                         item.unit === "ml" ? "l" : 
+                         item.unit}
                       </span>
                     </div>
                   </div>

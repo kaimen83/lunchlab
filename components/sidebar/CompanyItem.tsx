@@ -235,7 +235,7 @@ export function CompanyItem({ company, toggleCompany, handleLinkClick }: Company
               onClick={(e) => handleTabClick(`/companies/${id}/stock`, e)}
             >
               <Package className="h-3.5 w-3.5 mr-2 text-gray-400" />
-              <span>재고 관리 (구현중)</span>
+              <span>재고 관리</span>
               {/* 로딩 인디케이터 */}
               {navigationInProgress === `/companies/${id}/stock` && (
                 <div className="absolute right-2 w-3 h-3 rounded-full border-2 border-t-transparent border-white animate-spin"></div>
