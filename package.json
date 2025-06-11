@@ -62,6 +62,7 @@
     "react-hook-form": "^7.55.0",
     "recharts": "^2.15.2",
     "resend": "^4.5.1",
+    "sonner": "^2.0.5",
     "svix": "^1.63.1",
     "tailwind-merge": "^3.2.0",
     "tailwindcss-animate": "^1.0.7",

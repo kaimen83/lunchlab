@@ -3,7 +3,7 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { FileText, Download, Printer, ChevronDown, ChevronUp, Package } from 'lucide-react';
+import { FileText, Download, Printer, ChevronDown, ChevronUp, Package, Plus, X, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -13,6 +13,8 @@ import { CookingPlan, MenuPortion, IngredientRequirement, ExtendedCookingPlan, C
 import { useState, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { useParams } from 'next/navigation';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 
 // 확장된 식재료 요구사항 타입 정의 - 외부에서 import하는 IngredientRequirement 사용
 interface ExtendedIngredientRequirement extends IngredientRequirement {}
@@ -114,10 +116,41 @@ interface ContainerInfo {
   }[] | undefined
 }
 
+// 추가된 식재료 타입
+interface AdditionalIngredient {
+  id: string;
+  quantity: number;
+  created_at: string;
+  ingredient: {
+    id: string;
+    name: string;
+    unit: string;
+    price: number;
+    package_amount: number;
+    supplier?: string;
+    code_name?: string;
+  };
+}
+
+// 추가된 용기 타입
+interface AdditionalContainer {
+  id: string;
+  quantity: number;
+  created_at: string;
+  container: {
+    id: string;
+    name: string;
+    price?: number;
+    code_name?: string;
+    description?: string;
+  };
+}
+
 export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, onDownloadWithOrderQuantities, onStockReflection, onTabChange, activeTab = 'menu-portions' }: CookingPlanResultProps) {
   const params = useParams();
   const companyId = params.id as string;
   const date = cookingPlan.date;
+  const { toast } = useToast();
   
   // 메뉴 확장 상태 관리
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
@@ -127,6 +160,26 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
   
   // 발주량 변경 사항 추적
   const [pendingChanges, setPendingChanges] = useState<Record<string, number>>({});
+
+  // 추가된 식재료/용기 상태 관리
+  const [additionalIngredients, setAdditionalIngredients] = useState<AdditionalIngredient[]>([]);
+  const [additionalContainers, setAdditionalContainers] = useState<AdditionalContainer[]>([]);
+  
+  // 모달 상태 관리
+  const [showIngredientModal, setShowIngredientModal] = useState(false);
+  const [showContainerModal, setShowContainerModal] = useState(false);
+  
+  // 검색 상태 관리
+  const [ingredientSearch, setIngredientSearch] = useState('');
+  const [containerSearch, setContainerSearch] = useState('');
+  const [availableIngredients, setAvailableIngredients] = useState<any[]>([]);
+  const [availableContainers, setAvailableContainers] = useState<any[]>([]);
+  
+  // 선택된 항목 상태
+  const [selectedIngredient, setSelectedIngredient] = useState<any>(null);
+  const [selectedContainer, setSelectedContainer] = useState<any>(null);
+  const [ingredientQuantity, setIngredientQuantity] = useState('');
+  const [containerQuantity, setContainerQuantity] = useState('');
 
   // 메뉴 확장 상태 토글
   const toggleMenuExpand = (menuId: string, containerId: string | null) => {
@@ -214,6 +267,239 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
 
     return () => clearTimeout(timeoutId);
   }, [pendingChanges, saveOrderQuantities]);
+
+  // 추가된 식재료/용기 관리 함수들
+  const fetchAdditionalIngredients = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/cooking-plans/${date}/additional-ingredients`);
+      if (response.ok) {
+        const data = await response.json();
+        setAdditionalIngredients(data.additionalIngredients || []);
+      }
+    } catch (error) {
+      console.error('추가된 식재료 조회 오류:', error);
+    }
+  }, [companyId, date]);
+
+  const fetchAdditionalContainers = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/cooking-plans/${date}/additional-containers`);
+      if (response.ok) {
+        const data = await response.json();
+        setAdditionalContainers(data.additionalContainers || []);
+      }
+    } catch (error) {
+      console.error('추가된 용기 조회 오류:', error);
+    }
+  }, [companyId, date]);
+
+  const fetchAvailableIngredients = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/inventory/ingredients`);
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableIngredients(data.ingredients || []);
+      }
+    } catch (error) {
+      console.error('식재료 목록 조회 오류:', error);
+    }
+  }, [companyId]);
+
+  const fetchAvailableContainers = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/inventory/containers`);
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableContainers(data.containers || []);
+      }
+    } catch (error) {
+      console.error('용기 목록 조회 오류:', error);
+    }
+  }, [companyId]);
+
+  const addIngredient = async () => {
+    if (!selectedIngredient || !ingredientQuantity) {
+      toast({
+        title: "오류",
+        description: "식재료와 수량을 모두 입력해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/companies/${companyId}/cooking-plans/${date}/additional-ingredients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ingredientId: selectedIngredient.id,
+          quantity: parseFloat(ingredientQuantity)
+        })
+      });
+
+      if (response.ok) {
+        await fetchAdditionalIngredients();
+        setShowIngredientModal(false);
+        setSelectedIngredient(null);
+        setIngredientQuantity('');
+        setIngredientSearch('');
+        toast({
+          title: "성공",
+          description: "식재료가 추가되었습니다.",
+        });
+      } else {
+        const error = await response.json();
+        toast({
+          title: "오류",
+          description: error.error || "식재료 추가에 실패했습니다.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('식재료 추가 오류:', error);
+      toast({
+        title: "오류",
+        description: "식재료 추가 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const addContainer = async () => {
+    if (!selectedContainer || !containerQuantity) {
+      toast({
+        title: "오류",
+        description: "용기와 수량을 모두 입력해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/companies/${companyId}/cooking-plans/${date}/additional-containers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          containerId: selectedContainer.id,
+          quantity: parseFloat(containerQuantity)
+        })
+      });
+
+      if (response.ok) {
+        await fetchAdditionalContainers();
+        setShowContainerModal(false);
+        setSelectedContainer(null);
+        setContainerQuantity('');
+        setContainerSearch('');
+        toast({
+          title: "성공",
+          description: "용기가 추가되었습니다.",
+        });
+      } else {
+        const error = await response.json();
+        toast({
+          title: "오류",
+          description: error.error || "용기 추가에 실패했습니다.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('용기 추가 오류:', error);
+      toast({
+        title: "오류",
+        description: "용기 추가 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const removeAdditionalIngredient = async (ingredientId: string) => {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/cooking-plans/${date}/additional-ingredients/${ingredientId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        await fetchAdditionalIngredients();
+        toast({
+          title: "성공",
+          description: "식재료가 삭제되었습니다.",
+        });
+      } else {
+        toast({
+          title: "오류",
+          description: "식재료 삭제에 실패했습니다.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('식재료 삭제 오류:', error);
+      toast({
+        title: "오류",
+        description: "식재료 삭제 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const removeAdditionalContainer = async (containerId: string) => {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/cooking-plans/${date}/additional-containers/${containerId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        await fetchAdditionalContainers();
+        toast({
+          title: "성공",
+          description: "용기가 삭제되었습니다.",
+        });
+      } else {
+        toast({
+          title: "오류",
+          description: "용기 삭제에 실패했습니다.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('용기 삭제 오류:', error);
+      toast({
+        title: "오류",
+        description: "용기 삭제 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // 초기 데이터 로드
+  useEffect(() => {
+    fetchAdditionalIngredients();
+    fetchAdditionalContainers();
+  }, [fetchAdditionalIngredients, fetchAdditionalContainers]);
+
+  // 모달 열릴 때 데이터 로드
+  useEffect(() => {
+    if (showIngredientModal) {
+      fetchAvailableIngredients();
+    }
+  }, [showIngredientModal, fetchAvailableIngredients]);
+
+  useEffect(() => {
+    if (showContainerModal) {
+      fetchAvailableContainers();
+    }
+  }, [showContainerModal, fetchAvailableContainers]);
+
+  // 검색 필터링
+  const filteredIngredients = availableIngredients.filter(ingredient =>
+    ingredient.name.toLowerCase().includes(ingredientSearch.toLowerCase()) ||
+    (ingredient.code_name && ingredient.code_name.toLowerCase().includes(ingredientSearch.toLowerCase()))
+  );
+
+  const filteredContainers = availableContainers.filter(container =>
+    container.name.toLowerCase().includes(containerSearch.toLowerCase()) ||
+    (container.code_name && container.code_name.toLowerCase().includes(containerSearch.toLowerCase()))
+  );
 
   // 식사 시간별로 그룹화
   const menusByMealTime = cookingPlan.menu_portions.reduce((acc, menu) => {
@@ -777,11 +1063,86 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
         <TabsContent value="ingredients">
           <Card>
             <CardHeader>
-              <CardTitle>발주서 목록</CardTitle>
-              <CardDescription>
-                총 {cookingPlan.ingredient_requirements.length}개 품목 / 
-                예상 원가: {formatCurrency(totalIngredientsCost)}원
-              </CardDescription>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle>발주서 목록</CardTitle>
+                  <CardDescription>
+                    총 {cookingPlan.ingredient_requirements.length + additionalIngredients.length}개 품목 / 
+                    예상 원가: {formatCurrency(totalIngredientsCost)}원
+                  </CardDescription>
+                </div>
+                <Dialog open={showIngredientModal} onOpenChange={setShowIngredientModal}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Plus className="h-4 w-4 mr-2" />
+                      식재료 추가
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>식재료 추가</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="식재료명 또는 품목코드로 검색..."
+                          value={ingredientSearch}
+                          onChange={(e) => setIngredientSearch(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <div className="max-h-60 overflow-y-auto border rounded-md">
+                        {filteredIngredients.map((ingredient) => (
+                          <div
+                            key={ingredient.id}
+                            className={`p-3 cursor-pointer hover:bg-gray-50 border-b last:border-b-0 ${
+                              selectedIngredient?.id === ingredient.id ? 'bg-blue-50 border-blue-200' : ''
+                            }`}
+                            onClick={() => setSelectedIngredient(ingredient)}
+                          >
+                            <div className="font-medium">{ingredient.name}</div>
+                            <div className="text-sm text-gray-500">
+                              {ingredient.code_name && `품목코드: ${ingredient.code_name} | `}
+                              단위: {ingredient.unit} | 가격: {formatCurrency(ingredient.price)}원
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {selectedIngredient && (
+                        <div className="space-y-2">
+                          <div className="p-3 bg-blue-50 rounded-md">
+                            <div className="font-medium">선택된 식재료: {selectedIngredient.name}</div>
+                            <div className="text-sm text-gray-600">
+                              단위: {selectedIngredient.unit} | 포장단위: {selectedIngredient.package_amount}{selectedIngredient.unit}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Input
+                              type="number"
+                              placeholder="수량 입력"
+                              value={ingredientQuantity}
+                              onChange={(e) => setIngredientQuantity(e.target.value)}
+                              className="flex-1"
+                            />
+                            <span className="flex items-center text-sm text-gray-500">
+                              {selectedIngredient.unit}
+                            </span>
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <Button variant="outline" onClick={() => setShowIngredientModal(false)}>
+                              취소
+                            </Button>
+                            <Button onClick={addIngredient}>
+                              추가
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -806,6 +1167,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {/* 기존 조리계획 식재료 */}
                   {cookingPlan.ingredient_requirements.map((item, index) => {
                     // 식재료 포장단위 정보 가져오기
                     const packageAmount = item.package_amount;
@@ -872,6 +1234,57 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                       </TableRow>
                     );
                   })}
+                  
+                  {/* 추가된 식재료 */}
+                  {additionalIngredients.map((item) => (
+                    <TableRow key={`additional-${item.id}`} className="bg-blue-50">
+                      <TableCell className="font-bold">
+                        <div className="flex items-center gap-2">
+                          {item.ingredient.name}
+                          <Badge variant="secondary" className="text-xs">추가</Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell>{item.ingredient.code_name || "-"}</TableCell>
+                      <TableCell>{item.ingredient.supplier || "-"}</TableCell>
+                      <TableCell className="text-right">
+                        {formatIngredientAmount(item.quantity, item.ingredient.unit)}
+                      </TableCell>
+                      <TableCell className="text-right">-</TableCell>
+                      <TableCell className="text-right">
+                        {formatPackageAmount(item.ingredient.package_amount, item.ingredient.unit)}
+                      </TableCell>
+                      <TableCell className="text-right font-bold">
+                        {item.ingredient.package_amount ? 
+                          (item.quantity / item.ingredient.package_amount).toFixed(1) : 
+                          "-"
+                        }
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center gap-2 justify-end">
+                          <span>{item.ingredient.package_amount ? 
+                            (item.quantity / item.ingredient.package_amount).toFixed(1) : 
+                            "-"
+                          }</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeAdditionalIngredient(item.ingredient.id)}
+                            className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">{formatUnitPrice(item.ingredient.price, item.ingredient.unit)}</TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(
+                          item.ingredient.package_amount ? 
+                            (item.quantity / item.ingredient.package_amount) * item.ingredient.price : 
+                            0
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
               <p className="text-xs text-gray-500 mt-2">
@@ -901,11 +1314,84 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
           {/* 용기 목록 카드 추가 */}
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle>필요 용기 목록</CardTitle>
-              <CardDescription>
-                총 {cookingPlan.container_requirements?.length || 0}개 품목 / 
-                예상 비용: {formatCurrency(totalContainerCost)}원
-              </CardDescription>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle>필요 용기 목록</CardTitle>
+                  <CardDescription>
+                    총 {(cookingPlan.container_requirements?.length || 0) + additionalContainers.length}개 품목 / 
+                    예상 비용: {formatCurrency(totalContainerCost)}원
+                  </CardDescription>
+                </div>
+                <Dialog open={showContainerModal} onOpenChange={setShowContainerModal}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Plus className="h-4 w-4 mr-2" />
+                      용기 추가
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>용기 추가</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="용기명 또는 품목코드로 검색..."
+                          value={containerSearch}
+                          onChange={(e) => setContainerSearch(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <div className="max-h-60 overflow-y-auto border rounded-md">
+                        {filteredContainers.map((container) => (
+                          <div
+                            key={container.id}
+                            className={`p-3 cursor-pointer hover:bg-gray-50 border-b last:border-b-0 ${
+                              selectedContainer?.id === container.id ? 'bg-blue-50 border-blue-200' : ''
+                            }`}
+                            onClick={() => setSelectedContainer(container)}
+                          >
+                            <div className="font-medium">{container.name}</div>
+                            <div className="text-sm text-gray-500">
+                              {container.code_name && `품목코드: ${container.code_name} | `}
+                              {container.price && `가격: ${formatCurrency(container.price)}원`}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {selectedContainer && (
+                        <div className="space-y-2">
+                          <div className="p-3 bg-blue-50 rounded-md">
+                            <div className="font-medium">선택된 용기: {selectedContainer.name}</div>
+                            <div className="text-sm text-gray-600">
+                              {selectedContainer.description && `설명: ${selectedContainer.description}`}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Input
+                              type="number"
+                              placeholder="수량 입력"
+                              value={containerQuantity}
+                              onChange={(e) => setContainerQuantity(e.target.value)}
+                              className="flex-1"
+                            />
+                            <span className="flex items-center text-sm text-gray-500">개</span>
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <Button variant="outline" onClick={() => setShowContainerModal(false)}>
+                              취소
+                            </Button>
+                            <Button onClick={addContainer}>
+                              추가
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -923,6 +1409,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {/* 기존 조리계획 용기 */}
                   {(cookingPlan.container_requirements?.length || 0) > 0 ? (
                     cookingPlan.container_requirements?.map((item, index) => (
                       <TableRow key={index}>
@@ -941,12 +1428,47 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                       </TableRow>
                     ))
                   ) : (
-                    <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                        등록된 용기가 없습니다.
+                    (cookingPlan.container_requirements?.length || 0) === 0 && additionalContainers.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                          등록된 용기가 없습니다.
+                        </TableCell>
+                      </TableRow>
+                    )
+                  )}
+                  
+                  {/* 추가된 용기 */}
+                  {additionalContainers.map((item) => (
+                    <TableRow key={`additional-${item.id}`} className="bg-blue-50">
+                      <TableCell className="font-bold">
+                        <div className="flex items-center gap-2">
+                          {item.container.name}
+                          <Badge variant="secondary" className="text-xs">추가</Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell>{item.container.code_name || "-"}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center gap-2 justify-end">
+                          <span>{item.quantity}개</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeAdditionalContainer(item.container.id)}
+                            className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">-</TableCell>
+                      <TableCell className="text-right">
+                        {item.container.price ? formatCurrency(item.container.price) : "-"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(item.container.price ? item.quantity * item.container.price : 0)}
                       </TableCell>
                     </TableRow>
-                  )}
+                  ))}
                 </TableBody>
               </Table>
               <p className="text-xs text-gray-500 mt-2">
