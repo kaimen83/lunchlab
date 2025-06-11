@@ -359,24 +359,27 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
     }, 0);
     
     // 추가된 식재료 원가 계산
-    const additionalIngredientsCost = additionalItems?.ingredients.reduce((sum, item) => {
-      const packageAmount = item.ingredient?.package_amount;
-      if (!packageAmount || packageAmount <= 0) return sum;
-      
-      const unitsRequired = item.quantity / packageAmount;
-      const itemTotalPrice = unitsRequired * (item.ingredient?.price || 0);
-      
-      return sum + itemTotalPrice;
-    }, 0) || 0;
+    const additionalIngredientsCost = (additionalItems?.ingredients && Array.isArray(additionalItems.ingredients)) 
+      ? additionalItems.ingredients.reduce((sum, item) => {
+          const packageAmount = item.ingredient?.package_amount;
+          if (!packageAmount || packageAmount <= 0) return sum;
+          
+          const unitsRequired = item.quantity / packageAmount;
+          const itemTotalPrice = unitsRequired * (item.ingredient?.price || 0);
+          
+          return sum + itemTotalPrice;
+        }, 0) 
+      : 0;
     
     const totalCost = totalIngredientsCost + additionalIngredientsCost;
-    const totalItemCount = cookingPlan.ingredient_requirements.length + (additionalItems?.ingredients.length || 0);
+    const totalItemCount = cookingPlan.ingredient_requirements.length + 
+      ((additionalItems?.ingredients && Array.isArray(additionalItems.ingredients)) ? additionalItems.ingredients.length : 0);
     
     // 헤더 행 추가
     excelData.push(['식재료 목록']);
     excelData.push([`총 ${totalItemCount}개 품목 / 예상 원가: ${formatCurrency(totalCost)}`]);
     excelData.push(['']);
-    excelData.push(['식재료명', '품목코드', '필요 수량', '포장단위', '투입량', '발주량', '단가', '총 원가', '구분']);
+    excelData.push(['식재료명', '품목코드', '필요 수량', '포장단위', '투입량', '발주량', '단가', '총 원가']);
     
     // 기존 식재료 데이터 추가
     cookingPlan.ingredient_requirements.forEach((item, index) => {
@@ -411,13 +414,12 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
         unitsRequired,
         orderQuantity,
         formatUnitPrice(item.unit_price, item.unit),
-        formatCurrency(calculatedTotalPrice),
-        "조리계획"
+        formatCurrency(calculatedTotalPrice)
       ]);
     });
 
     // 추가된 식재료 데이터 추가
-    if (additionalItems?.ingredients && additionalItems.ingredients.length > 0) {
+    if (additionalItems?.ingredients && Array.isArray(additionalItems.ingredients) && additionalItems.ingredients.length > 0) {
       additionalItems.ingredients.forEach((item) => {
         const ingredient = item.ingredient;
         if (!ingredient) return;
@@ -439,8 +441,7 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
           unitsRequired,
           unitsRequired, // 추가 항목은 투입량과 발주량이 동일
           formatUnitPrice(ingredient.price || 0, ingredient.unit),
-          formatCurrency(calculatedTotalPrice),
-          "추가"
+          formatCurrency(calculatedTotalPrice)
         ]);
       });
     }
@@ -455,18 +456,21 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
     );
     
     // 추가된 용기 비용 계산
-    const additionalContainerCost = additionalItems?.containers.reduce((sum, item) => {
-      const price = item.container?.price || 0;
-      return sum + (price * item.quantity);
-    }, 0) || 0;
+    const additionalContainerCost = (additionalItems?.containers && Array.isArray(additionalItems.containers))
+      ? additionalItems.containers.reduce((sum, item) => {
+          const price = item.container?.price || 0;
+          return sum + (price * item.quantity);
+        }, 0)
+      : 0;
     
     const totalContainerCostWithAdditional = totalContainerCost + additionalContainerCost;
-    const totalContainerCount = extendedCookingPlan.container_requirements.length + (additionalItems?.containers.length || 0);
+    const totalContainerCount = extendedCookingPlan.container_requirements.length + 
+      ((additionalItems?.containers && Array.isArray(additionalItems.containers)) ? additionalItems.containers.length : 0);
     
     excelData.push(['필요 용기 목록']);
     excelData.push([`총 ${totalContainerCount}개 품목 / 예상 비용: ${formatCurrency(totalContainerCostWithAdditional)}`]);
     excelData.push(['']);
-    excelData.push(['용기명', '품목코드', '필요 수량', '단가', '총 비용', '구분']);
+    excelData.push(['용기명', '품목코드', '필요 수량', '단가', '총 비용']);
     
     // 기존 용기 데이터 추가
     extendedCookingPlan.container_requirements.forEach(item => {
@@ -475,13 +479,12 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
         item.code_name || "-",
         `${item.needed_quantity}개`,
         item.price ? formatCurrency(item.price) : "-",
-        formatCurrency(item.total_price),
-        "조리계획"
+        formatCurrency(item.total_price)
       ]);
     });
 
     // 추가된 용기 데이터 추가
-    if (additionalItems?.containers && additionalItems.containers.length > 0) {
+    if (additionalItems?.containers && Array.isArray(additionalItems.containers) && additionalItems.containers.length > 0) {
       additionalItems.containers.forEach((item) => {
         const container = item.container;
         if (!container) return;
@@ -493,8 +496,7 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
           container.code_name || "-",
           `${item.quantity}개`,
           container.price ? formatCurrency(container.price) : "-",
-          formatCurrency(totalPrice),
-          "추가"
+          formatCurrency(totalPrice)
         ]);
       });
     }
@@ -549,8 +551,22 @@ export default function CookingPlanClientWrapper({ cookingPlan, containerStocks 
         fetch(`/api/companies/${companyId}/cooking-plans/${cookingPlan.date}/additional-containers`)
       ]);
 
-      const additionalIngredients = ingredientsResponse.ok ? await ingredientsResponse.json() : [];
-      const additionalContainers = containersResponse.ok ? await containersResponse.json() : [];
+      let additionalIngredients = [];
+      let additionalContainers = [];
+
+      if (ingredientsResponse.ok) {
+        const ingredientsData = await ingredientsResponse.json();
+        // API 응답 구조에 맞게 additionalIngredients 배열 추출
+        additionalIngredients = Array.isArray(ingredientsData.additionalIngredients) ? ingredientsData.additionalIngredients : [];
+      }
+
+      if (containersResponse.ok) {
+        const containersData = await containersResponse.json();
+        // API 응답 구조에 맞게 additionalContainers 배열 추출
+        additionalContainers = Array.isArray(containersData.additionalContainers) ? containersData.additionalContainers : [];
+      }
+
+
 
       return {
         ingredients: additionalIngredients,
