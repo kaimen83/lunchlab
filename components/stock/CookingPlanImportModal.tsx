@@ -85,15 +85,7 @@ export function CookingPlanImportModal({
   // 인라인 캘린더 표시 상태
   const [showCalendar, setShowCalendar] = useState(false);
 
-  // 항목 추가 관련 상태
-  const [additionalItems, setAdditionalItems] = useState<StockRequirement[]>([]);
-  const [showAddItemForm, setShowAddItemForm] = useState(false);
-  const [addItemType, setAddItemType] = useState<'ingredient' | 'container'>('ingredient');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [selectedSearchItems, setSelectedSearchItems] = useState<any[]>([]);
-  const [addItemQuantity, setAddItemQuantity] = useState<number>(1);
+
 
   // 컴포넌트 마운트 상태 추적을 위한 ref
   const isMountedRef = useRef(true);
@@ -139,13 +131,7 @@ export function CookingPlanImportModal({
           setIsProcessing(false);
           setEditedQuantities(new Map());
           setShowCalendar(false);
-          // 항목 추가 관련 상태 초기화
-          setAdditionalItems([]);
-          setShowAddItemForm(false);
-          setSearchQuery('');
-          setSearchResults([]);
-          setSelectedSearchItems([]);
-          setAddItemQuantity(1);
+
         }
       }, 100);
 
@@ -192,106 +178,7 @@ export function CookingPlanImportModal({
     setShowCalendar(false); // 날짜 선택 시 캘린더 닫기
   }, []);
 
-  // 항목 검색 함수
-  const searchItems = async () => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      return;
-    }
 
-    setIsSearching(true);
-    try {
-      let endpoint = '';
-      if (addItemType === 'ingredient') {
-        endpoint = `/api/companies/${companyId}/ingredients?search=${encodeURIComponent(searchQuery)}&limit=20`;
-      } else {
-        // 용기의 경우 플랫 구조로 조회한 후 개별 용기만 필터링
-        endpoint = `/api/companies/${companyId}/containers?flat=true`;
-      }
-
-      const response = await fetch(endpoint);
-      if (!response.ok) {
-        throw new Error('검색에 실패했습니다');
-      }
-
-      const data = await response.json();
-      
-      if (addItemType === 'ingredient') {
-        setSearchResults(data.ingredients || []);
-      } else {
-        // 용기 검색: 개별 아이템만 필터링하고 검색어 적용
-        const containers = data || [];
-        const individualContainers = containers.filter((container: any) => {
-          // 그룹이 아닌 개별 용기만 (parent_container_id가 있거나 container_type이 'item')
-          const isIndividualItem = container.parent_container_id !== null || container.container_type === 'item';
-          // 검색어 매칭
-          const matchesSearch = container.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                               container.code_name?.toLowerCase().includes(searchQuery.toLowerCase());
-          
-          return isIndividualItem && matchesSearch;
-        });
-        setSearchResults(individualContainers);
-      }
-    } catch (error) {
-      console.error('항목 검색 오류:', error);
-      toast({
-        title: '검색 실패',
-        description: '항목을 검색하는 중 오류가 발생했습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  // 항목 추가 함수
-  const addItem = () => {
-    if (selectedSearchItems.length === 0 || addItemQuantity <= 0) {
-      toast({
-        title: '입력 확인',
-        description: '항목을 선택하고 올바른 수량을 입력해주세요.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const newItems: StockRequirement[] = selectedSearchItems.map(selectedItem => ({
-      id: `temp_${addItemType}_${selectedItem.id}`,
-      name: selectedItem.name,
-      item_type: addItemType,
-      total_amount: addItemQuantity,
-      unit: selectedItem.unit || '개',
-      code_name: selectedItem.code_name,
-      supplier: selectedItem.supplier,
-      stock_grade: selectedItem.stock_grade,
-      price: selectedItem.price,
-    }));
-
-    setAdditionalItems(prev => [...prev, ...newItems]);
-    
-    // 폼 초기화
-    setSelectedSearchItems([]);
-    setAddItemQuantity(1);
-    setSearchQuery('');
-    setSearchResults([]);
-    setShowAddItemForm(false);
-
-    toast({
-      title: '항목 추가됨',
-      description: `${newItems.length}개 항목이 목록에 추가되었습니다.`,
-    });
-  };
-
-  // 추가된 항목 제거 함수
-  const removeAdditionalItem = (itemId: string) => {
-    setAdditionalItems(prev => prev.filter(item => item.id !== itemId));
-    // 선택된 항목에서도 제거
-    setSelectedItems(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(itemId);
-      return newSet;
-    });
-  };
 
   // 조리계획서 조회
   const fetchCookingPlan = useCallback(async () => {
@@ -322,8 +209,6 @@ export function CookingPlanImportModal({
         setCookingPlanData(result.data);
         setSelectedItems(new Set()); // 선택 항목 초기화
         setEditedQuantities(new Map()); // 수정된 수량 초기화
-        setAdditionalItems([]); // 추가된 항목 초기화
-        setShowAddItemForm(false); // 항목 추가 폼 닫기
       });
 
       if (result.data.ingredients.length === 0 && result.data.containers.length === 0) {
@@ -364,10 +249,10 @@ export function CookingPlanImportModal({
 
   // 전체 선택/해제
   const toggleAllSelection = useCallback(() => {
-    if (!cookingPlanData && additionalItems.length === 0) return;
+    if (!cookingPlanData) return;
 
     safeSetState(() => {
-      const allItems = cookingPlanData ? [...cookingPlanData.ingredients, ...cookingPlanData.containers, ...additionalItems] : additionalItems;
+      const allItems = [...cookingPlanData.ingredients, ...cookingPlanData.containers];
       const allItemIds = allItems.map(item => item.id);
       
       if (selectedItems.size === allItemIds.length) {
@@ -376,7 +261,7 @@ export function CookingPlanImportModal({
         setSelectedItems(new Set(allItemIds));
       }
     });
-  }, [cookingPlanData, additionalItems, selectedItems, safeSetState]);
+  }, [cookingPlanData, selectedItems, safeSetState]);
 
   // 용기의 parent 정보를 가져오는 함수 (ID와 이름 모두 반환)
   const getContainerParentInfo = async (containerId: string): Promise<{parentId: string | null, parentName: string | null}> => {
@@ -414,7 +299,7 @@ export function CookingPlanImportModal({
       return;
     }
 
-    const allItems = cookingPlanData ? [...cookingPlanData.ingredients, ...cookingPlanData.containers, ...additionalItems] : additionalItems;
+    const allItems = cookingPlanData ? [...cookingPlanData.ingredients, ...cookingPlanData.containers] : [];
     if (allItems.length === 0) return;
 
     safeSetState(() => setIsProcessing(true));
@@ -626,28 +511,9 @@ export function CookingPlanImportModal({
     }
   };
 
-  const allItems = cookingPlanData ? [...cookingPlanData.ingredients, ...cookingPlanData.containers, ...additionalItems] : additionalItems;
+  const allItems = cookingPlanData ? [...cookingPlanData.ingredients, ...cookingPlanData.containers] : [];
   const isAllSelected = allItems.length > 0 && selectedItems.size === allItems.length;
   const today = new Date();
-
-  // 이미 존재하는 항목인지 체크하는 함수
-  const isItemAlreadyExists = useCallback((itemName: string) => {
-    return allItems.some(item => item.name === itemName);
-  }, [allItems]);
-
-  // 검색 항목 선택/해제 핸들러
-  const toggleSearchItemSelection = useCallback((item: any) => {
-    if (isItemAlreadyExists(item.name)) return; // 이미 존재하는 항목은 선택 불가
-    
-    setSelectedSearchItems(prev => {
-      const isSelected = prev.some(selected => selected.id === item.id);
-      if (isSelected) {
-        return prev.filter(selected => selected.id !== item.id);
-      } else {
-        return [...prev, item];
-      }
-    });
-  }, [isItemAlreadyExists]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -750,13 +616,7 @@ export function CookingPlanImportModal({
                             {format(new Date(cookingPlanData.date), 'yyyy년 MM월 dd일', { locale: ko })} 조리계획서
                           </CardTitle>
                           <p className="text-sm text-muted-foreground">
-                            총 {allItems.length}개 항목 
-                            {cookingPlanData && (
-                              <>
-                                (조리계획서: {cookingPlanData.ingredients.length + cookingPlanData.containers.length}개
-                                {additionalItems.length > 0 && `, 추가: ${additionalItems.length}개`})
-                              </>
-                            )}
+                            총 {allItems.length}개 항목 (조리계획서)
                           </p>
                         </div>
                       </div>
@@ -781,19 +641,9 @@ export function CookingPlanImportModal({
                   </CardHeader>
 
                   <CardContent className="space-y-4">
-                    {/* 항목 추가 버튼 - 상단으로 이동 */}
-                    <div className="flex justify-between items-center">
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowAddItemForm(!showAddItemForm)}
-                        className="gap-2 h-8 px-3 text-sm"
-                        size="sm"
-                      >
-                        <Plus className="h-3 w-3" />
-                        항목 추가
-                      </Button>
-                      
-                      {selectedItems.size > 0 && (
+                    {/* 일괄 출고 버튼 */}
+                    {selectedItems.size > 0 && (
+                      <div className="flex justify-end">
                         <Button
                           onClick={processBulkOutgoing}
                           disabled={isProcessing}
@@ -812,166 +662,10 @@ export function CookingPlanImportModal({
                             </>
                           )}
                         </Button>
-                      )}
-                    </div>
-
-                    {/* 항목 추가 폼 */}
-                    {showAddItemForm && (
-                      <div className="border rounded-lg p-4 space-y-4 bg-muted/50">
-                        <div className="flex items-center gap-2">
-                          <Plus className="h-4 w-4" />
-                          <h4 className="font-medium text-sm">새 항목 추가</h4>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          {/* 항목 유형 선택 */}
-                          <div className="space-y-2">
-                            <label className="text-xs font-medium">항목 유형</label>
-                            <Select value={addItemType} onValueChange={(value: 'ingredient' | 'container') => setAddItemType(value)}>
-                              <SelectTrigger className="h-8">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="ingredient">
-                                  <div className="flex items-center gap-2">
-                                    <Tag className="h-3 w-3" />
-                                    식재료
-                                  </div>
-                                </SelectItem>
-                                <SelectItem value="container">
-                                  <div className="flex items-center gap-2">
-                                    <Package className="h-3 w-3" />
-                                    용기
-                                  </div>
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          {/* 수량 입력 */}
-                          <div className="space-y-2">
-                            <label className="text-xs font-medium">수량</label>
-                            <Input
-                              type="number"
-                              min="0.1"
-                              step="0.1"
-                              value={addItemQuantity}
-                              onChange={(e) => setAddItemQuantity(parseFloat(e.target.value) || 1)}
-                              placeholder="수량"
-                              className="h-8"
-                            />
-                          </div>
-
-                          {/* 항목 검색 */}
-                          <div className="space-y-2">
-                            <label className="text-xs font-medium">항목 검색</label>
-                            <div className="flex gap-2">
-                              <Input
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder={`${addItemType === 'ingredient' ? '식재료' : '용기'} 이름`}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    searchItems();
-                                  }
-                                }}
-                                className="h-8"
-                              />
-                              <Button
-                                onClick={searchItems}
-                                disabled={isSearching}
-                                variant="outline"
-                                size="sm"
-                                className="h-8 px-2"
-                              >
-                                {isSearching ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : (
-                                  <Search className="h-3 w-3" />
-                                )}
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* 검색 결과 */}
-                        {searchResults.length > 0 && (
-                          <div className="space-y-2">
-                            <label className="text-xs font-medium">검색 결과</label>
-                            <div className="max-h-32 overflow-y-auto border rounded-md bg-background">
-                              {searchResults.map((item) => {
-                                const isAlreadyExists = isItemAlreadyExists(item.name);
-                                const isSelected = selectedSearchItems.some(selected => selected.id === item.id);
-                                
-                                return (
-                                  <div
-                                    key={item.id}
-                                    onClick={() => !isAlreadyExists && toggleSearchItemSelection(item)}
-                                    className={cn(
-                                      "p-2 border-b last:border-b-0 text-sm flex items-center gap-2",
-                                      !isAlreadyExists && "cursor-pointer hover:bg-muted",
-                                      isSelected && "bg-muted",
-                                      isAlreadyExists && "opacity-50 cursor-not-allowed bg-muted/30"
-                                    )}
-                                  >
-                                    <Checkbox
-                                      checked={isSelected}
-                                      disabled={isAlreadyExists}
-                                      onCheckedChange={() => !isAlreadyExists && toggleSearchItemSelection(item)}
-                                    />
-                                    <div className="flex-1">
-                                      <div className="flex items-center justify-between">
-                                        <div>
-                                          <div className="font-medium flex items-center gap-2">
-                                            {item.name}
-                                            {isAlreadyExists && (
-                                              <Badge variant="outline" className="text-xs">
-                                                이미 존재
-                                              </Badge>
-                                            )}
-                                          </div>
-                                          <div className="text-xs text-muted-foreground">
-                                            {item.code_name && `코드: ${item.code_name} • `}
-                                            {item.unit && `단위: ${item.unit}`}
-                                            {item.stock_grade && ` • 등급: ${item.stock_grade}`}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 버튼들 */}
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              setShowAddItemForm(false);
-                              setSearchQuery('');
-                              setSearchResults([]);
-                              setSelectedSearchItems([]);
-                              setAddItemQuantity(1);
-                            }}
-                            size="sm"
-                            className="h-8 px-3"
-                          >
-                            취소
-                          </Button>
-                          <Button
-                            onClick={addItem}
-                            disabled={selectedSearchItems.length === 0}
-                            size="sm"
-                            className="h-8 px-3"
-                          >
-                            추가 ({selectedSearchItems.length}개)
-                          </Button>
-                        </div>
                       </div>
                     )}
+
+
 
                     {/* 테이블 */}
                     <div className="rounded-md border overflow-hidden">
@@ -989,48 +683,27 @@ export function CookingPlanImportModal({
                         </TableHeader>
                         <TableBody>
                           {allItems.map((item) => {
-                            const isAdditionalItem = item.id.startsWith('additional_');
                             return (
                               <TableRow 
                                 key={item.id}
                                 className={cn(
                                   "hover:bg-muted/50",
-                                  selectedItems.has(item.id) && "bg-muted",
-                                  isAdditionalItem && "bg-accent/50"
+                                  selectedItems.has(item.id) && "bg-muted"
                                 )}
                               >
                                 <TableCell className="py-2">
-                                  <div className="flex items-center gap-1">
-                                    <Checkbox
-                                      checked={selectedItems.has(item.id)}
-                                      onCheckedChange={() => toggleItemSelection(item.id)}
-                                    />
-                                    {isAdditionalItem && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => removeAdditionalItem(item.id)}
-                                        className="h-5 w-5 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </Button>
-                                    )}
-                                  </div>
+                                  <Checkbox
+                                    checked={selectedItems.has(item.id)}
+                                    onCheckedChange={() => toggleItemSelection(item.id)}
+                                  />
                                 </TableCell>
                                 <TableCell className="py-2">
-                                  <div className="flex items-center gap-1">
-                                    <Badge 
-                                      variant={item.item_type === 'ingredient' ? 'secondary' : 'outline'}
-                                      className="text-xs"
-                                    >
-                                      {item.item_type === 'ingredient' ? '식재료' : '용기'}
-                                    </Badge>
-                                    {isAdditionalItem && (
-                                      <Badge variant="default" className="text-xs">
-                                        추가
-                                      </Badge>
-                                    )}
-                                  </div>
+                                  <Badge 
+                                    variant={item.item_type === 'ingredient' ? 'secondary' : 'outline'}
+                                    className="text-xs"
+                                  >
+                                    {item.item_type === 'ingredient' ? '식재료' : '용기'}
+                                  </Badge>
                                 </TableCell>
                                 <TableCell className="font-medium py-2 text-sm">{item.name}</TableCell>
                                 <TableCell className="text-muted-foreground py-2 text-sm font-mono">
