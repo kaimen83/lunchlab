@@ -429,4 +429,4 @@ function CartItemRow({ item, onRemove, onQuantityChange }: CartItemRowProps) {
       </div>
     </div>
   );
-} 
+}

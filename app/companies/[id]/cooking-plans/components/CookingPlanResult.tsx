@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { useParams } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
 // 확장된 식재료 요구사항 타입 정의 - 외부에서 import하는 IngredientRequirement 사용
@@ -180,6 +181,9 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
   const [selectedContainer, setSelectedContainer] = useState<any>(null);
   const [ingredientQuantity, setIngredientQuantity] = useState('');
   const [containerQuantity, setContainerQuantity] = useState('');
+  
+  // 식재료 수량 입력 단위 상태 추가
+  const [ingredientInputUnit, setIngredientInputUnit] = useState<'kg' | 'g' | 'l' | 'ml' | 'EA'>('kg');
 
   // 메뉴 확장 상태 토글
   const toggleMenuExpand = (menuId: string, containerId: string | null) => {
@@ -328,12 +332,15 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
     }
 
     try {
+      // 환산된 수량을 서버로 전송
+      const convertedQuantity = getConvertedQuantity();
+      
       const response = await fetch(`/api/companies/${companyId}/cooking-plans/${date}/additional-ingredients`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ingredientId: selectedIngredient.id,
-          quantity: parseFloat(ingredientQuantity)
+          quantity: convertedQuantity
         })
       });
 
@@ -342,6 +349,7 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
         setShowIngredientModal(false);
         setSelectedIngredient(null);
         setIngredientQuantity('');
+        setIngredientInputUnit('kg');
         setIngredientSearch('');
         toast({
           title: "성공",
@@ -865,6 +873,109 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
     return `${Math.floor(quantity)} ${unit}`;
   };
 
+  // 단위 환산 함수
+  const convertToBaseUnit = (quantity: number, inputUnit: 'kg' | 'g' | 'l' | 'ml' | 'EA', ingredientUnit: string): number => {
+    // kg 입력 단위 처리
+    if (inputUnit === 'kg') {
+      if (ingredientUnit === 'g' || ingredientUnit === 'gram') {
+        return quantity * 1000; // kg to g
+      } else if (ingredientUnit === 'kg') {
+        return quantity; // kg to kg (no conversion)
+      }
+    }
+    
+    // g 입력 단위 처리
+    if (inputUnit === 'g') {
+      if (ingredientUnit === 'g' || ingredientUnit === 'gram') {
+        return quantity; // g to g (no conversion)
+      } else if (ingredientUnit === 'kg') {
+        return quantity / 1000; // g to kg
+      }
+    }
+    
+    // l 입력 단위 처리  
+    if (inputUnit === 'l') {
+      if (ingredientUnit === 'ml' || ingredientUnit === 'milliliter') {
+        return quantity * 1000; // l to ml
+      } else if (ingredientUnit === 'l' || ingredientUnit === 'liter') {
+        return quantity; // l to l (no conversion)
+      }
+    }
+    
+    // ml 입력 단위 처리
+    if (inputUnit === 'ml') {
+      if (ingredientUnit === 'ml' || ingredientUnit === 'milliliter') {
+        return quantity; // ml to ml (no conversion)
+      } else if (ingredientUnit === 'l' || ingredientUnit === 'liter') {
+        return quantity / 1000; // ml to l
+      }
+    }
+    
+    // 환산 불가능한 경우 원본 값 반환
+    return quantity;
+  };
+
+  // 단위 환산 가능 여부 확인
+  const isConversionPossible = (inputUnit: 'kg' | 'g' | 'l' | 'ml', ingredientUnit: string): boolean => {
+    // 무게 단위 그룹
+    if (inputUnit === 'kg' || inputUnit === 'g') {
+      return ingredientUnit === 'g' || ingredientUnit === 'gram' || ingredientUnit === 'kg';
+    }
+    // 부피 단위 그룹
+    if (inputUnit === 'l' || inputUnit === 'ml') {
+      return ingredientUnit === 'ml' || ingredientUnit === 'milliliter' || ingredientUnit === 'l' || ingredientUnit === 'liter';
+    }
+    return false;
+  };
+
+  // 식재료 단위에 따른 사용 가능한 입력 단위 목록
+  const getAvailableInputUnits = (ingredientUnit: string): ('kg' | 'g' | 'l' | 'ml')[] => {
+    // 무게 단위인 경우
+    if (ingredientUnit === 'g' || ingredientUnit === 'gram' || ingredientUnit === 'kg') {
+      return ['kg', 'g'];
+    }
+    // 부피 단위인 경우
+    if (ingredientUnit === 'ml' || ingredientUnit === 'milliliter' || ingredientUnit === 'l' || ingredientUnit === 'liter') {
+      return ['l', 'ml'];
+    }
+    // 기타 단위인 경우 기본값
+    return ['kg', 'g'];
+  };
+
+  // 식재료 선택 시 기본 입력 단위 설정
+  const getDefaultInputUnit = (ingredientUnit: string): 'kg' | 'g' | 'l' | 'ml' => {
+    // 무게 단위인 경우 kg를 기본으로
+    if (ingredientUnit === 'g' || ingredientUnit === 'gram' || ingredientUnit === 'kg') {
+      return 'kg';
+    }
+    // 부피 단위인 경우 l을 기본으로
+    if (ingredientUnit === 'ml' || ingredientUnit === 'milliliter' || ingredientUnit === 'l' || ingredientUnit === 'liter') {
+      return 'l';
+    }
+    // 기타 단위인 경우 기본값
+    return 'kg';
+  };
+
+  // 환산된 수량 계산
+  const getConvertedQuantity = (): number => {
+    if (!ingredientQuantity || !selectedIngredient) return 0;
+    const inputQty = parseFloat(ingredientQuantity);
+    return convertToBaseUnit(inputQty, ingredientInputUnit, selectedIngredient.unit);
+  };
+
+  // 환산된 수량 표시 텍스트
+  const getConvertedQuantityText = (): string => {
+    if (!ingredientQuantity || !selectedIngredient) return '';
+    const convertedQty = getConvertedQuantity();
+    const isConvertible = isConversionPossible(ingredientInputUnit, selectedIngredient.unit);
+    
+    if (!isConvertible) {
+      return `${convertedQty.toFixed(1)}${selectedIngredient.unit} (환산 불가)`;
+    }
+    
+    return `${convertedQty.toFixed(1)}${selectedIngredient.unit}`;
+  };
+
   return (
     <div className="space-y-6">
       {/* 헤더 */}
@@ -1099,7 +1210,10 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                             className={`p-3 cursor-pointer hover:bg-gray-50 border-b last:border-b-0 ${
                               selectedIngredient?.id === ingredient.id ? 'bg-blue-50 border-blue-200' : ''
                             }`}
-                            onClick={() => setSelectedIngredient(ingredient)}
+                            onClick={() => {
+                              setSelectedIngredient(ingredient);
+                              setIngredientInputUnit(getDefaultInputUnit(ingredient.unit));
+                            }}
                           >
                             <div className="font-medium">{ingredient.name}</div>
                             <div className="text-sm text-gray-500">
@@ -1110,27 +1224,69 @@ export default function CookingPlanResult({ cookingPlan, onPrint, onDownload, on
                         ))}
                       </div>
                       {selectedIngredient && (
-                        <div className="space-y-2">
-                          <div className="p-3 bg-blue-50 rounded-md">
-                            <div className="font-medium">선택된 식재료: {selectedIngredient.name}</div>
-                            <div className="text-sm text-gray-600">
-                              단위: {selectedIngredient.unit} | 포장단위: {selectedIngredient.package_amount}{selectedIngredient.unit}
+                                                  <div className="space-y-2">
+                            <div className="p-3 bg-blue-50 rounded-md">
+                              <div className="font-medium">선택된 식재료: {selectedIngredient.name}</div>
+                              <div className="text-sm text-gray-600">
+                                기본 단위: {selectedIngredient.unit} | 포장단위: {selectedIngredient.package_amount}{selectedIngredient.unit}
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Input
-                              type="number"
-                              placeholder="수량 입력"
-                              value={ingredientQuantity}
-                              onChange={(e) => setIngredientQuantity(e.target.value)}
-                              className="flex-1"
-                            />
-                            <span className="flex items-center text-sm text-gray-500">
-                              {selectedIngredient.unit}
-                            </span>
-                          </div>
+                            <div className="space-y-3">
+                              <div className="flex gap-2">
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  placeholder="수량 입력"
+                                  value={ingredientQuantity}
+                                  onChange={(e) => setIngredientQuantity(e.target.value)}
+                                  className="flex-1"
+                                />
+                                <Select 
+                                  value={ingredientInputUnit} 
+                                  onValueChange={(value: 'kg' | 'g' | 'l' | 'ml') => setIngredientInputUnit(value)}
+                                >
+                                  <SelectTrigger className="w-20">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {getAvailableInputUnits(selectedIngredient.unit).map((unit) => (
+                                      <SelectItem key={unit} value={unit}>
+                                        {unit}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              {ingredientQuantity && (
+                                <div className={`text-sm p-2 rounded ${
+                                  isConversionPossible(ingredientInputUnit, selectedIngredient.unit) 
+                                    ? 'text-gray-600 bg-gray-50' 
+                                    : 'text-orange-600 bg-orange-50'
+                                }`}>
+                                  <span className="font-medium">환산 수량:</span> {getConvertedQuantityText()}
+                                  <div className="text-xs mt-1">
+                                    {isConversionPossible(ingredientInputUnit, selectedIngredient.unit) ? (
+                                      <span className="text-gray-500">
+                                        {ingredientInputUnit} → {selectedIngredient.unit}로 환산
+                                      </span>
+                                    ) : (
+                                      <span className="text-orange-500">
+                                        ⚠️ {ingredientInputUnit}와 {selectedIngredient.unit} 간 환산이 불가능합니다. 원본 값이 그대로 사용됩니다.
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           <div className="flex gap-2 justify-end">
-                            <Button variant="outline" onClick={() => setShowIngredientModal(false)}>
+                            <Button variant="outline" onClick={() => {
+                              setShowIngredientModal(false);
+                              setSelectedIngredient(null);
+                              setIngredientQuantity('');
+                              setIngredientInputUnit('kg');
+                              setIngredientSearch('');
+                            }}>
                               취소
                             </Button>
                             <Button onClick={addIngredient}>
