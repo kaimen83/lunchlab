@@ -24,15 +24,38 @@ import {
   RefreshCw,
   Loader2,
   X,
+  Calendar as CalendarIcon,
+  TrendingUp,
+  Clock,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { formatQuantity } from "@/lib/utils/format";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { ko } from "date-fns/locale";
 
 interface StockItemDetailModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   companyId: string;
   itemId: string | null;
+}
+
+// 특정 날짜 재고 조회 결과 타입
+interface HistoricalStockData {
+  stockItemId: string;
+  itemType: string;
+  itemName: string;
+  unit: string;
+  quantity: number;
+  date: string;
+  calculationMethod: string;
+  calculationTime: string;
+  transactionsProcessed: number;
+  baseSnapshot?: {
+    date: string;
+    quantity: number;
+  } | null;
 }
 
 export function StockItemDetailModal({
@@ -51,6 +74,11 @@ export function StockItemDetailModal({
     pageSize: 5,
     pageCount: 0,
   });
+
+  // 특정 날짜 재고 조회 관련 상태
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [historicalData, setHistoricalData] = useState<HistoricalStockData | null>(null);
+  const [isHistoricalLoading, setIsHistoricalLoading] = useState(false);
 
   // 재고 항목 상세 정보 조회
   const fetchItemDetail = async () => {
@@ -110,6 +138,69 @@ export function StockItemDetailModal({
     }
   };
 
+  // 특정 날짜 재고 조회
+  const fetchHistoricalStock = async (dateString: string) => {
+    if (!itemId || !dateString) return;
+    
+    setIsHistoricalLoading(true);
+    try {
+      const response = await fetch(
+        `/api/companies/${companyId}/stock/items/${itemId}/historical?date=${dateString}`
+      );
+
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        setHistoricalData(result.data);
+        toast({
+          title: "조회 완료",
+          description: `${format(new Date(dateString), 'yyyy년 MM월 dd일', { locale: ko })} 재고 현황을 조회했습니다.`,
+        });
+      } else {
+        // 404 오류 또는 데이터가 없는 경우
+        if (response.status === 404 || result.error?.includes('찾을 수 없습니다')) {
+          toast({
+            title: "데이터 없음",
+            description: `${format(new Date(dateString), 'yyyy년 MM월 dd일', { locale: ko })}에는 재고 데이터가 없습니다. 재고 생성 이후의 날짜를 선택해주세요.`,
+            variant: "default",
+          });
+        } else {
+          toast({
+            title: "조회 실패",
+            description: result.error || "특정 날짜 재고 조회 중 문제가 발생했습니다.",
+            variant: "destructive",
+          });
+        }
+        setHistoricalData(null);
+      }
+    } catch (error) {
+      console.error("특정 날짜 재고 조회 오류:", error);
+      toast({
+        title: "조회 실패",
+        description: "네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        variant: "destructive",
+      });
+      setHistoricalData(null);
+    } finally {
+      setIsHistoricalLoading(false);
+    }
+  };
+
+  // 날짜 선택 핸들러
+  const handleDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const dateString = event.target.value;
+    setSelectedDate(dateString);
+    if (dateString) {
+      fetchHistoricalStock(dateString);
+    }
+  };
+
+  // 특정 날짜 재고 초기화
+  const clearHistoricalData = () => {
+    setSelectedDate('');
+    setHistoricalData(null);
+  };
+
 
 
   // 페이지 변경 핸들러
@@ -131,6 +222,8 @@ export function StockItemDetailModal({
         pageSize: 5,
         pageCount: 0,
       });
+      // 특정 날짜 재고 관련 상태도 초기화
+      clearHistoricalData();
     }
   }, [open, itemId]);
 
@@ -266,6 +359,131 @@ export function StockItemDetailModal({
                         <h4 className="text-sm font-medium text-muted-foreground">설명</h4>
                         <p>{item.details?.description || "-"}</p>
                       </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 특정 날짜 재고 조회 섹션 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <TrendingUp className="mr-2 h-5 w-5" />
+                  특정 날짜 재고 조회
+                </CardTitle>
+                <CardDescription>
+                  원하는 날짜의 재고 현황을 조회할 수 있습니다.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      onChange={handleDateChange}
+                      max={new Date().toISOString().split('T')[0]}
+                      min="2020-01-01"
+                      className="px-3 py-2 border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                    />
+                  </div>
+
+                  {selectedDate && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearHistoricalData}
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      초기화
+                    </Button>
+                  )}
+                </div>
+
+                {isHistoricalLoading && (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                    <span>재고 현황을 조회하고 있습니다...</span>
+                  </div>
+                )}
+
+                {historicalData && !isHistoricalLoading && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+                      <div>
+                        <h4 className="text-sm font-medium text-muted-foreground">조회 날짜</h4>
+                        <p className="text-lg font-semibold">
+                          {format(new Date(historicalData.date), "yyyy년 MM월 dd일", { locale: ko })}
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-muted-foreground">해당 날짜 재고량</h4>
+                        <p className="text-lg font-semibold text-primary">
+                          {formatQuantity(historicalData.quantity, historicalData.unit)} {
+                            historicalData.unit === "g" ? "kg" : 
+                            historicalData.unit === "ml" ? "l" : 
+                            historicalData.unit
+                          }
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-muted-foreground">현재 재고와의 차이</h4>
+                        <p className={cn(
+                          "text-lg font-semibold",
+                          item.current_quantity - historicalData.quantity > 0 ? "text-green-600" : 
+                          item.current_quantity - historicalData.quantity < 0 ? "text-red-600" : 
+                          "text-muted-foreground"
+                        )}>
+                          {item.current_quantity - historicalData.quantity > 0 ? "+" : ""}
+                          {formatQuantity(item.current_quantity - historicalData.quantity, historicalData.unit)} {
+                            historicalData.unit === "g" ? "kg" : 
+                            historicalData.unit === "ml" ? "l" : 
+                            historicalData.unit
+                          }
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-muted-foreground flex items-center">
+                          <Clock className="mr-1 h-3 w-3" />
+                          조회 성능
+                        </h4>
+                        <div className="space-y-1">
+                          <div className="text-sm flex items-center">
+                            <Badge variant="outline" className="mr-2">
+                              {historicalData.calculationMethod === 'snapshot_direct' ? '스냅샷 직접' :
+                               historicalData.calculationMethod === 'snapshot_incremental' ? '스냅샷+증분' :
+                               '전체 계산'}
+                            </Badge>
+                            <span>{historicalData.calculationTime}</span>
+                          </div>
+                          {historicalData.transactionsProcessed > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              {historicalData.transactionsProcessed}건 거래 처리
+                            </p>
+                          )}
+                          {historicalData.baseSnapshot && (
+                            <p className="text-xs text-muted-foreground">
+                              기준: {format(new Date(historicalData.baseSnapshot.date), "MM/dd", { locale: ko })} 스냅샷
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedDate && !historicalData && !isHistoricalLoading && (
+                  <div className="text-center py-8 space-y-2">
+                    <div className="text-muted-foreground">
+                      📅 {format(new Date(selectedDate), 'yyyy년 MM월 dd일', { locale: ko })}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      해당 날짜의 재고 데이터가 없습니다.
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      재고 생성 이후의 날짜를 선택해주세요.
                     </div>
                   </div>
                 )}
