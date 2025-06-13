@@ -70,32 +70,6 @@ export function CompanyMemberList({
   const isOwner = currentUserMembership?.role === 'owner';
   const isAdmin = currentUserMembership?.role === 'admin' || isOwner;
   
-  // 사용자 표시 이름을 가져오는 함수
-  const getUserDisplayName = (userInfo: UserInfo): string => {
-    // Clerk metadata에 name이 있는 경우 우선 사용
-    if (userInfo.metadataName) {
-      return userInfo.metadataName;
-    }
-    
-    // 다음으로 프로젝트 사용자 프로필에 이름이 있는 경우 사용
-    if (userInfo.profileCompleted && userInfo.profile?.name) {
-      return userInfo.profile.name;
-    }
-    
-    // Clerk 이름 사용
-    if (userInfo.firstName || userInfo.lastName) {
-      return `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim();
-    }
-    
-    // 이름이 없으면 이메일 또는 사용자명
-    if (userInfo.email) {
-      return userInfo.email.split('@')[0];
-    }
-    
-    // 아무것도 없는 경우
-    return '이름 없음';
-  };
-  
   // 멤버 목록에 대한 사용자 정보 가져오기
   useEffect(() => {
     const fetchUsers = async () => {
@@ -122,7 +96,7 @@ export function CompanyMemberList({
         });
         
         if (!response.ok) {
-          throw new Error('사용자 정보 조회에 실패했습니다.');
+          throw new Error(`API 호출 실패: ${response.status}`);
         }
         
         const data = await response.json();
@@ -140,35 +114,36 @@ export function CompanyMemberList({
             };
           }
           
-          // API 응답에서 받은 형식을 UserInfo 형태로 변환
-          const userInfoFormatted: UserInfo = {
-            id: userInfo.id,
-            firstName: userInfo.firstName,
-            lastName: userInfo.lastName,
-            email: userInfo.email || '',
-            imageUrl: userInfo.imageUrl,
-            profileCompleted: userInfo.profileCompleted,
-            profile: userInfo.profile,
-            metadataName: userInfo.metadataName
-          };
+          // 이름 결정 로직
+          let displayName = '알 수 없음';
+          
+          if (userInfo.metadataName) {
+            displayName = userInfo.metadataName;
+          } else if (userInfo.firstName && userInfo.lastName) {
+            displayName = `${userInfo.firstName} ${userInfo.lastName}`;
+          } else if (userInfo.firstName) {
+            displayName = userInfo.firstName;
+          } else if (userInfo.lastName) {
+            displayName = userInfo.lastName;
+          }
           
           return {
             membership,
-            displayName: getUserDisplayName(userInfoFormatted),
+            displayName,
             email: userInfo.email || '',
             imageUrl: userInfo.imageUrl,
           };
         });
         
         setMembersWithUsers(membersWithUserInfo);
-      } catch (err) {
-        console.error('멤버 정보 로딩 중 오류:', err);
-        setError('멤버 정보를 불러오는데 실패했습니다.');
+      } catch (error) {
+        console.error('사용자 정보 조회 오류:', error);
+        setError('사용자 정보를 불러오는데 실패했습니다.');
       } finally {
         setIsLoading(false);
       }
     };
-    
+
     fetchUsers();
   }, [members]);
   
