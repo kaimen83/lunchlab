@@ -285,14 +285,14 @@ export async function PATCH(
               console.log(`재고량 업데이트 성공: ${item.item_name} -> ${updateResult[0].current_quantity}`);
               updatedCount++;
               
-              // 재고 거래 기록 생성 (실사 조정)
+              // 재고 거래 기록 생성 (실사 조정) - 실사 날짜를 거래 날짜로 사용
               const { error: transactionError } = await supabase
                 .from('stock_transactions')
                 .insert({
                   stock_item_id: item.stock_item_id,
                   transaction_type: 'adjustment',
                   quantity: Number(item.difference) || 0,
-                  transaction_date: new Date().toISOString(),
+                  transaction_date: audit.audit_date, // 실사 날짜를 거래 날짜로 사용
                   user_id: userId,
                   reference_id: auditId,
                   reference_type: 'stock_audit',

@@ -131,11 +131,18 @@ export async function POST(
 
     // 요청 본문 파싱
     const body: CreateStockAuditRequest = await request.json();
-    const { name, description, item_types = ['ingredient', 'container'] } = body;
+    const { name, description, audit_date, item_types = ['ingredient', 'container'] } = body;
 
     if (!name || name.trim() === '') {
       return NextResponse.json(
         { error: '실사명을 입력해주세요.' },
+        { status: 400 }
+      );
+    }
+
+    if (!audit_date) {
+      return NextResponse.json(
+        { error: '실사 날짜를 선택해주세요.' },
         { status: 400 }
       );
     }
@@ -147,6 +154,7 @@ export async function POST(
         company_id: companyId,
         name: name.trim(),
         description: description?.trim(),
+        audit_date: audit_date, // 사용자가 선택한 실사 날짜
         created_by: userId,
         status: 'in_progress'
       })

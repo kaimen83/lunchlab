@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 import { 
   ClipboardCheck, 
   Plus, 
@@ -55,19 +56,34 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
     search: ''
   });
   
-  // 현재 날짜 기반 기본 실사명 생성
-  const getDefaultAuditName = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth() + 1;
-    const day = today.getDate();
+  // 선택된 날짜 기반 실사명 생성
+  const getAuditNameByDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
     return `${year}년 ${month}월 ${day}일 정기실사`;
+  };
+
+  // 날짜 선택 상태
+  const [selectedAuditDate, setSelectedAuditDate] = useState<Date>(new Date());
+
+  // 날짜 선택 시 실사명과 audit_date 자동 업데이트
+  const handleDateSelect = (date: Date | undefined) => {
+    if (!date) return;
+    
+    setSelectedAuditDate(date);
+    setNewAuditForm(prev => ({
+      ...prev,
+      name: getAuditNameByDate(date),
+      audit_date: format(date, 'yyyy-MM-dd')
+    }));
   };
 
   // 새 실사 생성 폼
   const [newAuditForm, setNewAuditForm] = useState({
-    name: getDefaultAuditName(),
+    name: getAuditNameByDate(new Date()),
     description: '',
+    audit_date: format(new Date(), 'yyyy-MM-dd'), // YYYY-MM-DD 형식
     item_types: ['ingredient', 'container'] as ('ingredient' | 'container')[]
   });
   
@@ -165,7 +181,14 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
       });
       
       // 폼 초기화 및 목록 새로고침
-      setNewAuditForm({ name: getDefaultAuditName(), description: '', item_types: ['ingredient', 'container'] });
+      const today = new Date();
+      setSelectedAuditDate(today);
+      setNewAuditForm({ 
+        name: getAuditNameByDate(today), 
+        description: '', 
+        audit_date: format(today, 'yyyy-MM-dd'),
+        item_types: ['ingredient', 'container'] 
+      });
       setIsCreateModalOpen(false); // 모달 닫기
       await fetchAudits();
       
@@ -361,68 +384,7 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
     completeAudit(shouldApply);
   };
 
-  // 완료된 실사의 재고량 수동 반영
-  const applyStockDifferences = async () => {
-    if (!currentAudit) return;
 
-    try {
-      const response = await fetch(
-        `/api/companies/${companyId}/stock/audits/${currentAudit.audit.id}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'apply_differences'
-          })
-        }
-      );
-
-      if (!response.ok) throw new Error('재고량 반영 실패');
-      
-      const data = await response.json();
-      toast({
-        title: "재고량 반영 완료",
-        description: `${data.applied_count || 0}개 항목의 재고량이 실사량으로 반영되었습니다.`,
-      });
-      
-      // 재고량 반영 후 실사 상세 정보 새로고침
-      await fetchAuditDetail(currentAudit.audit.id);
-    } catch (error) {
-      console.error('재고량 반영 오류:', error);
-      toast({
-        title: "오류 발생",
-        description: "재고량 반영 중 문제가 발생했습니다.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // 재고량 반영 확인 다이얼로그
-  const handleApplyStockDifferences = () => {
-    if (!currentAudit) return;
-    
-    const discrepancyItemsCount = currentAudit.items.filter(item => 
-      item.actual_quantity !== null && 
-      item.actual_quantity !== undefined &&
-      item.difference !== 0
-    ).length;
-    
-    if (discrepancyItemsCount === 0) {
-      toast({
-        title: "반영할 차이 없음",
-        description: "장부량과 실사량에 차이가 있는 항목이 없습니다.",
-      });
-      return;
-    }
-
-    const shouldApply = window.confirm(
-      `장부량과 실사량에 차이가 있는 ${discrepancyItemsCount}개 항목의 재고량을 실사량으로 반영하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`
-    );
-    
-    if (shouldApply) {
-      applyStockDifferences();
-    }
-  };
 
   // 상태별 색상 및 아이콘
   const getStatusInfo = (status: string) => {
@@ -593,6 +555,21 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
                 </p>
               </div>
               
+              {/* 실사 날짜 선택 */}
+              <div>
+                <Label htmlFor="audit-date">실사 날짜</Label>
+                <Input
+                  id="audit-date"
+                  type="date"
+                  value={format(selectedAuditDate, 'yyyy-MM-dd')}
+                  onChange={(e) => {
+                    const newDate = new Date(e.target.value);
+                    handleDateSelect(newDate);
+                  }}
+                  className="w-full"
+                />
+              </div>
+              
               <div>
                 <Label htmlFor="audit-name">실사명</Label>
                 <Input
@@ -601,6 +578,9 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
                   value={newAuditForm.name}
                   onChange={(e) => setNewAuditForm(prev => ({ ...prev, name: e.target.value }))}
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  선택한 날짜에 따라 자동으로 생성됩니다. 필요시 수정 가능합니다.
+                </p>
               </div>
               <div>
                 <Label htmlFor="audit-description">설명 (선택사항)</Label>
@@ -691,15 +671,9 @@ export default function StockAuditPage({ companyId }: StockAuditPageProps) {
                   )}
 
                   {currentAudit.audit.status === 'completed' && (
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        onClick={handleApplyStockDifferences}
-                        className="bg-yellow-50 border-yellow-300 text-yellow-800 hover:bg-yellow-100"
-                      >
-                        <AlertTriangle className="h-4 w-4 mr-2" />
-                        재고량 반영
-                      </Button>
+                    <div className="flex items-center space-x-2 text-sm text-green-600">
+                      <CheckCircle className="h-4 w-4" />
+                      <span>실사 완료</span>
                     </div>
                   )}
                 </div>
