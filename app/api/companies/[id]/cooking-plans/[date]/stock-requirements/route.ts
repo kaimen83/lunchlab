@@ -13,6 +13,8 @@ interface StockRequirement {
   supplier?: string;
   stock_grade?: string;
   price?: number;
+  order_quantity?: number;
+  package_amount?: number; // 포장량 정보 추가
 }
 
 // 메뉴 컨테이너 타입 정의
@@ -196,7 +198,8 @@ export async function GET(
                 code_name: ingredient.code_name,
                 supplier: ingredient.supplier,
                 stock_grade: ingredient.stock_grade,
-                price: ingredient.price
+                price: ingredient.price,
+                package_amount: ingredient.package_amount
               };
             }
             
@@ -299,7 +302,8 @@ export async function GET(
             code_name: ingredient.code_name,
             supplier: ingredient.supplier,
             stock_grade: ingredient.stock_grade,
-            price: ingredient.price
+            price: ingredient.price,
+            package_amount: ingredient.package_amount
           });
         }
       }
@@ -320,6 +324,41 @@ export async function GET(
             code_name: container.code_name,
             price: container.price
           });
+        }
+      }
+    }
+
+    // 7. 발주량 정보 조회 및 추가
+    const allIngredientIds = [
+      ...Object.keys(ingredientRequirements),
+      ...additionalIngredientRequirements
+        .map(item => item.id.replace('additional_ingredient_', ''))
+        .filter(id => !id.startsWith('additional_'))
+    ];
+
+    if (allIngredientIds.length > 0) {
+      const { data: orderQuantities, error: orderQuantitiesError } = await supabase
+        .from('order_quantities')
+        .select('ingredient_id, order_quantity')
+        .eq('company_id', companyId)
+        .eq('date', date)
+        .in('ingredient_id', allIngredientIds);
+
+      if (!orderQuantitiesError && orderQuantities) {
+        // 기본 식재료 요구사항에 발주량 정보 추가
+        for (const orderQty of orderQuantities) {
+          if (ingredientRequirements[orderQty.ingredient_id]) {
+            ingredientRequirements[orderQty.ingredient_id].order_quantity = orderQty.order_quantity;
+          }
+        }
+
+        // 추가된 식재료에도 발주량 정보 추가
+        for (const additionalItem of additionalIngredientRequirements) {
+          const originalId = additionalItem.id.replace('additional_ingredient_', '');
+          const orderQty = orderQuantities.find(oq => oq.ingredient_id === originalId);
+          if (orderQty) {
+            additionalItem.order_quantity = orderQty.order_quantity;
+          }
         }
       }
     }

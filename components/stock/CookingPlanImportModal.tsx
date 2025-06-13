@@ -48,6 +48,8 @@ interface StockRequirement {
   supplier?: string;
   stock_grade?: string;
   price?: number;
+  order_quantity?: number; // 발주량 정보 추가
+  package_amount?: number; // 포장량 정보 추가
 }
 
 interface CookingPlanData {
@@ -78,6 +80,9 @@ export function CookingPlanImportModal({
   const [isProcessing, setIsProcessing] = useState(false);
   const [cookingPlanData, setCookingPlanData] = useState<CookingPlanData | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  
+  // 거래 모드 상태 (입고/출고)
+  const [transactionMode, setTransactionMode] = useState<'incoming' | 'outgoing'>('outgoing');
   
   // 수정된 수량 관리 (항상 활성화)
   const [editedQuantities, setEditedQuantities] = useState<Map<string, number>>(new Map());
@@ -131,6 +136,7 @@ export function CookingPlanImportModal({
           setIsProcessing(false);
           setEditedQuantities(new Map());
           setShowCalendar(false);
+          setTransactionMode('outgoing');
 
         }
       }, 100);
@@ -167,10 +173,24 @@ export function CookingPlanImportModal({
     }
   }, [editedQuantities, safeSetState]);
 
-  // 실제 사용할 수량 가져오기 (수정된 수량이 있으면 수정된 수량, 없으면 원래 수량)
+  // 실제 사용할 수량 가져오기 (수정된 수량이 있으면 수정된 수량, 없으면 모드에 따른 기본값)
   const getActualQuantity = useCallback((item: StockRequirement) => {
-    return editedQuantities.get(item.id) ?? item.total_amount;
-  }, [editedQuantities]);
+    if (editedQuantities.has(item.id)) {
+      return editedQuantities.get(item.id)!;
+    }
+    
+    // 입고 모드일 때는 발주량 × 포장량, 없으면 필요량
+    if (transactionMode === 'incoming') {
+      if (item.order_quantity !== undefined && item.package_amount && item.package_amount > 0) {
+        // 발주량(개) × 포장량 = 실제 입고량
+        return item.order_quantity * item.package_amount;
+      }
+      return item.total_amount;
+    }
+    
+    // 출고 모드일 때는 필요량
+    return item.total_amount;
+  }, [editedQuantities, transactionMode]);
 
   // 날짜 선택 핸들러
   const handleDateSelect = useCallback((date: Date | undefined) => {
@@ -442,7 +462,7 @@ export function CookingPlanImportModal({
         return;
       }
 
-      // 일괄 출고 거래 생성
+      // 일괄 거래 생성 (입고/출고)
       const transactionResponse = await fetch(
         `/api/companies/${companyId}/stock/transactions`,
         {
@@ -452,9 +472,9 @@ export function CookingPlanImportModal({
           },
           body: JSON.stringify({
             transactionItems, // 개별 거래 기록용 (isMaxInGroup 정보 포함)
-            stockAdjustments, // 실제 재고 차감용
-            requestType: 'outgoing',
-            notes: `조리계획서 기반 출고 (${cookingPlanData?.date || format(selectedDate!, 'yyyy-MM-dd')}) - 그룹별 최대 수량 적용`,
+            stockAdjustments, // 실제 재고 차감/증가용
+            requestType: transactionMode === 'incoming' ? 'incoming' : 'outgoing',
+            notes: `조리계획서 기반 ${transactionMode === 'incoming' ? '입고' : '출고'} (${cookingPlanData?.date || format(selectedDate!, 'yyyy-MM-dd')}) - ${transactionMode === 'incoming' ? '발주량 기준' : '그룹별 최대 수량 적용'}`,
             directProcess: true,
             isGroupedTransaction: true // 그룹화된 거래임을 표시
           }),
@@ -485,8 +505,8 @@ export function CookingPlanImportModal({
         });
       } else {
         toast({
-          title: '일괄 출고 완료',
-          description: `${successful}개 항목이 성공적으로 출고 처리되었습니다.${groupInfo ? ` ${groupInfo}` : ''}`,
+          title: `일괄 ${transactionMode === 'incoming' ? '입고' : '출고'} 완료`,
+          description: `${successful}개 항목이 성공적으로 ${transactionMode === 'incoming' ? '입고' : '출고'} 처리되었습니다.${groupInfo ? ` ${groupInfo}` : ''}`,
         });
       }
 
@@ -500,10 +520,10 @@ export function CookingPlanImportModal({
         }, 100);
       }
     } catch (error) {
-      console.error('일괄 출고 처리 오류:', error);
+      console.error(`일괄 ${transactionMode === 'incoming' ? '입고' : '출고'} 처리 오류:`, error);
       toast({
-        title: '출고 처리 실패',
-        description: error instanceof Error ? error.message : '일괄 출고 처리 중 오류가 발생했습니다.',
+        title: `${transactionMode === 'incoming' ? '입고' : '출고'} 처리 실패`,
+        description: error instanceof Error ? error.message : `일괄 ${transactionMode === 'incoming' ? '입고' : '출고'} 처리 중 오류가 발생했습니다.`,
         variant: 'destructive',
       });
     } finally {
@@ -526,7 +546,7 @@ export function CookingPlanImportModal({
             조리계획서 불러오기
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            특정 날짜의 조리계획서에서 재고 등급이 있는 식재료와 용기를 불러와 필요수량을 조정한 후 일괄 출고 처리할 수 있습니다.
+            특정 날짜의 조리계획서에서 재고 등급이 있는 식재료와 용기를 불러와 수량을 조정한 후 일괄 입고/출고 처리할 수 있습니다.
           </DialogDescription>
         </DialogHeader>
 
@@ -597,6 +617,37 @@ export function CookingPlanImportModal({
                   />
                 </div>
               )}
+
+              {/* 거래 모드 선택 */}
+              {cookingPlanData && allItems.length > 0 && (
+                <div className="flex items-center gap-4 pt-2 border-t">
+                  <span className="text-sm font-medium text-muted-foreground">거래 모드:</span>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="transactionMode"
+                        value="outgoing"
+                        checked={transactionMode === 'outgoing'}
+                        onChange={(e) => setTransactionMode(e.target.value as 'outgoing')}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">출고 (필요량 기준)</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="transactionMode"
+                        value="incoming"
+                        checked={transactionMode === 'incoming'}
+                        onChange={(e) => setTransactionMode(e.target.value as 'incoming')}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">입고 (발주량 기준)</span>
+                    </label>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -641,7 +692,7 @@ export function CookingPlanImportModal({
                   </CardHeader>
 
                   <CardContent className="space-y-4">
-                    {/* 일괄 출고 버튼 */}
+                    {/* 일괄 처리 버튼 */}
                     {selectedItems.size > 0 && (
                       <div className="flex justify-end">
                         <Button
@@ -658,7 +709,7 @@ export function CookingPlanImportModal({
                           ) : (
                             <>
                               <ShoppingCart className="h-3 w-3" />
-                              일괄 출고 ({selectedItems.size}개)
+                              일괄 {transactionMode === 'incoming' ? '입고' : '출고'} ({selectedItems.size}개)
                             </>
                           )}
                         </Button>
@@ -674,9 +725,11 @@ export function CookingPlanImportModal({
                           <TableRow>
                             <TableHead className="w-[60px] py-2">선택</TableHead>
                             <TableHead className="w-[80px] py-2">유형</TableHead>
-                            <TableHead className="w-[200px] py-2">항목명</TableHead>
+                            <TableHead className="w-[180px] py-2">항목명</TableHead>
                             <TableHead className="w-[100px] py-2">코드</TableHead>
-                            <TableHead className="w-[150px] text-right py-2">필요 수량</TableHead>
+                            <TableHead className="w-[120px] text-right py-2">필요 수량</TableHead>
+                            <TableHead className="w-[120px] text-right py-2">발주량</TableHead>
+                            <TableHead className="w-[120px] text-right py-2">처리 수량</TableHead>
                             <TableHead className="w-[100px] py-2">재고 등급</TableHead>
                             <TableHead className="py-2">공급업체</TableHead>
                           </TableRow>
@@ -710,6 +763,29 @@ export function CookingPlanImportModal({
                                   {item.code_name || '-'}
                                 </TableCell>
                                 <TableCell className="text-right py-2">
+                                  <div className="text-sm font-mono">
+                                    {formatNumber(item.total_amount)} {item.unit}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right py-2">
+                                  <div className="text-sm font-mono">
+                                    {item.order_quantity !== undefined ? (
+                                      <div className="flex flex-col items-end">
+                                        <span className="text-blue-600 font-medium">
+                                          {formatNumber(item.order_quantity)} 개
+                                        </span>
+                                        {item.package_amount && (
+                                          <span className="text-xs text-muted-foreground">
+                                            ({formatNumber(item.package_amount)}{item.unit}/개)
+                                          </span>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right py-2">
                                   <div className="flex flex-col items-end gap-1">
                                     <Input
                                       type="number"
@@ -723,9 +799,14 @@ export function CookingPlanImportModal({
                                       <span className="text-xs text-muted-foreground">
                                         {item.unit}
                                       </span>
-                                      {editedQuantities.has(item.id) && editedQuantities.get(item.id) !== item.total_amount && (
+                                      {editedQuantities.has(item.id) && (
                                         <span className="text-xs text-orange-600">
-                                          (원래: {formatNumber(item.total_amount)})
+                                          (수정됨)
+                                        </span>
+                                      )}
+                                      {transactionMode === 'incoming' && item.order_quantity !== undefined && item.package_amount && !editedQuantities.has(item.id) && (
+                                        <span className="text-xs text-blue-600">
+                                          ({item.order_quantity}개 × {item.package_amount}{item.unit})
                                         </span>
                                       )}
                                     </div>
@@ -801,7 +882,7 @@ export function CookingPlanImportModal({
                   ) : (
                     <>
                       <ShoppingCart className="h-4 w-4" />
-                      일괄 출고 처리
+                      일괄 {transactionMode === 'incoming' ? '입고' : '출고'} 처리
                     </>
                   )}
                 </Button>
