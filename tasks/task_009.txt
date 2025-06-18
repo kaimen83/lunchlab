@@ -1,0 +1,43 @@
+# Task ID: 9
+# Title: Develop Transfer Approval Workflow
+# Status: pending
+# Dependencies: 7, 8
+# Priority: low
+# Description: Implement the optional approval process for inventory transfers
+# Details:
+Extend the transfer API to support 'pending' status for transfers requiring approval. Add approval/rejection functionality with appropriate permissions checks. Implement UI components for reviewing and approving transfers. Create notification mechanism for pending approvals. Track who approved each transfer.
+
+# Test Strategy:
+Test the complete approval workflow with different user roles. Verify permissions are enforced correctly. Test notifications for pending approvals. Verify transfer history correctly shows approval information.
+
+# Subtasks:
+## 1. Extend Transfer Data Model and API for Approval Workflow [pending]
+### Dependencies: None
+### Description: Implement the foundational data model changes and API endpoints to support the approval workflow state machine. This includes adding approval status tracking, approval history, and configurable approval requirements.
+### Details:
+Add new fields to the InventoryTransfer model: status (enum with values: requested, pending_approval, approved, rejected, transferred, received), approved_by (many-to-many relationship to User), approval_required (boolean), approval_level_required (integer), rejection_reason (text field), and approval_deadline (datetime). Create ApprovalHistory model to track each approval action with fields: transfer_id, approver, action (approved/rejected), timestamp, comments, and digital_signature_hash. Implement state machine pattern using a library like python-transitions or similar for your tech stack. Create new API endpoints: POST /transfers/{id}/submit-for-approval, POST /transfers/{id}/approve, POST /transfers/{id}/reject, GET /transfers/pending-approval. Add validation to ensure transfers can only move through valid state transitions. Include comprehensive error handling for invalid state changes and permission violations. Write unit tests for all state transitions and API endpoints, focusing on edge cases like attempting to approve already-processed transfers.
+
+## 2. Implement Role-Based Permission System for Approvals [pending]
+### Dependencies: 9.1
+### Description: Create a flexible permission system that supports role-based approvals with configurable approval chains and multi-level approval requirements based on transfer criteria.
+### Details:
+Create ApprovalRole model with fields: name, description, can_approve_transfers, max_approval_amount, warehouse_restrictions. Implement ApprovalConfiguration model to define approval requirements based on transfer criteria: transfer_value_threshold, item_category, source/destination warehouse combinations, required_approval_levels, and approval_chain_order. Create middleware/decorators for permission checking that validates: user has appropriate approval role, transfer meets criteria for user's approval level, user hasn't already approved this transfer, and approval is within user's authority limits. Implement approval chain logic using Chain of Responsibility pattern - when a transfer needs approval, determine the required approvers based on configuration and route accordingly. Add API endpoints for managing approval configurations: GET/POST/PUT /approval-configurations and GET /users/{id}/approval-permissions. Create permission checking utilities that can be reused across the application. Write comprehensive tests for permission validation, including boundary cases like approval amount limits and warehouse restrictions.
+
+## 3. Build Approval Management UI Components [pending]
+### Dependencies: 9.1, 9.2
+### Description: Develop responsive UI components for submitting transfers for approval, reviewing pending approvals, and managing the approval process with intuitive workflows and clear status indicators.
+### Details:
+Create ApprovalQueue component displaying pending transfers in a sortable, filterable table with columns: transfer ID, requester, source/destination, items, value, submission date, and urgency indicators. Implement TransferApprovalModal with detailed transfer information, approval history timeline, comment section for approver notes, and approve/reject action buttons with confirmation dialogs. Build ApprovalStatusBadge component showing current status with appropriate color coding and progress indicators for multi-level approvals. Create TransferSubmissionForm that automatically determines if approval is required based on configured rules and shows approval requirements to the user. Implement ApprovalHistory component displaying chronological approval actions with approver details, timestamps, and comments. Add bulk approval functionality for multiple transfers when appropriate. Include responsive design for mobile approval workflows. Implement real-time updates using WebSocket connections or polling to show status changes immediately. Create comprehensive component tests using testing libraries like Jest/React Testing Library, focusing on user interactions and state management.
+
+## 4. Develop Multi-Channel Notification System [pending]
+### Dependencies: 9.1, 9.2
+### Description: Implement a comprehensive notification system that alerts relevant stakeholders about approval requests, status changes, and deadlines through multiple channels including email, in-app notifications, and optional SMS.
+### Details:
+Create NotificationTemplate model with customizable templates for different notification types: approval_requested, transfer_approved, transfer_rejected, approval_deadline_approaching, and transfer_completed. Implement NotificationPreference model allowing users to configure their notification preferences by type and channel. Build notification service using Observer pattern that triggers on transfer status changes, with support for immediate notifications and digest emails. Create email templates using a templating engine with professional styling, including transfer details, approval links, and deadline information. Implement in-app notification system with NotificationCenter component showing unread count, notification history, and mark-as-read functionality. Add optional SMS notifications using services like Twilio for urgent approvals. Create notification queue system for reliable delivery with retry logic and failure handling. Implement notification scheduling for deadline reminders (e.g., 24 hours before approval deadline). Add notification audit trail for compliance tracking. Build admin interface for managing notification templates and monitoring delivery status. Write integration tests for all notification channels and comprehensive unit tests for notification logic, including edge cases like failed deliveries and user preference handling.
+
+## 5. Implement Audit Trail and Reporting Dashboard [pending]
+### Dependencies: 9.1, 9.2, 9.3, 9.4
+### Description: Create comprehensive audit logging and reporting capabilities to track all approval actions, generate compliance reports, and provide analytics on approval workflow performance with exportable data.
+### Details:
+Extend ApprovalHistory model with additional audit fields: ip_address, user_agent, session_id, and digital_signature for enhanced security tracking. Create AuditLog model for comprehensive activity tracking including: user actions, system events, permission changes, and configuration updates. Build ApprovalReportsService generating reports: pending approvals by approver, approval turnaround times, rejection rates by category, and compliance audit trails. Implement ApprovalDashboard component with key metrics: average approval time, pending approval count by urgency, approval bottlenecks, and approver workload distribution. Create exportable reports in multiple formats (PDF, Excel, CSV) with customizable date ranges and filters. Add approval workflow analytics: identify slow approval chains, track approval patterns, and highlight process improvement opportunities. Implement automated compliance reporting with scheduled generation and distribution to stakeholders. Create approval deadline monitoring with escalation procedures for overdue approvals. Build search and filtering capabilities for audit logs with advanced query options. Add data retention policies for audit logs with configurable archival. Implement approval workflow performance metrics and SLA tracking. Write comprehensive integration tests covering the entire approval workflow from submission to completion, including error scenarios and edge cases.
+

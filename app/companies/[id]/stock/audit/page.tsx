@@ -28,9 +28,10 @@ import { StockAudit, StockAuditItem, StockAuditDetailResponse, CreateStockAuditR
 
 interface StockAuditPageProps {
   companyId: string;
+  selectedWarehouseId?: string;
 }
 
-export default function StockAuditPage({ companyId }: StockAuditPageProps) {
+export default function StockAuditPage({ companyId, selectedWarehouseId }: StockAuditPageProps) {
   const router = useRouter();
   const { toast } = useToast();
   

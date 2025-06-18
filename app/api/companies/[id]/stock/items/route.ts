@@ -2,13 +2,27 @@ import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 
+// 창고별 재고 정보 타입 정의
+interface WarehouseStock {
+  warehouseId: string;
+  warehouseName: string;
+  quantity: number;
+  unit: string;
+  lastUpdated?: string;
+}
+
+// 창고별 재고 맵 타입 정의
+interface WarehouseStocksMap {
+  [warehouseId: string]: WarehouseStock;
+}
+
 /**
  * 재고 항목 목록 조회 API
  * 
  * @route GET /api/companies/[id]/stock/items
  * @param request - 요청 객체
  * @param params - URL 파라미터 (회사 ID)
- * @returns 재고 항목 목록
+ * @returns 재고 항목 목록 (창고별 재고 포함)
  */
 export async function GET(
   request: NextRequest,
@@ -52,8 +66,23 @@ export async function GET(
     const sortBy = searchParams.get('sortBy') || 'name';
     const sortOrder = searchParams.get('sortOrder') || 'asc';
     const page = parseInt(searchParams.get('page') || '1');
-    // 페이지 당 아이템 수 제한을 더 낮게 설정하여 성능 개선
     const pageSize = parseInt(searchParams.get('pageSize') || '10');
+    const warehouseId = searchParams.get('warehouse_id'); // 창고 필터 (표시용으로만 사용)
+
+    // 먼저 회사의 모든 창고 정보를 가져오기
+    const { data: warehouses, error: warehousesError } = await supabase
+      .from('warehouses')
+      .select('id, name')
+      .eq('company_id', companyId)
+      .order('name');
+
+    if (warehousesError) {
+      console.error('창고 목록 조회 오류:', warehousesError);
+      return NextResponse.json(
+        { error: '창고 정보를 가져올 수 없습니다.' },
+        { status: 500 }
+      );
+    }
 
     // 모든 재고 항목 목록을 저장할 배열
     let allItems = [];
@@ -70,7 +99,6 @@ export async function GET(
     // 1. 회사에서 사용 가능한 식자재 ID 목록 조회
     if (shouldIncludeIngredients) {
       try {
-        // 우선 company_ingredients 매핑 테이블이 있는지 확인
         let ingredientQuery = supabase
           .from('ingredients')
           .select('id')
@@ -78,7 +106,6 @@ export async function GET(
         
         // 검색어나 카테고리 필터가 있으면 먼저 적용
         if (searchQuery) {
-          // PostgREST의 or 쿼리에서 특수문자 문제를 피하기 위해 별도 쿼리로 분리
           const nameResults = await supabase
             .from('ingredients')
             .select('id')
@@ -91,7 +118,6 @@ export async function GET(
             .eq('company_id', companyId)
             .ilike('code_name', `%${searchQuery}%`);
             
-          // 두 결과를 합치고 중복 제거
           const nameIds = nameResults.data?.map(item => item.id) || [];
           const codeIds = codeResults.data?.map(item => item.id) || [];
           const combinedIds = [...new Set([...nameIds, ...codeIds])];
@@ -99,7 +125,6 @@ export async function GET(
           if (combinedIds.length > 0) {
             ingredientQuery = ingredientQuery.in('id', combinedIds);
           } else {
-            // 검색 결과가 없으면 빈 결과 반환
             ingredientQuery = ingredientQuery.eq('id', 'no-match');
           }
         }
@@ -108,11 +133,9 @@ export async function GET(
           ingredientQuery = ingredientQuery.ilike('category', `%${category}%`);
         }
         
-        // 재고 등급 필터 적용
         if (stockGrade && stockGrade !== 'all') {
           ingredientQuery = ingredientQuery.eq('stock_grade', stockGrade);
         } else {
-          // stockGrade가 없거나 'all'인 경우, 재고관리 등급이 있는 모든 식자재 조회
           ingredientQuery = ingredientQuery.not('stock_grade', 'is', null);
         }
         
@@ -135,11 +158,9 @@ export async function GET(
           .from('containers')
           .select('id')
           .eq('company_id', companyId)
-          .is('parent_container_id', null); // 상위 그룹이 없는 컨테이너만 조회
+          .is('parent_container_id', null);
         
-        // 검색어나 카테고리 필터가 있으면 먼저 적용
         if (searchQuery) {
-          // PostgREST의 or 쿼리에서 특수문자 문제를 피하기 위해 별도 쿼리로 분리
           const nameResults = await supabase
             .from('containers')
             .select('id')
@@ -154,7 +175,6 @@ export async function GET(
             .is('parent_container_id', null)
             .ilike('code_name', `%${searchQuery}%`);
             
-          // 두 결과를 합치고 중복 제거
           const nameIds = nameResults.data?.map(item => item.id) || [];
           const codeIds = codeResults.data?.map(item => item.id) || [];
           const combinedIds = [...new Set([...nameIds, ...codeIds])];
@@ -162,7 +182,6 @@ export async function GET(
           if (combinedIds.length > 0) {
             containerQuery = containerQuery.in('id', combinedIds);
           } else {
-            // 검색 결과가 없으면 빈 배열 설정하고 건너뛰기
             availableContainerIds = [];
           }
         }
@@ -183,9 +202,8 @@ export async function GET(
       }
     }
 
-    // 3. 식자재 조회 및 재고 항목 조회를 단일 쿼리로 최적화
+    // 3. 식자재 조회 및 창고별 재고 항목 조회
     if (shouldIncludeIngredients && availableIngredientIds.length > 0) {
-      // 전체 카운트만 먼저 가져오기
       const { count: ingredientCount, error: countError } = await supabase
         .from('ingredients')
         .select('*', { count: 'exact', head: true })
@@ -197,7 +215,6 @@ export async function GET(
         totalCount += ingredientCount || 0;
       }
       
-      // 페이지네이션 및 정렬 적용 후 데이터 가져오기
       const limit = shouldIncludeContainers ? Math.floor(pageSize / 2) : pageSize;
       const offset = shouldIncludeContainers ? Math.floor((page - 1) * pageSize / 2) : (page - 1) * pageSize;
       
@@ -206,7 +223,6 @@ export async function GET(
         .select('*')
         .in('id', availableIngredientIds);
         
-      // 정렬 조건 적용
       if (sortBy === 'name') {
         ingredientQuery = ingredientQuery.order('name', { ascending: sortOrder === 'asc' });
       } else if (sortBy === 'code_name') {
@@ -222,11 +238,10 @@ export async function GET(
       if (ingredientsError) {
         console.error('식자재 조회 오류:', ingredientsError);
       } else if (ingredients && ingredients.length > 0) {
-        // 선택된 식자재 ID 목록
         const selectedIngredientIds = ingredients.map(ingredient => ingredient.id);
         
-        // 해당 식자재에 대한 재고 항목 한 번에 조회
-        const { data: stockItems, error: stockItemsError } = await supabase
+        // 모든 창고의 재고 항목 조회 (창고 필터링 없이)
+        const { data: allStockItems, error: stockItemsError } = await supabase
           .from('stock_items')
           .select('*')
           .eq('company_id', companyId)
@@ -237,39 +252,67 @@ export async function GET(
           console.error('재고 항목 조회 오류:', stockItemsError);
         }
         
-        // 식자재 정보와 재고 항목 정보 결합
+        // 식자재 정보와 창고별 재고 항목 정보 결합
         for (const ingredient of ingredients) {
-          // 이 식자재에 대한 재고 항목 찾기
-          const stockItem = stockItems && stockItems.find(item => item.item_id === ingredient.id);
+          // 이 식자재에 대한 모든 창고의 재고 항목 찾기
+          const itemStocksByWarehouse = allStockItems?.filter(item => item.item_id === ingredient.id) || [];
           
-          // 재고 정보가 있으면 그 정보를 사용하고, 없으면 기본값 사용
+          // 창고별 재고 맵 생성
+          const warehouseStocks: WarehouseStocksMap = {};
+          let totalQuantity = 0;
+          let latestUpdate = null;
+          
+          for (const warehouse of warehouses) {
+            const warehouseStock = itemStocksByWarehouse.find(stock => stock.warehouse_id === warehouse.id);
+            const quantity = warehouseStock?.current_quantity ?? 0;
+            
+            warehouseStocks[warehouse.id] = {
+              warehouseId: warehouse.id,
+              warehouseName: warehouse.name,
+              quantity: quantity,
+              unit: warehouseStock?.unit || ingredient.unit || '개',
+              lastUpdated: warehouseStock?.last_updated
+            };
+            
+            totalQuantity += quantity;
+            
+            if (warehouseStock?.last_updated) {
+              if (!latestUpdate || new Date(warehouseStock.last_updated) > new Date(latestUpdate)) {
+                latestUpdate = warehouseStock.last_updated;
+              }
+            }
+          }
+          
+          // 창고 필터링이 있는 경우, 해당 창고의 재고량만 표시
+          const displayQuantity = warehouseId ? (warehouseStocks[warehouseId]?.quantity ?? 0) : totalQuantity;
+          
           allItems.push({
-            id: stockItem?.id || `temp_ingredient_${ingredient.id}`,
+            id: `ingredient_${ingredient.id}`,
             company_id: companyId,
             item_type: 'ingredient',
             item_id: ingredient.id,
-            current_quantity: stockItem?.current_quantity ?? 0,
-            unit: stockItem?.unit || ingredient.unit || '개',
-            last_updated: stockItem?.last_updated || new Date().toISOString(),
-            created_at: stockItem?.created_at || new Date().toISOString(),
+            current_quantity: displayQuantity,
+            unit: ingredient.unit || '개',
+            last_updated: latestUpdate || new Date().toISOString(),
+            created_at: ingredient.created_at || new Date().toISOString(),
             details: {
               ...ingredient,
               price: ingredient.price || undefined
             },
-            name: ingredient.name || '알 수 없음'
+            name: ingredient.name || '알 수 없음',
+            warehouseStocks: warehouseStocks
           });
         }
       }
     }
 
-    // 4. 용기 조회 (필터에 따라) - 식자재 조회와 동일한 방식으로 최적화
+    // 4. 용기 조회 및 창고별 재고 항목 조회
     if (shouldIncludeContainers && availableContainerIds.length > 0) {
-      // 전체 카운트만 먼저 가져오기
       const { count: containerCount, error: countError } = await supabase
         .from('containers')
         .select('*', { count: 'exact', head: true })
         .in('id', availableContainerIds)
-        .is('parent_container_id', null); // 최상위 레벨 컨테이너만 카운트
+        .is('parent_container_id', null);
       
       if (countError) {
         console.error('용기 카운트 조회 오류:', countError);
@@ -277,7 +320,6 @@ export async function GET(
         totalCount += containerCount || 0;
       }
       
-      // 페이지네이션 및 정렬 적용 후 데이터 가져오기
       const limit = shouldIncludeIngredients ? Math.floor(pageSize / 2) : pageSize;
       const offset = shouldIncludeIngredients ? Math.floor((page - 1) * pageSize / 2) : (page - 1) * pageSize;
       
@@ -285,9 +327,8 @@ export async function GET(
         .from('containers')
         .select('*')
         .in('id', availableContainerIds)
-        .is('parent_container_id', null); // 최상위 레벨 컨테이너만 조회
+        .is('parent_container_id', null);
         
-      // 정렬 조건 적용
       if (sortBy === 'name') {
         containerQuery = containerQuery.order('name', { ascending: sortOrder === 'asc' });
       } else if (sortBy === 'code_name') {
@@ -303,11 +344,10 @@ export async function GET(
       if (containersError) {
         console.error('용기 조회 오류:', containersError);
       } else if (containers && containers.length > 0) {
-        // 선택된 용기 ID 목록
         const selectedContainerIds = containers.map(container => container.id);
         
-        // 해당 용기에 대한 재고 항목 한 번에 조회
-        const { data: stockItems, error: stockItemsError } = await supabase
+        // 모든 창고의 재고 항목 조회 (창고 필터링 없이)
+        const { data: allStockItems, error: stockItemsError } = await supabase
           .from('stock_items')
           .select('*')
           .eq('company_id', companyId)
@@ -318,7 +358,7 @@ export async function GET(
           console.error('재고 항목 조회 오류:', stockItemsError);
         }
         
-        // 하위 컨테이너들을 상위 그룹별로 그룹화하고 최대 수량으로 집계
+        // 용기 정보와 창고별 재고 항목 정보 결합
         for (const topContainer of containers) {
           // 하위 컨테이너들 조회
           const { data: subContainers, error: subError } = await supabase
@@ -332,90 +372,85 @@ export async function GET(
             continue;
           }
 
-          // 하위 컨테이너들이 있으면 각각의 재고를 확인하여 최대값 찾기
-          if (subContainers && subContainers.length > 0) {
-            const subContainerIds = subContainers.map(sub => sub.id);
-            const { data: subStockItems, error: subStockError } = await supabase
-              .from('stock_items')
-              .select('*')
-              .eq('company_id', companyId)
-              .eq('item_type', 'container')
-              .in('item_id', subContainerIds);
-
-            if (subStockError) {
-              console.error('하위 컨테이너 재고 조회 오류:', subStockError);
-              continue;
-            }
-
-            // 상위 그룹 자체의 재고 확인
-            const parentStockItem = stockItems && stockItems.find(item => item.item_id === topContainer.id);
-            const parentQuantity = parentStockItem?.current_quantity ?? 0;
+          // 창고별 재고 맵 생성
+          const warehouseStocks: WarehouseStocksMap = {};
+          let totalQuantity = 0;
+          let latestUpdate = null;
+          
+          for (const warehouse of warehouses) {
+            let warehouseQuantity = 0;
+            let warehouseLastUpdated = null;
             
-            // 하위 컨테이너들의 최대 재고량 찾기
-            let maxSubQuantity = 0;
-            let maxSubStockItem = null;
-            
-            for (const subContainer of subContainers) {
-              const subStockItem = subStockItems?.find(stock => stock.item_id === subContainer.id);
-              const quantity = subStockItem?.current_quantity ?? 0;
+            if (subContainers && subContainers.length > 0) {
+              // 하위 컨테이너들이 있는 경우
+              const subContainerIds = subContainers.map(sub => sub.id);
+              const subStockItems = allStockItems?.filter(stock => 
+                subContainerIds.includes(stock.item_id) && stock.warehouse_id === warehouse.id
+              ) || [];
               
-              if (quantity > maxSubQuantity) {
-                maxSubQuantity = quantity;
-                maxSubStockItem = subStockItem;
+              // 상위 그룹 자체의 재고 확인
+              const parentStockItem = allStockItems?.find(item => 
+                item.item_id === topContainer.id && item.warehouse_id === warehouse.id
+              );
+              
+              if (parentStockItem) {
+                warehouseQuantity = parentStockItem.current_quantity ?? 0;
+                warehouseLastUpdated = parentStockItem.last_updated;
+              } else if (subStockItems.length > 0) {
+                // 하위 컨테이너들의 최대 재고량 찾기
+                const maxSubStock = subStockItems.reduce((max, current) => {
+                  return (current.current_quantity ?? 0) > (max.current_quantity ?? 0) ? current : max;
+                }, subStockItems[0]);
+                
+                warehouseQuantity = maxSubStock.current_quantity ?? 0;
+                warehouseLastUpdated = maxSubStock.last_updated;
+              }
+            } else {
+              // 하위 컨테이너가 없는 경우
+              const stockItem = allStockItems?.find(item => 
+                item.item_id === topContainer.id && item.warehouse_id === warehouse.id
+              );
+              
+              warehouseQuantity = stockItem?.current_quantity ?? 0;
+              warehouseLastUpdated = stockItem?.last_updated;
+            }
+            
+            warehouseStocks[warehouse.id] = {
+              warehouseId: warehouse.id,
+              warehouseName: warehouse.name,
+              quantity: warehouseQuantity,
+              unit: '개',
+              lastUpdated: warehouseLastUpdated
+            };
+            
+            totalQuantity += warehouseQuantity;
+            
+            if (warehouseLastUpdated) {
+              if (!latestUpdate || new Date(warehouseLastUpdated) > new Date(latestUpdate)) {
+                latestUpdate = warehouseLastUpdated;
               }
             }
-            
-            // 상위 그룹 재고와 하위 컨테이너들의 최대 재고 중 더 큰 값 사용
-            // 단, 상위 그룹에 실제 재고 데이터가 있으면 그것을 우선 사용
-            let finalQuantity = parentQuantity;
-            let finalStockItem = parentStockItem;
-            
-            // 상위 그룹에 재고 데이터가 없고, 하위 컨테이너에 재고가 있는 경우에만 하위 데이터 사용
-            if (!parentStockItem && maxSubStockItem) {
-              finalQuantity = maxSubQuantity;
-              finalStockItem = maxSubStockItem;
-            }
-            
-            // 최종 사용할 재고 정보 설정
-            const finalQuantityToUse = finalQuantity;
-            const finalStockItemToUse = finalStockItem;
-
-            // 상위 그룹으로 항목 추가 (실제 재고 수량 사용)
-            allItems.push({
-              id: finalStockItemToUse?.id || `temp_container_${topContainer.id}`,
-              company_id: companyId,
-              item_type: 'container',
-              item_id: topContainer.id, // 상위 그룹 ID 사용
-              current_quantity: finalQuantityToUse, // 실제 재고 수량 (마이너스 값 포함)
-              unit: finalStockItemToUse?.unit || '개',
-              last_updated: finalStockItemToUse?.last_updated || new Date().toISOString(),
-              created_at: finalStockItemToUse?.created_at || new Date().toISOString(),
-              details: {
-                ...topContainer,
-                price: topContainer.price || undefined
-              },
-              name: topContainer.name || '알 수 없음' // 상위 그룹명 사용
-            });
-          } else {
-            // 하위 컨테이너가 없으면 그 자체로 처리
-            const stockItem = stockItems && stockItems.find(item => item.item_id === topContainer.id);
-            
-            allItems.push({
-              id: stockItem?.id || `temp_container_${topContainer.id}`,
-              company_id: companyId,
-              item_type: 'container',
-              item_id: topContainer.id,
-              current_quantity: stockItem?.current_quantity ?? 0, // null/undefined만 0으로 처리
-              unit: stockItem?.unit || '개',
-              last_updated: stockItem?.last_updated || new Date().toISOString(),
-              created_at: stockItem?.created_at || new Date().toISOString(),
-              details: {
-                ...topContainer,
-                price: topContainer.price || undefined
-              },
-              name: topContainer.name || '알 수 없음'
-            });
           }
+          
+          // 창고 필터링이 있는 경우, 해당 창고의 재고량만 표시
+          const displayQuantity = warehouseId ? (warehouseStocks[warehouseId]?.quantity ?? 0) : totalQuantity;
+          
+          allItems.push({
+            id: `container_${topContainer.id}`,
+            company_id: companyId,
+            item_type: 'container',
+            item_id: topContainer.id,
+            current_quantity: displayQuantity,
+            unit: '개',
+            last_updated: latestUpdate || new Date().toISOString(),
+            created_at: topContainer.created_at || new Date().toISOString(),
+            details: {
+              ...topContainer,
+              price: topContainer.price || undefined
+            },
+            name: topContainer.name || '알 수 없음',
+            warehouseStocks: warehouseStocks
+          });
         }
       }
     }
@@ -441,26 +476,12 @@ export async function GET(
           ? a.current_quantity - b.current_quantity
           : b.current_quantity - a.current_quantity;
       });
-    } else if (sortBy === 'last_updated') {
-      allItems.sort((a, b) => {
-        return sortOrder === 'asc'
-          ? new Date(a.last_updated).getTime() - new Date(b.last_updated).getTime()
-          : new Date(b.last_updated).getTime() - new Date(a.last_updated).getTime();
-      });
-    } else if (sortBy === 'created_at') {
-      allItems.sort((a, b) => {
-        return sortOrder === 'asc'
-          ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-          : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      });
     }
 
-    // 이미 각 쿼리에서 페이지네이션이 적용되어 있으므로 다시 슬라이싱하지 않음
-    const paginatedItems = allItems;
-
-    // 응답 반환
+    // 응답 반환 (창고 정보 포함)
     return NextResponse.json({
-      items: paginatedItems,
+      items: allItems,
+      warehouses: warehouses || [],
       pagination: {
         total: totalCount,
         page,

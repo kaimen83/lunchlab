@@ -2,10 +2,11 @@ import { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
-import { Settings, AlertTriangle } from 'lucide-react';
+import { Settings, AlertTriangle, Warehouse } from 'lucide-react';
 import { CompanySettingsForm } from './CompanySettingsForm';
 import { DangerZone } from './DangerZone';
 import FeaturesManager from './FeaturesManager';
+import { WarehouseManagement } from './WarehouseManagement';
 
 export const metadata: Metadata = {
   title: '회사 설정 - LunchLab',
@@ -84,6 +85,11 @@ export default async function CompanySettingsPage({ params }: CompanySettingsPag
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
             <h2 className="text-xl font-bold mb-4">기능 관리</h2>
             <FeaturesManager companyId={id} />
+          </div>
+          
+          {/* 창고 관리 섹션 */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+            <WarehouseManagement companyId={id} />
           </div>
           
           {/* 위험 영역 - 삭제 등 */}

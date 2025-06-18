@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 interface StockItemsPageProps {
   companyId: string;
   selectedItemType?: "ingredient" | "container";
+  selectedWarehouseId?: string;
 }
 
 // 확장된 필터 타입
@@ -19,7 +20,7 @@ interface ExtendedStockFilterValues extends StockFilterValues {
   sortOrder?: "asc" | "desc";
 }
 
-export default function StockItemsPage({ companyId, selectedItemType = "ingredient" }: StockItemsPageProps) {
+export default function StockItemsPage({ companyId, selectedItemType = "ingredient", selectedWarehouseId }: StockItemsPageProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [items, setItems] = useState<StockItem[]>([]);
@@ -49,6 +50,14 @@ export default function StockItemsPage({ companyId, selectedItemType = "ingredie
       shouldFetch.current = true;
     }
   }, [selectedItemType]);
+
+  // 선택된 창고가 변경되면 데이터 다시 가져오기
+  useEffect(() => {
+    if (isInitialized.current) {
+      setPagination(prev => ({ ...prev, page: 1 })); // 창고 변경 시 1페이지로 이동
+      shouldFetch.current = true;
+    }
+  }, [selectedWarehouseId]);
 
   // 상태를 localStorage에 저장하는 함수
   const saveStateToLocalStorage = useCallback(() => {
@@ -113,6 +122,7 @@ export default function StockItemsPage({ companyId, selectedItemType = "ingredie
       if (filters.stockGrade && filters.stockGrade !== 'all') queryParams.set("stockGrade", filters.stockGrade);
       if (filters.sortBy) queryParams.set("sortBy", filters.sortBy);
       if (filters.sortOrder) queryParams.set("sortOrder", filters.sortOrder);
+      if (selectedWarehouseId) queryParams.set("warehouse_id", selectedWarehouseId);
 
       const response = await fetch(
         `/api/companies/${companyId}/stock/items?${queryParams.toString()}`

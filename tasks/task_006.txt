@@ -1,0 +1,81 @@
+# Task ID: 6
+# Title: Enhance Stock Filter and Table Components
+# Status: pending
+# Dependencies: 4, 5
+# Priority: medium
+# Description: Update existing UI components to support location filtering and display
+# Details:
+Add location selection dropdown to StockFilter component. Modify StockTable to display location information. Add view type toggle between separated and aggregated views. Update column definitions to include location data. Ensure responsive design is maintained with the additional columns.
+
+# Test Strategy:
+Test filtering by different locations. Verify table displays correct data in both view types. Check mobile responsiveness with the new columns. Test with various screen sizes and data volumes.
+
+# Subtasks:
+## 1. Enhance StockFilter Component with Location Selection [pending]
+### Dependencies: None
+### Description: Add location dropdown to the existing StockFilter component with proper state management and accessibility features. Implement controlled component pattern with debounced input handling for optimal performance.
+### Details:
+1. Add location prop to StockFilter component to receive available locations array
+2. Implement location dropdown using semantic HTML select element with proper labeling
+3. Add 'All Locations' default option and map through locations for individual options
+4. Implement controlled component pattern - lift location filter state to parent component
+5. Add debouncing (300ms) to prevent excessive re-renders during user interaction
+6. Include proper ARIA labels and keyboard navigation support for accessibility
+7. Add loading state handling for when locations are being fetched
+8. Implement error boundary for graceful error handling
+9. Test component with unit tests covering filter selection, state updates, and accessibility
+10. Ensure component maintains existing styling and responsive behavior
+
+## 2. Add View Type Toggle for Separated and Aggregated Views [pending]
+### Dependencies: 6.1
+### Description: Implement toggle component to switch between separated (by location) and aggregated (combined) stock views. Use modern toggle patterns with clear visual feedback and state persistence.
+### Details:
+1. Create ViewToggle component with radio buttons or toggle switch for view type selection
+2. Define two view modes: 'separated' (group by location) and 'aggregated' (combine all locations)
+3. Implement controlled component with clear visual indicators for active state
+4. Add icons and labels for better UX (e.g., 'Separate by Location' vs 'Combined View')
+5. Integrate toggle state with existing filter state management in parent component
+6. Add URL synchronization using query parameters for shareable view states
+7. Implement local storage persistence to remember user's preferred view mode
+8. Ensure toggle is accessible with proper ARIA attributes and keyboard support
+9. Add smooth transitions between view states for better user experience
+10. Test toggle functionality, state persistence, and URL synchronization
+11. Verify responsive behavior on mobile devices with appropriate touch targets
+
+## 3. Update StockTable Component with Location Display and Column Management [pending]
+### Dependencies: 6.1, 6.2
+### Description: Modify StockTable to display location information with dynamic column definitions based on view type. Implement responsive column management and proper data handling for both separated and aggregated views.
+### Details:
+1. Add location column to table schema with proper header and cell rendering
+2. Implement dynamic column definitions that adapt based on view type (separated vs aggregated)
+3. For separated view: group data by location with clear section headers or expandable rows
+4. For aggregated view: show location as a standard column with combined stock data
+5. Add location-based sorting and filtering capabilities at column level
+6. Implement responsive column management - hide less critical columns on mobile
+7. Add column reordering functionality with drag-and-drop for desktop users
+8. Implement proper data memoization using useMemo to prevent unnecessary re-renders
+9. Add loading states and skeleton screens for better perceived performance
+10. Implement virtualization for large datasets to maintain performance
+11. Add proper error handling for missing location data
+12. Test table rendering with different data sets, view modes, and screen sizes
+13. Verify accessibility with screen readers and keyboard navigation
+
+## 4. Implement Responsive Design and Integration Testing [pending]
+### Dependencies: 6.1, 6.2, 6.3
+### Description: Ensure all enhanced components maintain responsive design with the additional location features. Implement comprehensive integration testing and performance optimization for the complete filtering system.
+### Details:
+1. Audit all components for responsive breakpoints and adjust CSS/styling as needed
+2. Implement mobile-first approach for filter layout - collapsible filter panel on mobile
+3. Optimize table for mobile with horizontal scrolling and sticky columns for location data
+4. Add touch-friendly interactions for mobile users (larger tap targets, swipe gestures)
+5. Implement progressive disclosure - show essential columns first, allow expansion for more details
+6. Add comprehensive integration tests covering full user workflows (filter → toggle → table update)
+7. Test cross-browser compatibility and mobile device testing on various screen sizes
+8. Implement performance monitoring and optimization - measure render times and memory usage
+9. Add error boundaries and fallback UI for graceful degradation
+10. Implement analytics tracking for filter usage patterns and performance metrics
+11. Conduct accessibility audit with automated tools and manual testing
+12. Add comprehensive documentation for component props, state management, and usage patterns
+13. Perform load testing with large datasets to ensure performance remains acceptable
+14. Create visual regression tests to catch styling issues in different viewport sizes
+

@@ -24,6 +24,21 @@ import { useStockCart } from "./StockCartContext";
 import { StockItemDetailModal } from "./StockItemDetailModal";
 import { formatQuantity } from "@/lib/utils/format";
 
+// 창고 정보 타입 정의
+interface Warehouse {
+  id: string;
+  name: string;
+}
+
+// 창고별 재고 정보 타입 정의
+interface WarehouseStock {
+  warehouseId: string;
+  warehouseName: string;
+  quantity: number;
+  unit: string;
+  lastUpdated?: string;
+}
+
 // 재고 항목 타입 정의
 export interface StockItem {
   id: string;
@@ -40,6 +55,7 @@ export interface StockItem {
     price?: number; // 단가 정보 추가
     [key: string]: any;
   };
+  warehouseStocks?: { [warehouseId: string]: WarehouseStock }; // 창고별 재고 정보
 }
 
 // 페이지네이션 정보 타입 정의
@@ -52,6 +68,7 @@ export interface PaginationInfo {
 
 interface StockTableProps {
   items: StockItem[];
+  warehouses: Warehouse[]; // 창고 목록 추가
   pagination: PaginationInfo;
   isLoading: boolean;
   onPageChange: (page: number) => void;
@@ -66,6 +83,7 @@ interface StockTableProps {
 
 export function StockTable({
   items,
+  warehouses,
   pagination,
   isLoading,
   onPageChange,
@@ -78,12 +96,27 @@ export function StockTable({
   itemType,
 }: StockTableProps) {
   // 장바구니 컨텍스트 사용
-  const { addItem } = useStockCart();
+  const { addItem, removeItem, items: cartItems } = useStockCart();
   
   // 선택된 항목과 모달 상태 관리
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
+  // 장바구니에 있는 항목인지 확인하는 함수
+  const isInCart = (itemId: string) => {
+    return cartItems.some(cartItem => cartItem.stockItemId === itemId);
+  };
+
+  // 장바구니 토글 핸들러
+  const handleCartToggle = (item: StockItem) => {
+    const inCart = isInCart(item.id);
+    if (inCart) {
+      removeItem(item.id);
+    } else {
+      addItem(item);
+    }
+  };
+
   // 항목 클릭 핸들러
   const handleItemClick = (itemId: string) => {
     setSelectedItemId(itemId);
@@ -139,14 +172,24 @@ export function StockTable({
     return value.toLocaleString("ko-KR");
   };
 
-
-
   // 가격 포맷 함수 (재고액은 반올림 처리)
   const formatPrice = (price: number | undefined) => {
     if (price === undefined || price === null) return "-";
     const roundedPrice = Math.round(price);
     return `${formatNumber(roundedPrice)}원`;
   };
+
+  // 창고별 재고량 포맷 함수
+  const formatWarehouseQuantity = (quantity: number, unit: string) => {
+    return formatQuantity(quantity, unit) + " " + (
+      unit === "g" ? "kg" : 
+      unit === "ml" ? "l" : 
+      unit
+    );
+  };
+
+  // 전체 칼럼 수 계산 (기본 칼럼 + 창고 칼럼 + 장바구니 칼럼)
+  const totalColumns = 6 + warehouses.length;
 
   if (isLoading) {
     return (
@@ -177,12 +220,11 @@ export function StockTable({
                 <TableHead className="w-[100px]">
                   <Skeleton className="h-4 w-20" />
                 </TableHead>
-                <TableHead className="w-[100px]">
-                  <Skeleton className="h-4 w-20" />
-                </TableHead>
-                <TableHead className="w-[180px]">
-                  <Skeleton className="h-4 w-20" />
-                </TableHead>
+                {warehouses.map((warehouse) => (
+                  <TableHead key={warehouse.id} className="w-[120px]">
+                    <Skeleton className="h-4 w-16" />
+                  </TableHead>
+                ))}
                 <TableHead className="w-[60px] text-right">
                   <Skeleton className="h-4 w-20 ml-auto" />
                 </TableHead>
@@ -203,13 +245,7 @@ export function StockTable({
                       <Skeleton className="h-6 w-16" />
                     </TableCell>
                     <TableCell>
-                      <Skeleton className="h-6 w-16" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-6 w-16" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-6 w-16" />
+                      <Skeleton className="h-6 w-20" />
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-6 w-16" />
@@ -217,6 +253,11 @@ export function StockTable({
                     <TableCell>
                       <Skeleton className="h-6 w-20" />
                     </TableCell>
+                    {warehouses.map((warehouse) => (
+                      <TableCell key={warehouse.id}>
+                        <Skeleton className="h-6 w-16" />
+                      </TableCell>
+                    ))}
                     <TableCell className="text-right">
                       <Skeleton className="h-8 w-8 ml-auto" />
                     </TableCell>
@@ -253,7 +294,7 @@ export function StockTable({
         </div>
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -279,26 +320,23 @@ export function StockTable({
                   onClick={() => onSort("current_quantity")}
                   className="inline-flex items-center hover:text-primary"
                 >
-                  수량 {sortIcon("current_quantity")}
+                  총 수량 {sortIcon("current_quantity")}
                 </button>
               </TableHead>
               <TableHead className="w-[100px]">단가</TableHead>
               <TableHead className="w-[100px]">재고액</TableHead>
-              <TableHead className="w-[180px]">
-                <button
-                  onClick={() => onSort("last_updated")}
-                  className="inline-flex items-center hover:text-primary"
-                >
-                  최종 업데이트 {sortIcon("last_updated")}
-                </button>
-              </TableHead>
+              {warehouses.map((warehouse) => (
+                <TableHead key={warehouse.id} className="w-[120px] text-center">
+                  {warehouse.name}
+                </TableHead>
+              ))}
               <TableHead className="text-right">장바구니</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center">
+                <TableCell colSpan={totalColumns} className="h-24 text-center">
                   <div className="flex flex-col items-center justify-center text-muted-foreground">
                     <Package className="h-12 w-12 mb-2" />
                     <p>재고 항목이 없습니다.</p>
@@ -327,21 +365,33 @@ export function StockTable({
                     : undefined;
                 }
                 
+                const inCart = isInCart(item.id);
+                
                 return (
-                  <TableRow key={item.id}>
+                  <TableRow 
+                    key={item.id}
+                    className={inCart ? "bg-blue-50 border-l-4 border-l-blue-500" : ""}
+                  >
                     <TableCell>{getItemTypeBadge(item.item_type)}</TableCell>
                     <TableCell>
-                      {isTemporary ? (
-                        <span className="cursor-not-allowed">{item.name}</span>
-                      ) : (
-                        <button
-                          onClick={() => handleItemClick(item.id)}
-                          className="hover:underline flex items-center text-left"
-                        >
-                          {item.name}
-                          <ExternalLink className="h-3 w-3 ml-1 text-muted-foreground" />
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {inCart && (
+                          <div className="flex items-center justify-center w-5 h-5 bg-blue-500 text-white rounded-full text-xs">
+                            ✓
+                          </div>
+                        )}
+                        {isTemporary ? (
+                          <span className="cursor-not-allowed">{item.name}</span>
+                        ) : (
+                          <button
+                            onClick={() => handleItemClick(item.id)}
+                            className="hover:underline flex items-center text-left"
+                          >
+                            {item.name}
+                            <ExternalLink className="h-3 w-3 ml-1 text-muted-foreground" />
+                          </button>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {item.details?.code_name || "-"}
@@ -355,17 +405,32 @@ export function StockTable({
                     </TableCell>
                     <TableCell>{formatPrice(price)}</TableCell>
                     <TableCell>{formatPrice(totalValue)}</TableCell>
-                    <TableCell>
-                      {formatDate(item.last_updated || item.created_at)}
-                    </TableCell>
+                    {warehouses.map((warehouse) => {
+                      const warehouseStock = item.warehouseStocks?.[warehouse.id];
+                      const quantity = warehouseStock?.quantity ?? 0;
+                      const unit = warehouseStock?.unit || item.unit;
+                      
+                      return (
+                        <TableCell key={`${item.id}-${warehouse.id}`}>
+                          {(() => {
+                            if (quantity === 0) {
+                              return '-';
+                            }
+                            
+                            return `${quantity.toLocaleString()}${item.unit}`;
+                          })()}
+                        </TableCell>
+                      );
+                    })}
                     <TableCell className="text-right">
                       <Button
-                        variant="ghost"
+                        variant={inCart ? "default" : "ghost"}
                         size="icon"
-                        onClick={() => addItem(item)}
-                        title="장바구니 추가"
+                        onClick={() => handleCartToggle(item)}
+                        title={inCart ? "장바구니에서 제거" : "장바구니 추가"}
+                        className={inCart ? "bg-blue-500 hover:bg-red-500 text-white transition-colors" : "hover:bg-blue-50"}
                       >
-                        <ShoppingCart className="h-4 w-4" />
+                        <ShoppingCart className={`h-4 w-4 ${inCart ? "fill-current" : ""}`} />
                       </Button>
                     </TableCell>
                   </TableRow>

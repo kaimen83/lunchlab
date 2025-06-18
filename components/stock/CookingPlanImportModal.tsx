@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Calendar as CalendarIcon, FileText, Loader2, ShoppingCart, Search, CheckCircle2, AlertCircle, Plus, X, Tag, Package, Clock, Users, ChefHat } from 'lucide-react';
+import { Calendar as CalendarIcon, FileText, Loader2, ShoppingCart, Search, CheckCircle2, AlertCircle, Plus, X, Tag, Package, Clock, Users, ChefHat, Warehouse } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -27,15 +28,10 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import WarehouseSelector from './WarehouseSelector';
 
 // 재고 요구사항 타입 정의
 interface StockRequirement {
@@ -50,6 +46,7 @@ interface StockRequirement {
   price?: number;
   order_quantity?: number; // 발주량 정보 추가
   package_amount?: number; // 포장량 정보 추가
+  warehouseId?: string; // 개별 창고 ID 추가
 }
 
 interface CookingPlanData {
@@ -87,10 +84,13 @@ export function CookingPlanImportModal({
   // 수정된 수량 관리 (항상 활성화)
   const [editedQuantities, setEditedQuantities] = useState<Map<string, number>>(new Map());
 
+  // 창고 관련 상태 추가
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | undefined>();
+  const [useMultipleWarehouses, setUseMultipleWarehouses] = useState<boolean>(false);
+  const [itemWarehouses, setItemWarehouses] = useState<Map<string, string>>(new Map());
+
   // 인라인 캘린더 표시 상태
   const [showCalendar, setShowCalendar] = useState(false);
-
-
 
   // 컴포넌트 마운트 상태 추적을 위한 ref
   const isMountedRef = useRef(true);
@@ -137,7 +137,9 @@ export function CookingPlanImportModal({
           setEditedQuantities(new Map());
           setShowCalendar(false);
           setTransactionMode('outgoing');
-
+          setSelectedWarehouseId(undefined);
+          setUseMultipleWarehouses(false);
+          setItemWarehouses(new Map());
         }
       }, 100);
 
@@ -173,6 +175,15 @@ export function CookingPlanImportModal({
     }
   }, [editedQuantities, safeSetState]);
 
+  // 창고 변경 핸들러
+  const handleWarehouseChange = useCallback((itemId: string, warehouseId: string) => {
+    setItemWarehouses(prev => {
+      const newMap = new Map(prev);
+      newMap.set(itemId, warehouseId);
+      return newMap;
+    });
+  }, []);
+
   // 실제 사용할 수량 가져오기 (수정된 수량이 있으면 수정된 수량, 없으면 모드에 따른 기본값)
   const getActualQuantity = useCallback((item: StockRequirement) => {
     if (editedQuantities.has(item.id)) {
@@ -192,13 +203,42 @@ export function CookingPlanImportModal({
     return item.total_amount;
   }, [editedQuantities, transactionMode]);
 
+  // 실제 사용할 창고 ID 가져오기
+  const getActualWarehouseId = useCallback((item: StockRequirement) => {
+    if (useMultipleWarehouses) {
+      return itemWarehouses.get(item.id) || selectedWarehouseId;
+    }
+    return selectedWarehouseId;
+  }, [useMultipleWarehouses, itemWarehouses, selectedWarehouseId]);
+
   // 날짜 선택 핸들러
   const handleDateSelect = useCallback((date: Date | undefined) => {
     setSelectedDate(date);
     setShowCalendar(false); // 날짜 선택 시 캘린더 닫기
   }, []);
 
+  // 모든 항목 선택/해제 토글
+  const toggleSelectAll = useCallback(() => {
+    if (!cookingPlanData) return;
 
+    const allItems = [...cookingPlanData.ingredients, ...cookingPlanData.containers];
+    const allItemIds = new Set(allItems.map(item => item.id));
+    
+    if (selectedItems.size === allItemIds.size) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(allItemIds);
+    }
+  }, [cookingPlanData, selectedItems]);
+
+  // 다중 창고 모드 토글 핸들러
+  const handleMultipleWarehousesToggle = (checked: boolean) => {
+    setUseMultipleWarehouses(checked);
+    if (!checked) {
+      // 단일 창고 모드로 전환 시 아이템별 창고 설정 초기화
+      setItemWarehouses(new Map());
+    }
+  };
 
   // 조리계획서 조회
   const fetchCookingPlan = useCallback(async () => {
@@ -462,6 +502,26 @@ export function CookingPlanImportModal({
         return;
       }
 
+      // 창고 정보 검증
+      if (useMultipleWarehouses) {
+        const itemsWithoutWarehouse = selectedItemsData.filter(item => !getActualWarehouseId(item));
+        if (itemsWithoutWarehouse.length > 0) {
+          toast({
+            title: '창고가 선택되지 않은 항목이 있습니다',
+            description: `${itemsWithoutWarehouse.map(item => item.name).join(", ")}의 창고를 선택해주세요.`,
+            variant: 'destructive',
+          });
+          return;
+        }
+      } else if (!selectedWarehouseId) {
+        toast({
+          title: '창고를 선택해주세요',
+          description: '거래를 처리할 창고를 선택해주세요.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       // 일괄 거래 생성 (입고/출고)
       const transactionResponse = await fetch(
         `/api/companies/${companyId}/stock/transactions`,
@@ -473,9 +533,13 @@ export function CookingPlanImportModal({
           body: JSON.stringify({
             transactionItems, // 개별 거래 기록용 (isMaxInGroup 정보 포함)
             stockAdjustments, // 실제 재고 차감/증가용
+            warehouseIds: useMultipleWarehouses 
+              ? selectedItemsData.map(item => getActualWarehouseId(item))
+              : selectedItemsData.map(() => selectedWarehouseId), // 일괄 모드일 때는 모든 아이템에 같은 창고 적용
             requestType: transactionMode === 'incoming' ? 'incoming' : 'outgoing',
-            notes: `조리계획서 기반 ${transactionMode === 'incoming' ? '입고' : '출고'} (${cookingPlanData?.date || format(selectedDate!, 'yyyy-MM-dd')}) - ${transactionMode === 'incoming' ? '발주량 기준' : '그룹별 최대 수량 적용'}`,
+            notes: `조리계획서 기반 ${transactionMode === 'incoming' ? '입고' : '출고'} (${cookingPlanData?.date || format(selectedDate!, 'yyyy-MM-dd')}) - ${transactionMode === 'incoming' ? '발주량 기준' : '그룹별 최대 수량 적용'}${useMultipleWarehouses ? ' (다중 창고)' : ''}`,
             directProcess: true,
+            useMultipleWarehouses, // 다중 창고 모드 플래그
             isGroupedTransaction: true // 그룹화된 거래임을 표시
           }),
         }
@@ -651,6 +715,49 @@ export function CookingPlanImportModal({
             </CardContent>
           </Card>
 
+          {/* 창고 설정 섹션 */}
+          {cookingPlanData && allItems.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Warehouse className="h-4 w-4" />
+                  창고 설정
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* 기본 창고 선택 */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">기본 창고</Label>
+                  <WarehouseSelector
+                    companyId={companyId}
+                    selectedWarehouseId={selectedWarehouseId}
+                    onWarehouseChange={setSelectedWarehouseId}
+                    placeholder="창고를 선택하세요"
+                    className="h-9"
+                    showAllOption={false}
+                  />
+                </div>
+
+                {/* 다중 창고 모드 토글 */}
+                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+                  <div className="flex items-center gap-3">
+                    <Warehouse className="h-4 w-4 text-primary" />
+                    <div>
+                      <Label className="text-sm font-medium">다중 창고 거래</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        각 항목별로 다른 창고를 선택할 수 있습니다
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={useMultipleWarehouses}
+                    onCheckedChange={handleMultipleWarehousesToggle}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* 조리계획서 데이터 표시 */}
           {cookingPlanData && (
             <>
@@ -716,8 +823,6 @@ export function CookingPlanImportModal({
                       </div>
                     )}
 
-
-
                     {/* 테이블 */}
                     <div className="rounded-md border overflow-hidden">
                       <Table>
@@ -730,6 +835,9 @@ export function CookingPlanImportModal({
                             <TableHead className="w-[120px] text-right py-2">필요 수량</TableHead>
                             <TableHead className="w-[120px] text-right py-2">발주량</TableHead>
                             <TableHead className="w-[120px] text-right py-2">처리 수량</TableHead>
+                            {useMultipleWarehouses && (
+                              <TableHead className="w-[140px] py-2">창고</TableHead>
+                            )}
                             <TableHead className="w-[100px] py-2">재고 등급</TableHead>
                             <TableHead className="py-2">공급업체</TableHead>
                           </TableRow>
@@ -812,6 +920,18 @@ export function CookingPlanImportModal({
                                     </div>
                                   </div>
                                 </TableCell>
+                                {useMultipleWarehouses && (
+                                  <TableCell className="py-2">
+                                    <WarehouseSelector
+                                      companyId={companyId}
+                                      selectedWarehouseId={getActualWarehouseId(item)}
+                                      onWarehouseChange={(warehouseId) => warehouseId && handleWarehouseChange(item.id, warehouseId)}
+                                      placeholder="창고 선택"
+                                      className="h-7 text-xs"
+                                      showAllOption={false}
+                                    />
+                                  </TableCell>
+                                )}
                                 <TableCell className="py-2">
                                   {item.stock_grade ? (
                                     <Badge variant="outline" className="text-xs">

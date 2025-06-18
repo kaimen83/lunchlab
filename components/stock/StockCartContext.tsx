@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { StockItem } from "./StockTable";
 import { useToast } from "@/hooks/use-toast";
 
@@ -10,6 +10,7 @@ export interface CartItem {
   unit: string;
   quantity: number; // 입고/출고할 수량
   itemType: "ingredient" | "container"; // 항목 유형 추가
+  warehouseId?: string; // 개별 창고 ID 추가
 }
 
 // 장바구니 컨텍스트 인터페이스
@@ -17,12 +18,17 @@ interface StockCartContextType {
   items: CartItem[];
   transactionType: "in" | "out"; // 입고 또는 출고
   transactionDate: Date; // 거래 날짜
+  selectedWarehouseId: string | undefined; // 기본 선택된 창고 ID
+  useMultipleWarehouses: boolean; // 다중 창고 사용 여부
   addItem: (item: StockItem) => void;
   removeItem: (stockItemId: string) => void;
   updateQuantity: (stockItemId: string, quantity: number) => void;
+  updateItemWarehouse: (stockItemId: string, warehouseId: string) => void; // 개별 아이템 창고 변경
   clearCart: () => void;
   setTransactionType: (type: "in" | "out") => void;
   setTransactionDate: (date: Date) => void; // 거래 날짜 설정 함수
+  setSelectedWarehouseId: (warehouseId: string | undefined) => void; // 창고 설정 함수
+  setUseMultipleWarehouses: (use: boolean) => void; // 다중 창고 모드 설정
   processCart: (notes: string, companyId: string) => Promise<boolean>;
 }
 
@@ -30,11 +36,24 @@ interface StockCartContextType {
 const StockCartContext = createContext<StockCartContextType | undefined>(undefined);
 
 // 컨텍스트 제공자 컴포넌트
-export function StockCartProvider({ children }: { children: ReactNode }) {
+export function StockCartProvider({ 
+  children, 
+  initialWarehouseId 
+}: { 
+  children: ReactNode;
+  initialWarehouseId?: string;
+}) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [transactionType, setTransactionType] = useState<"in" | "out">("in");
   const [transactionDate, setTransactionDate] = useState<Date>(new Date()); // 현재 날짜로 초기화
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | undefined>(initialWarehouseId); // 선택된 창고 ID
+  const [useMultipleWarehouses, setUseMultipleWarehouses] = useState<boolean>(false); // 다중 창고 모드
   const { toast } = useToast();
+
+  // 상위에서 전달받은 창고 ID가 변경되면 상태 업데이트
+  useEffect(() => {
+    setSelectedWarehouseId(initialWarehouseId);
+  }, [initialWarehouseId]);
 
   // 항목 추가
   const addItem = (item: StockItem) => {
@@ -58,6 +77,7 @@ export function StockCartProvider({ children }: { children: ReactNode }) {
         unit: item.unit,
         quantity: 1, // 기본 수량
         itemType: item.item_type, // 항목 유형 추가
+        warehouseId: selectedWarehouseId, // 기본 창고로 설정
       },
     ]);
 
@@ -81,9 +101,19 @@ export function StockCartProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  // 개별 아이템 창고 업데이트
+  const updateItemWarehouse = (stockItemId: string, warehouseId: string) => {
+    setItems(prev =>
+      prev.map(item =>
+        item.stockItemId === stockItemId ? { ...item, warehouseId } : item
+      )
+    );
+  };
+
   // 장바구니 비우기
   const clearCart = () => {
     setItems([]);
+    setUseMultipleWarehouses(false);
   };
 
   // 일괄 처리
@@ -97,6 +127,29 @@ export function StockCartProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
+    // 다중 창고 모드일 때 모든 아이템에 창고가 설정되어 있는지 확인
+    if (useMultipleWarehouses) {
+      const itemsWithoutWarehouse = items.filter(item => !item.warehouseId);
+      if (itemsWithoutWarehouse.length > 0) {
+        toast({
+          title: "창고가 선택되지 않은 항목이 있습니다",
+          description: `${itemsWithoutWarehouse.map(item => item.name).join(", ")}의 창고를 선택해주세요.`,
+          variant: "destructive",
+        });
+        return false;
+      }
+    } else {
+      // 일괄 창고 모드일 때 기본 창고가 선택되어 있는지 확인
+      if (!selectedWarehouseId) {
+        toast({
+          title: "창고를 선택해주세요",
+          description: "거래를 처리할 창고를 선택해주세요.",
+          variant: "destructive",
+        });
+        return false;
+      }
+    }
+
     try {
       const response = await fetch(
         `/api/companies/${companyId}/stock/transactions`,
@@ -108,10 +161,14 @@ export function StockCartProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify({
             stockItemIds: items.map(item => item.stockItemId),
             quantities: items.map(item => item.quantity),
+            warehouseIds: useMultipleWarehouses 
+              ? items.map(item => item.warehouseId)
+              : items.map(() => selectedWarehouseId), // 일괄 모드일 때는 모든 아이템에 같은 창고 적용
             requestType: transactionType === "in" ? "incoming" : "outgoing",
             notes,
             directProcess: true, // 직접 처리 플래그
             transactionDate: transactionDate.toISOString(), // 거래 날짜 추가
+            useMultipleWarehouses, // 다중 창고 모드 플래그
           }),
         }
       );
@@ -121,9 +178,13 @@ export function StockCartProvider({ children }: { children: ReactNode }) {
         throw new Error(errorData.error || "일괄 거래 생성에 실패했습니다");
       }
 
+      const warehouseInfo = useMultipleWarehouses 
+        ? `다중 창고 거래 (${new Set(items.map(item => item.warehouseId)).size}개 창고)`
+        : `단일 창고 거래`;
+
       toast({
         title: "일괄 거래가 생성되었습니다",
-        description: `${transactionType === "in" ? "입고" : "출고"} 거래가 성공적으로 처리되었습니다.`,
+        description: `${transactionType === "in" ? "입고" : "출고"} 거래가 성공적으로 처리되었습니다. (${warehouseInfo})`,
       });
 
       // 성공 후 장바구니 비우기
@@ -145,12 +206,17 @@ export function StockCartProvider({ children }: { children: ReactNode }) {
     items,
     transactionType,
     transactionDate,
+    selectedWarehouseId,
+    useMultipleWarehouses,
     addItem,
     removeItem,
     updateQuantity,
+    updateItemWarehouse,
     clearCart,
     setTransactionType,
     setTransactionDate,
+    setSelectedWarehouseId,
+    setUseMultipleWarehouses,
     processCart,
   };
 

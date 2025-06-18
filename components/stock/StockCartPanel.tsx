@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import {
   ArrowDown,
   ArrowUp,
@@ -28,6 +29,7 @@ import {
   Settings,
   Package,
   Plus,
+  Warehouse,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useStockCart, CartItem } from "./StockCartContext";
@@ -39,6 +41,7 @@ import { ko } from "date-fns/locale";
 import { CookingPlanImportModal } from "./CookingPlanImportModal";
 import { cn } from "@/lib/utils";
 import { formatQuantity } from "@/lib/utils/format";
+import WarehouseSelector from "./WarehouseSelector";
 
 interface StockCartPanelProps {
   companyId: string;
@@ -50,10 +53,15 @@ export function StockCartPanel({ companyId, onProcessComplete }: StockCartPanelP
     items,
     transactionType,
     transactionDate,
+    selectedWarehouseId,
+    useMultipleWarehouses,
     setTransactionType,
     setTransactionDate,
+    setSelectedWarehouseId,
+    setUseMultipleWarehouses,
     removeItem,
     updateQuantity,
+    updateItemWarehouse,
     clearCart,
     processCart,
   } = useStockCart();
@@ -88,6 +96,19 @@ export function StockCartPanel({ companyId, onProcessComplete }: StockCartPanelP
       setActiveTab("manual");
     }
   }, [items.length, activeTab]);
+
+  // 다중 창고 모드 토글 핸들러
+  const handleMultipleWarehousesToggle = (checked: boolean) => {
+    setUseMultipleWarehouses(checked);
+    if (!checked) {
+      // 단일 창고 모드로 전환 시 모든 아이템의 창고를 기본 창고로 설정
+      items.forEach(item => {
+        if (selectedWarehouseId) {
+          updateItemWarehouse(item.stockItemId, selectedWarehouseId);
+        }
+      });
+    }
+  };
 
   return (
     <>
@@ -157,7 +178,7 @@ export function StockCartPanel({ companyId, onProcessComplete }: StockCartPanelP
                     <Label className="text-sm font-medium">거래 설정</Label>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* 거래 유형 */}
                     <div className="space-y-2">
                       <Label className="text-sm">거래 유형</Label>
@@ -183,6 +204,19 @@ export function StockCartPanel({ companyId, onProcessComplete }: StockCartPanelP
                           출고
                         </Button>
                       </div>
+                    </div>
+
+                    {/* 창고 선택 */}
+                    <div className="space-y-2">
+                      <Label className="text-sm">기본 창고</Label>
+                      <WarehouseSelector
+                        companyId={companyId}
+                        selectedWarehouseId={selectedWarehouseId}
+                        onWarehouseChange={setSelectedWarehouseId}
+                        placeholder="창고 선택"
+                        className="h-8 text-sm"
+                        showAllOption={false}
+                      />
                     </div>
 
                     {/* 거래 날짜 */}
@@ -217,6 +251,23 @@ export function StockCartPanel({ companyId, onProcessComplete }: StockCartPanelP
                         </PopoverContent>
                       </Popover>
                     </div>
+                  </div>
+
+                  {/* 다중 창고 모드 토글 */}
+                  <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+                    <div className="flex items-center gap-3">
+                      <Warehouse className="h-4 w-4 text-primary" />
+                      <div>
+                        <Label className="text-sm font-medium">다중 창고 거래</Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          각 항목별로 다른 창고를 선택할 수 있습니다
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={useMultipleWarehouses}
+                      onCheckedChange={handleMultipleWarehousesToggle}
+                    />
                   </div>
                 </div>
               </div>
@@ -269,8 +320,11 @@ export function StockCartPanel({ companyId, onProcessComplete }: StockCartPanelP
                           <CartItemRow
                             key={item.stockItemId}
                             item={item}
+                            companyId={companyId}
+                            useMultipleWarehouses={useMultipleWarehouses}
                             onRemove={removeItem}
                             onQuantityChange={updateQuantity}
+                            onWarehouseChange={updateItemWarehouse}
                             isLast={index === items.length - 1}
                           />
                         ))}
@@ -313,6 +367,11 @@ export function StockCartPanel({ companyId, onProcessComplete }: StockCartPanelP
                   <span className="font-medium">
                     {transactionType === "in" ? "입고" : "출고"} 거래
                   </span>
+                  {useMultipleWarehouses && (
+                    <Badge variant="outline" className="text-xs">
+                      다중 창고
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 text-muted-foreground">
                   <Package className="h-4 w-4" />
@@ -331,25 +390,20 @@ export function StockCartPanel({ companyId, onProcessComplete }: StockCartPanelP
                     : "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800",
                   "shadow-lg hover:shadow-xl transition-all duration-200"
                 )}
-                size="lg"
               >
                 {isProcessing ? (
                   <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    <span>처리 중...</span>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    처리 중...
                   </>
                 ) : (
                   <>
-                    <div className="flex items-center gap-2">
-                      {transactionType === "in" ? (
-                        <ArrowDown className="h-5 w-5" />
-                      ) : (
-                        <ArrowUp className="h-5 w-5" />
-                      )}
-                      <span>
-                        {items.length}개 항목 {transactionType === "in" ? "입고" : "출고"} 처리
-                      </span>
-                    </div>
+                    {transactionType === "in" ? (
+                      <ArrowDown className="mr-2 h-4 w-4" />
+                    ) : (
+                      <ArrowUp className="mr-2 h-4 w-4" />
+                    )}
+                    {transactionType === "in" ? "입고" : "출고"} 처리
                   </>
                 )}
               </Button>
@@ -369,62 +423,86 @@ export function StockCartPanel({ companyId, onProcessComplete }: StockCartPanelP
   );
 }
 
-// 개선된 장바구니 항목 행 컴포넌트
+// 장바구니 아이템 행 컴포넌트
 interface CartItemRowProps {
   item: CartItem;
+  companyId: string;
+  useMultipleWarehouses: boolean;
   onRemove: (stockItemId: string) => void;
   onQuantityChange: (stockItemId: string, quantity: number) => void;
+  onWarehouseChange: (stockItemId: string, warehouseId: string) => void;
   isLast?: boolean;
 }
 
-function CartItemRow({ item, onRemove, onQuantityChange }: CartItemRowProps) {
+function CartItemRow({ 
+  item, 
+  companyId,
+  useMultipleWarehouses,
+  onRemove, 
+  onQuantityChange,
+  onWarehouseChange,
+}: CartItemRowProps) {
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseFloat(e.target.value) || 0;
+    if (value >= 0) {
+      onQuantityChange(item.stockItemId, value);
+    }
+  };
+
   return (
-    <div className="flex items-center gap-2 p-2 rounded-md bg-muted/40 hover:bg-muted/60 transition-colors border border-border/50">
-      {/* 아이템 정보 */}
-      <div className="flex-1 min-w-0">
+    <div className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/30 transition-colors">
+      <div className="flex-1 space-y-1">
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5">
-            <div className={cn(
-              "w-2 h-2 rounded-full",
-              item.itemType === "ingredient" ? "bg-blue-500" : "bg-green-500"
-            )} />
-            <span className="font-medium text-sm truncate max-w-[120px]">{item.name}</span>
-          </div>
+          <span className="text-sm font-medium text-foreground line-clamp-1">
+            {item.name}
+          </span>
           <Badge 
-            variant={item.itemType === "ingredient" ? "secondary" : "outline"} 
-            className="text-xs px-1.5 py-0 h-5 shrink-0"
+            variant="secondary" 
+            className="text-xs shrink-0"
           >
             {item.itemType === "ingredient" ? "식자재" : "용기"}
           </Badge>
         </div>
-        <div className="text-xs text-muted-foreground mt-0.5">
-          현재: {formatQuantity(item.current_quantity, item.unit)} {item.unit}
+        <div className="text-xs text-muted-foreground">
+          현재: {formatQuantity(item.current_quantity, item.unit)}
         </div>
+        
+        {/* 다중 창고 모드일 때 개별 창고 선택 */}
+        {useMultipleWarehouses && (
+          <div className="mt-2">
+            <WarehouseSelector
+              companyId={companyId}
+              selectedWarehouseId={item.warehouseId}
+              onWarehouseChange={(warehouseId) => warehouseId && onWarehouseChange(item.stockItemId, warehouseId)}
+              placeholder="창고 선택"
+              className="h-7 text-xs"
+              showAllOption={false}
+            />
+          </div>
+        )}
       </div>
       
-      {/* 수량 입력 */}
-      <div className="flex items-center gap-1.5 shrink-0">
-        <Input
-          type="number"
-          step="0.01"
-          min="0"
-          value={item.quantity}
-          onChange={(e) =>
-            onQuantityChange(item.stockItemId, parseFloat(e.target.value) || 0)
-          }
-          className="w-16 h-7 text-right text-xs px-2 border-muted-foreground/20"
-        />
-        <span className="text-xs text-muted-foreground min-w-[1.5rem] text-left">
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="w-16">
+          <Input
+            type="number"
+            value={item.quantity}
+            onChange={handleQuantityChange}
+            className="h-7 text-xs text-center"
+            min="0"
+            step="0.1"
+          />
+        </div>
+        <span className="text-xs text-muted-foreground w-8">
           {item.unit}
         </span>
         <Button
           variant="ghost"
           size="sm"
           onClick={() => onRemove(item.stockItemId)}
-          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
         >
           <X className="h-3 w-3" />
-          <span className="sr-only">제거</span>
         </Button>
       </div>
     </div>

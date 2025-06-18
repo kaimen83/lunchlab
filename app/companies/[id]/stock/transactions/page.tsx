@@ -18,9 +18,10 @@ import { Search, X } from "lucide-react";
 
 interface StockTransactionsPageProps {
   companyId: string;
+  selectedWarehouseId?: string;
 }
 
-export default function StockTransactionsPage({ companyId }: StockTransactionsPageProps) {
+export default function StockTransactionsPage({ companyId, selectedWarehouseId }: StockTransactionsPageProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);

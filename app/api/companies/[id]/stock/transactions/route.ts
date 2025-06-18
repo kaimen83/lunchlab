@@ -215,7 +215,8 @@ async function processTemporaryIds(
   supabase: any, 
   stockItemIds: string[], 
   companyId: string, 
-  userId: string
+  userId: string,
+  warehouseId?: string
 ): Promise<string[]> {
   const processedIds = [...stockItemIds]; // 기존 ID 배열 복사
   
@@ -264,6 +265,25 @@ async function processTemporaryIds(
         // 이미 존재하는 재고 항목이 있으면 해당 ID 사용
         processedIds[i] = existingStockItem.id;
       } else {
+        // 창고 ID 결정 (전달받은 ID가 있으면 우선 사용, 없으면 기본 창고 조회)
+        let targetWarehouseId = warehouseId;
+        
+        if (!targetWarehouseId) {
+          const { data: defaultWarehouse, error: warehouseError } = await supabase
+            .from('warehouses')
+            .select('id')
+            .eq('company_id', companyId)
+            .eq('is_default', true)
+            .single();
+          
+          if (warehouseError) {
+            console.error('기본 창고 조회 오류:', warehouseError);
+            throw new Error(`기본 창고를 찾을 수 없습니다: ${warehouseError.message}`);
+          }
+          
+          targetWarehouseId = defaultWarehouse.id;
+        }
+        
         // 존재하지 않으면 새로 생성
         const { data: newStockItem, error: createError } = await supabase
           .from('stock_items')
@@ -272,7 +292,8 @@ async function processTemporaryIds(
             item_type: 'ingredient',
             item_id: ingredientId,
             current_quantity: 0, // 초기 수량은 0
-            unit: ingredient.unit || '개'
+            unit: ingredient.unit || '개',
+            warehouse_id: targetWarehouseId
           })
           .select()
           .single();
@@ -328,6 +349,25 @@ async function processTemporaryIds(
         // 이미 존재하는 재고 항목이 있으면 해당 ID 사용
         processedIds[i] = existingStockItem.id;
       } else {
+        // 창고 ID 결정 (전달받은 ID가 있으면 우선 사용, 없으면 기본 창고 조회)
+        let targetWarehouseId = warehouseId;
+        
+        if (!targetWarehouseId) {
+          const { data: defaultWarehouse, error: warehouseError } = await supabase
+            .from('warehouses')
+            .select('id')
+            .eq('company_id', companyId)
+            .eq('is_default', true)
+            .single();
+          
+          if (warehouseError) {
+            console.error('기본 창고 조회 오류:', warehouseError);
+            throw new Error(`기본 창고를 찾을 수 없습니다: ${warehouseError.message}`);
+          }
+          
+          targetWarehouseId = defaultWarehouse.id;
+        }
+        
         // 존재하지 않으면 새로 생성
         const { data: newStockItem, error: createError } = await supabase
           .from('stock_items')
@@ -336,7 +376,8 @@ async function processTemporaryIds(
             item_type: 'container',
             item_id: containerId,
             current_quantity: 0, // 초기 수량은 0
-            unit: '개' // 용기의 기본 단위는 '개'
+            unit: '개', // 용기의 기본 단위는 '개'
+            warehouse_id: targetWarehouseId
           })
           .select()
           .single();
@@ -407,7 +448,10 @@ export async function POST(
       notes = '', 
       referenceId = null, 
       referenceType = null,
-      isGroupedTransaction = false
+      isGroupedTransaction = false,
+      warehouseId = null,
+      warehouseIds = null,  // 다중 창고 지원을 위한 창고 ID 배열
+      useMultipleWarehouses = false // 다중 창고 모드 플래그
     } = requestData;
 
     // 새로운 그룹화된 거래 형식 지원
@@ -454,13 +498,65 @@ export async function POST(
       );
     }
 
+    // 다중 창고 설정 검증
+    if (useMultipleWarehouses) {
+      if (!warehouseIds || !Array.isArray(warehouseIds)) {
+        return NextResponse.json(
+          { error: '다중 창고 모드에서는 warehouseIds 배열이 필요합니다.' },
+          { status: 400 }
+        );
+      }
+      
+      if (warehouseIds.length !== transactionItems.length) {
+        return NextResponse.json(
+          { error: '거래 항목 수와 창고 ID 수가 일치하지 않습니다.' },
+          { status: 400 }
+        );
+      }
+
+      // 창고 유효성 검증
+      const { data: warehouses, error: warehouseError } = await supabase
+        .from('warehouses')
+        .select('id, company_id')
+        .in('id', warehouseIds.filter(id => id)); // null/undefined 제외
+
+      if (warehouseError) {
+        return NextResponse.json(
+          { error: '창고 정보를 조회하는 중 오류가 발생했습니다.' },
+          { status: 500 }
+        );
+      }
+
+      const invalidWarehouses = warehouses.filter(w => w.company_id !== companyId);
+      if (invalidWarehouses.length > 0) {
+        return NextResponse.json(
+          { error: '일부 창고가 이 회사에 속하지 않습니다.' },
+          { status: 403 }
+        );
+      }
+    } else if (warehouseId) {
+      // 단일 창고 모드에서 창고 유효성 검증
+      const { data: warehouse, error: warehouseError } = await supabase
+        .from('warehouses')
+        .select('id, company_id')
+        .eq('id', warehouseId)
+        .single();
+
+      if (warehouseError || !warehouse || warehouse.company_id !== companyId) {
+        return NextResponse.json(
+          { error: '유효하지 않은 창고입니다.' },
+          { status: 400 }
+        );
+      }
+    }
+
     // 임시 ID 처리 (거래 기록용과 재고 차감용 모두)
     try {
       const transactionStockItemIds = transactionItems.map((item: any) => item.stockItemId);
       const adjustmentStockItemIds = stockAdjustments.map((item: any) => item.stockItemId);
       
-      const processedTransactionIds = await processTemporaryIds(supabase, transactionStockItemIds, companyId, userId);
-      const processedAdjustmentIds = await processTemporaryIds(supabase, adjustmentStockItemIds, companyId, userId);
+      const processedTransactionIds = await processTemporaryIds(supabase, transactionStockItemIds, companyId, userId, warehouseId);
+      const processedAdjustmentIds = await processTemporaryIds(supabase, adjustmentStockItemIds, companyId, userId, warehouseId);
       
       // 처리된 ID로 업데이트
       transactionItems = transactionItems.map((item: any, index: number) => ({
@@ -546,6 +642,23 @@ export async function POST(
         const itemGroup = itemGroups.get(item.stockItemId);
         const isMaxQuantityInGroup = itemGroup && index === itemGroup.maxIndex;
         
+        // 해당 거래의 창고 ID 결정
+        const itemWarehouseId = useMultipleWarehouses 
+          ? warehouseIds[index] 
+          : warehouseId;
+
+        // 거래 타입에 따라 창고 ID를 적절한 필드에 설정
+        const warehouseFields: any = {};
+        if (itemWarehouseId) {
+          if (requestType === 'incoming') {
+            // 입고: destination_warehouse_id에 설정
+            warehouseFields.destination_warehouse_id = itemWarehouseId;
+          } else if (requestType === 'outgoing' || requestType === 'disposal') {
+            // 출고/폐기: source_warehouse_id에 설정
+            warehouseFields.source_warehouse_id = itemWarehouseId;
+          }
+        }
+
         const { data: transaction, error: transactionError } = await supabase
           .from('stock_transactions')
           .insert({
@@ -556,6 +669,7 @@ export async function POST(
             user_id: userId,
             reference_id: referenceId,
             reference_type: referenceType,
+            ...warehouseFields, // 창고 필드 추가
             notes: isGroupedTransaction ? 
               (isMaxInGroup && isMaxQuantityInGroup ? 
                 `${notes} - ${item.itemName} [ACTUAL_STOCK_CHANGE]` : 

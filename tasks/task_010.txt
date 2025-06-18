@@ -1,0 +1,43 @@
+# Task ID: 10
+# Title: Create Integrated Stock Dashboard
+# Status: pending
+# Dependencies: 5, 6
+# Priority: medium
+# Description: Build a dashboard showing inventory across all locations
+# Details:
+Implement IntegratedStockDashboard component. Create a new 'Integrated View' tab in the main navigation. Build card layout showing inventory by location. Add summary statistics for total inventory. Implement alerts for low stock across locations. Create visualizations for inventory distribution.
+
+# Test Strategy:
+Verify dashboard displays correct aggregated data. Test with various inventory scenarios. Check that alerts trigger appropriately for low stock. Test responsive design of the dashboard components.
+
+# Subtasks:
+## 1. Set up data aggregation layer and unified API endpoints [pending]
+### Dependencies: None
+### Description: Create a robust backend service to aggregate inventory data from all locations into a unified format. This involves building RESTful API endpoints that normalize data across different sources and handle real-time updates efficiently.
+### Details:
+Implement Express.js routes with database queries to aggregate inventory by location and SKU. Create endpoints like `/api/inventory/summary` for overall stats, `/api/inventory/by-location` for location-specific data, and `/api/inventory/alerts` for low-stock items. Use SQL GROUP BY queries to sum quantities across locations. Implement error handling for database failures and data validation. Add caching layer (Redis) for frequently accessed data to optimize performance. Include pagination for large datasets and implement rate limiting to prevent API abuse. Test with mock data covering edge cases like zero inventory, missing locations, and concurrent updates.
+
+## 2. Create IntegratedStockDashboard component with modular layout structure [pending]
+### Dependencies: 10.1
+### Description: Build the main React component with a responsive, modular layout that follows dashboard design best practices. Implement the card-based layout structure that will house different sections of inventory data and visualizations.
+### Details:
+Create IntegratedStockDashboard.jsx with a CSS Grid or Flexbox layout supporting responsive design. Implement separate card components: LocationInventoryCard, SummaryStatsCard, AlertsCard, and VisualizationCard. Use React hooks (useState, useEffect) for state management and data fetching from the API endpoints created in subtask 1. Implement loading states, error boundaries, and skeleton screens for better UX. Add real-time data refresh using setInterval (every 30 seconds) or WebSocket connection. Style with CSS modules or styled-components for maintainability. Include accessibility features like ARIA labels and keyboard navigation. Test component rendering with various data states (loading, error, empty, populated).
+
+## 3. Implement summary statistics calculation and display system [pending]
+### Dependencies: 10.1, 10.2
+### Description: Build the logic to calculate and display key inventory metrics including total inventory value, stock levels by location, turnover rates, and other actionable KPIs that provide executive-level insights.
+### Details:
+Create utility functions to calculate total inventory across all locations, average stock levels, inventory value (quantity × unit price), and stock distribution percentages. Implement SummaryStatsCard component displaying metrics in an easy-to-scan format with icons and color coding. Add trend indicators (up/down arrows) comparing current vs previous period. Include drill-down functionality allowing users to click metrics for detailed breakdowns. Implement data formatting utilities for currency, percentages, and large numbers (e.g., 1.2K, 1.5M). Add export functionality for summary reports. Create automated tests for calculation accuracy and edge cases like division by zero or negative inventory.
+
+## 4. Build low-stock alert system with configurable thresholds [pending]
+### Dependencies: 10.1, 10.2, 10.3
+### Description: Implement an intelligent alerting mechanism that monitors inventory levels across all locations and provides actionable notifications for items requiring attention, including low stock, overstock, and transfer recommendations.
+### Details:
+Create AlertsCard component with priority-based alert display (critical, warning, info). Implement configurable threshold settings stored in database or config files (e.g., low stock = <10 units, critical = <5 units). Build alert generation logic that compares current inventory against thresholds and identifies items needing reorder or transfer between locations. Add alert categorization: low stock, overstock, slow-moving items, and transfer opportunities. Implement alert acknowledgment system allowing users to mark alerts as 'seen' or 'resolved'. Include filtering and sorting options for alerts by location, priority, or SKU. Add notification badges and visual indicators (red/yellow/green status dots). Create email/SMS notification integration for critical alerts. Test alert triggering with various inventory scenarios and threshold configurations.
+
+## 5. Create interactive visualizations for inventory distribution and add navigation integration [pending]
+### Dependencies: 10.1, 10.2, 10.3, 10.4
+### Description: Implement Chart.js-based visualizations showing inventory distribution across locations and integrate the completed dashboard into the main application navigation as an 'Integrated View' tab.
+### Details:
+Install and configure Chart.js with React wrapper (react-chartjs-2). Create multiple visualization types: bar charts for inventory by location, pie charts for stock distribution, line charts for inventory trends over time, and heat maps for location performance. Implement interactive features like tooltips, click-to-drill-down, and legend filtering. Add chart export functionality (PNG, PDF). Create responsive chart sizing that adapts to different screen sizes. Integrate the IntegratedStockDashboard into main navigation by adding 'Integrated View' tab to the navigation component and setting up proper routing. Implement lazy loading for the dashboard component to optimize initial page load. Add breadcrumb navigation and page title updates. Create comprehensive integration tests covering navigation flow, chart interactions, and data refresh cycles. Test dashboard performance with large datasets and ensure smooth animations.
+
