@@ -11,6 +11,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -44,6 +53,7 @@ import {
   Settings,
   Package,
   Warehouse,
+  AlertTriangle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -52,7 +62,6 @@ import { cn } from "@/lib/utils";
 import { useStockCart } from "./StockCartContext";
 import WarehouseSelector from "./WarehouseSelector";
 import { CookingPlanImportModal } from "./CookingPlanImportModal";
-import { toast } from "@/hooks/use-toast";
 
 // 수량 포맷 함수
 const formatQuantity = (quantity: number, unit: string) => {
@@ -96,6 +105,13 @@ export function StockTransactionModal({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCookingPlanModalOpen, setIsCookingPlanModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("quick");
+  
+  // 탭 전환 제한 알림 모달 상태
+  const [isTabRestrictAlertOpen, setIsTabRestrictAlertOpen] = useState(false);
+  const [tabRestrictMessage, setTabRestrictMessage] = useState({
+    title: "",
+    description: ""
+  });
 
   // 모달이 열릴 때 초기 탭 설정
   useEffect(() => {
@@ -110,21 +126,21 @@ export function StockTransactionModal({
   const handleTabChange = (newTab: string) => {
     // 빠른 설정으로 전환 시도 시 장바구니 체크
     if (newTab === "quick" && items.length > 0) {
-      toast({
+      setTabRestrictMessage({
         title: "탭 전환 불가",
-        description: "장바구니에 아이템이 있어서 빠른 설정을 사용할 수 없습니다. 장바구니를 비우거나 수동 설정을 사용해주세요.",
-        variant: "destructive",
+        description: "장바구니에 아이템이 있어서 빠른 설정을 사용할 수 없습니다. 장바구니를 비우거나 수동 설정을 사용해주세요."
       });
+      setIsTabRestrictAlertOpen(true);
       return; // 탭 전환 차단
     }
     
     // 수동 설정으로 전환 시도 시 빈 장바구니 체크
     if (newTab === "manual" && items.length === 0) {
-      toast({
-        title: "탭 전환 불가", 
-        description: "장바구니가 비어있어서 수동 설정을 사용할 수 없습니다. 먼저 재고 항목을 장바구니에 추가해주세요.",
-        variant: "destructive",
+      setTabRestrictMessage({
+        title: "탭 전환 불가",
+        description: "장바구니가 비어있어서 수동 설정을 사용할 수 없습니다. 먼저 재고 항목을 장바구니에 추가해주세요."
       });
+      setIsTabRestrictAlertOpen(true);
       return; // 탭 전환 차단
     }
 
@@ -312,7 +328,7 @@ export function StockTransactionModal({
                               <WarehouseSelector
                                 companyId={companyId}
                                 selectedWarehouseId={selectedWarehouseId}
-                                onWarehouseChange={setSelectedWarehouseId}
+                                onWarehouseChange={(warehouseId) => setSelectedWarehouseId(warehouseId ?? null)}
                                 placeholder="창고 선택"
                                 className="h-9"
                                 showAllOption={false}
@@ -328,7 +344,7 @@ export function StockTransactionModal({
                                 <WarehouseSelector
                                   companyId={companyId}
                                   selectedWarehouseId={selectedWarehouseId || undefined}
-                                  onWarehouseChange={(warehouseId) => setSelectedWarehouseId(warehouseId || null)}
+                                  onWarehouseChange={(warehouseId) => setSelectedWarehouseId(warehouseId ?? null)}
                                   placeholder="원본 창고 선택"
                                   className="h-9"
                                   showAllOption={false}
@@ -339,7 +355,7 @@ export function StockTransactionModal({
                                 <WarehouseSelector
                                   companyId={companyId}
                                   selectedWarehouseId={destinationWarehouseId || undefined}
-                                  onWarehouseChange={(warehouseId) => setDestinationWarehouseId(warehouseId || null)}
+                                  onWarehouseChange={(warehouseId) => setDestinationWarehouseId(warehouseId ?? null)}
                                   placeholder="대상 창고 선택"
                                   className="h-9"
                                   showAllOption={false}
@@ -555,6 +571,26 @@ export function StockTransactionModal({
         companyId={companyId}
         onImportComplete={handleCookingPlanImportComplete}
       />
+
+      {/* 탭 전환 제한 알림 모달 */}
+      <AlertDialog open={isTabRestrictAlertOpen} onOpenChange={setIsTabRestrictAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              {tabRestrictMessage.title}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {tabRestrictMessage.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setIsTabRestrictAlertOpen(false)}>
+              확인
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
