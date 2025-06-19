@@ -320,6 +320,9 @@ function StockClientInner({ companyId }: StockClientProps) {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">전체</SelectItem>
+                        <SelectItem value="가">가등급</SelectItem>
+                        <SelectItem value="나">나등급</SelectItem>
+                        <SelectItem value="다">다등급</SelectItem>
                         <SelectItem value="A">A등급</SelectItem>
                         <SelectItem value="B">B등급</SelectItem>
                         <SelectItem value="C">C등급</SelectItem>
