@@ -22,7 +22,8 @@ import {
   Clock,
   Edit3,
   Save,
-  RotateCcw
+  RotateCcw,
+  Warehouse
 } from "lucide-react";
 import { StockAudit, StockAuditItem, StockAuditDetailResponse, CreateStockAuditRequest } from "@/types/stock-audit";
 import WarehouseSelector from "@/components/stock/WarehouseSelector";
@@ -681,54 +682,83 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
         <div className="lg:col-span-2">
           {currentAudit ? (
             <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>{currentAudit.audit.name}</CardTitle>
-                    <div className="flex items-center space-x-3 mt-1">
-                      <p className="text-sm text-gray-500">
-                        {currentAudit.audit.description}
-                      </p>
+              <CardHeader className="pb-4">
+                {/* 메인 헤더 - 제목과 액션 버튼 */}
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <CardTitle className="text-xl">{currentAudit.audit.name}</CardTitle>
                       {currentAudit?.warehouse && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                          📦 {currentAudit.warehouse.name}
-                        </span>
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 shadow-sm">
+                          <Warehouse className="h-3.5 w-3.5 text-slate-600" />
+                          <span className="text-xs font-medium text-slate-700">
+                            {currentAudit.warehouse.name}
+                          </span>
+                        </div>
                       )}
                     </div>
+                    {currentAudit.audit.description && (
+                      <p className="text-sm text-gray-600 leading-relaxed">
+                        {currentAudit.audit.description}
+                      </p>
+                    )}
                   </div>
                   
-                  {currentAudit.audit.status === 'in_progress' && (
-                    <div className="flex space-x-2">
+                  <div className="flex items-center gap-3">
+                    {currentAudit.audit.status === 'in_progress' && (
                       <Button
                         variant="outline"
                         onClick={handleCompleteAudit}
+                        className="flex items-center gap-2"
                       >
+                        <CheckCircle className="h-4 w-4" />
                         실사 완료
                       </Button>
-                    </div>
-                  )}
+                    )}
 
-                  {currentAudit.audit.status === 'completed' && (
-                    <div className="flex items-center space-x-2 text-sm text-green-600">
-                      <CheckCircle className="h-4 w-4" />
-                      <span>실사 완료</span>
-                    </div>
-                  )}
+                    {currentAudit.audit.status === 'completed' && (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-green-50 text-green-700 rounded-lg border border-green-200">
+                        <CheckCircle className="h-4 w-4" />
+                        <span className="text-sm font-medium">실사 완료</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 
-                {/* 진행률 */}
-                <div className="mt-4">
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span>진행률</span>
-                    <span>{currentAudit.stats.completion_rate}% ({currentAudit.stats.completed_items + currentAudit.stats.discrepancy_items}/{currentAudit.stats.total_items})</span>
+                {/* 실사 현황 통계 */}
+                <div className="mt-4 pt-3 border-t border-gray-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium text-gray-900">실사 현황</h3>
+                    <div className="text-xs text-gray-500">
+                      {currentAudit.stats.completed_items + currentAudit.stats.discrepancy_items}/{currentAudit.stats.total_items} 항목 완료
+                    </div>
                   </div>
-                  <Progress value={currentAudit.stats.completion_rate} className="h-2" />
                   
-                  <div className="flex justify-between text-xs text-gray-500 mt-2">
-                    <span>완료: {currentAudit.stats.completed_items + currentAudit.stats.discrepancy_items}</span>
-                    <span>대기: {currentAudit.stats.pending_items}</span>
-                    <span>차이: {currentAudit.stats.discrepancy_items}</span>
-                    <span>총 {currentAudit.stats.total_items}개</span>
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="bg-green-50 rounded-md px-3 py-2 text-center border border-green-100">
+                      <div className="text-base font-semibold text-green-600">
+                        {currentAudit.stats.completed_items}
+                      </div>
+                      <div className="text-xs text-green-700 mt-0.5">정상</div>
+                    </div>
+                    <div className="bg-orange-50 rounded-md px-3 py-2 text-center border border-orange-100">
+                      <div className="text-base font-semibold text-orange-600">
+                        {currentAudit.stats.discrepancy_items}
+                      </div>
+                      <div className="text-xs text-orange-700 mt-0.5">차이</div>
+                    </div>
+                    <div className="bg-gray-50 rounded-md px-3 py-2 text-center border border-gray-200">
+                      <div className="text-base font-semibold text-gray-600">
+                        {currentAudit.stats.pending_items}
+                      </div>
+                      <div className="text-xs text-gray-700 mt-0.5">대기</div>
+                    </div>
+                    <div className="bg-slate-50 rounded-md px-3 py-2 text-center border border-slate-200">
+                      <div className="text-base font-semibold text-slate-600">
+                        {currentAudit.stats.total_items}
+                      </div>
+                      <div className="text-xs text-slate-700 mt-0.5">총계</div>
+                    </div>
                   </div>
                 </div>
               </CardHeader>
