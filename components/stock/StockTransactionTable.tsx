@@ -64,17 +64,31 @@ export function StockTransactionTable({
 }: StockTransactionTableProps) {
   // 거래 유형에 따른 배지 렌더링
   const getTransactionTypeBadge = (type: string) => {
+    console.log('거래 유형 표시:', type); // 디버깅용 로그
+    
     switch (type) {
       case "in":
+      case "incoming":
+      case "add":
         return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">입고</Badge>;
       case "out":
+      case "outgoing":  
+      case "remove":
         return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">출고</Badge>;
       case "adjustment":
+      case "modify":
         return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">조정</Badge>;
       case "verification":
+      case "audit":
         return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">실사</Badge>;
+      case "transfer":
+      case "move":
+        return <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">이동</Badge>;
+      case "disposal":
+        return <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">폐기</Badge>;
       default:
-        return <Badge variant="secondary">{type}</Badge>;
+        console.warn('알 수 없는 거래 유형:', type); // 경고 로그
+        return <Badge variant="secondary">{type || '알 수 없음'}</Badge>;
     }
   };
 

@@ -45,17 +45,30 @@ interface StockItemDetailModalProps {
   item: StockItem | null;
 }
 
-// 특정 날짜 재고 조회 결과 타입
+// 특정 날짜 재고 조회 결과 타입 (새로운 API 응답 구조에 맞춤)
 interface HistoricalStockData {
-  stockItemId: string;
+  itemId: string;
+  combinedId: string;
   itemType: string;
   itemName: string;
   unit: string;
-  quantity: number;
+  totalQuantity: number; // quantity → totalQuantity로 변경
   date: string;
-  calculationMethod: string;
   calculationTime: string;
-  transactionsProcessed: number;
+  warehouseCount?: number; // 새로운 필드 추가
+  warehouses?: Array<{
+    warehouseId: string;
+    warehouseName: string;
+    quantity: number;
+    calculationMethod?: string;
+    baseSnapshot?: {
+      date: string;
+      quantity: number;
+    } | null;
+  }>; // 새로운 필드 추가
+  // 전체 조회에서는 제공되지 않을 수 있는 필드들
+  calculationMethod?: string;
+  transactionsProcessed?: number;
   baseSnapshot?: {
     date: string;
     quantity: number;
@@ -500,64 +513,6 @@ export function StockItemDetailModal({
               </CardContent>
             </Card>
 
-            {/* 최근 거래 내역 */}
-            {detailedItem.recentTransactions && detailedItem.recentTransactions.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Clock className="mr-2 h-5 w-5" />
-                    최근 거래 내역
-                  </CardTitle>
-                  <CardDescription>
-                    최근 10개의 거래 내역을 확인할 수 있습니다.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="border rounded-lg overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-3 py-2 text-left">날짜</th>
-                            <th className="px-3 py-2 text-left">유형</th>
-                            <th className="px-3 py-2 text-right">수량</th>
-                            <th className="px-3 py-2 text-left">메모</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {detailedItem.recentTransactions.map((transaction: any) => (
-                            <tr key={transaction.id} className="border-t">
-                              <td className="px-3 py-2">
-                                {new Date(transaction.transaction_date).toLocaleDateString('ko-KR')}
-                              </td>
-                              <td className="px-3 py-2">
-                                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                  transaction.transaction_type === 'add' 
-                                    ? 'bg-green-100 text-green-800'
-                                    : transaction.transaction_type === 'remove'
-                                    ? 'bg-red-100 text-red-800'
-                                    : 'bg-blue-100 text-blue-800'
-                                }`}>
-                                  {transaction.transaction_type === 'add' ? '입고' : 
-                                   transaction.transaction_type === 'remove' ? '출고' : '이동'}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 text-right font-medium">
-                                {transaction.quantity_change > 0 ? '+' : ''}{transaction.quantity_change} {transaction.unit}
-                              </td>
-                              <td className="px-3 py-2 text-gray-600">
-                                {transaction.notes || '-'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {/* 특정 날짜 재고 조회 섹션 */}
             <Card>
               <CardHeader>
@@ -614,7 +569,7 @@ export function StockItemDetailModal({
                       <div>
                         <h4 className="text-sm font-medium text-muted-foreground">해당 날짜 재고량</h4>
                         <p className="text-lg font-semibold text-primary">
-                          {formatQuantity(historicalData.quantity, historicalData.unit)} {
+                          {formatQuantity(historicalData.totalQuantity, historicalData.unit)} {
                             historicalData.unit === "g" ? "kg" : 
                             historicalData.unit === "ml" ? "l" : 
                             historicalData.unit
@@ -625,12 +580,12 @@ export function StockItemDetailModal({
                         <h4 className="text-sm font-medium text-muted-foreground">현재 재고와의 차이</h4>
                         <p className={cn(
                           "text-lg font-semibold",
-                          detailedItem.current_quantity - historicalData.quantity > 0 ? "text-green-600" : 
-                          detailedItem.current_quantity - historicalData.quantity < 0 ? "text-red-600" : 
+                          detailedItem.current_quantity - historicalData.totalQuantity > 0 ? "text-green-600" : 
+                          detailedItem.current_quantity - historicalData.totalQuantity < 0 ? "text-red-600" : 
                           "text-gray-600"
                         )}>
-                          {detailedItem.current_quantity - historicalData.quantity > 0 ? "+" : ""}
-                          {formatQuantity(detailedItem.current_quantity - historicalData.quantity, detailedItem.unit)} {
+                          {detailedItem.current_quantity - historicalData.totalQuantity > 0 ? "+" : ""}
+                          {formatQuantity(detailedItem.current_quantity - historicalData.totalQuantity, detailedItem.unit)} {
                             detailedItem.unit === "g" ? "kg" : 
                             detailedItem.unit === "ml" ? "l" : 
                             detailedItem.unit
@@ -640,11 +595,25 @@ export function StockItemDetailModal({
                       <div>
                         <h4 className="text-sm font-medium text-muted-foreground">계산 방법</h4>
                         <p className="text-sm">
-                          {historicalData.calculationMethod}
+                          {historicalData.calculationMethod || (
+                            historicalData.warehouseCount && historicalData.warehouseCount > 1 
+                              ? `${historicalData.warehouseCount}개 창고 합계` 
+                              : "전체 재고 계산"
+                          )}
                           {historicalData.baseSnapshot && (
                             <span className="block text-xs text-muted-foreground mt-1">
                               기준 스냅샷: {format(new Date(historicalData.baseSnapshot.date), "yyyy-MM-dd", { locale: ko })}
                             </span>
+                          )}
+                          {historicalData.warehouses && historicalData.warehouses.length > 1 && (
+                            <div className="mt-2 space-y-1">
+                              <span className="block text-xs font-medium text-muted-foreground">창고별 세부:</span>
+                              {historicalData.warehouses.map((warehouse, index) => (
+                                <div key={warehouse.warehouseId} className="text-xs text-muted-foreground">
+                                  • {warehouse.warehouseName}: {formatQuantity(warehouse.quantity, historicalData.unit)} {historicalData.unit}
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </p>
                       </div>
@@ -654,29 +623,27 @@ export function StockItemDetailModal({
               </CardContent>
             </Card>
 
-            {/* 거래 내역 테이블 */}
-            {transactions.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Clock className="mr-2 h-5 w-5" />
-                    전체 거래 내역
-                  </CardTitle>
-                  <CardDescription>
-                    해당 재고 항목의 모든 거래 내역을 확인할 수 있습니다.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                                   <StockTransactionTable
-                   transactions={transactions}
-                   pagination={pagination}
-                   onPageChange={handlePageChange}
-                   isLoading={false}
-                   onRefresh={fetchTransactions}
-                 />
-                </CardContent>
-              </Card>
-            )}
+            {/* 전체 거래 내역 테이블 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Clock className="mr-2 h-5 w-5" />
+                  거래 내역
+                </CardTitle>
+                <CardDescription>
+                  해당 재고 항목의 모든 거래 내역을 확인할 수 있습니다.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <StockTransactionTable
+                  transactions={transactions}
+                  pagination={pagination}
+                  onPageChange={handlePageChange}
+                  isLoading={false}
+                  onRefresh={fetchTransactions}
+                />
+              </CardContent>
+            </Card>
           </div>
         )}
       </SheetContent>
