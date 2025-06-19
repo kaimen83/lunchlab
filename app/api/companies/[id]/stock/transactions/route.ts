@@ -49,6 +49,7 @@ export async function GET(
     const stockItemIds = searchParams.getAll('stockItemIds'); // 여러 ID 지원
     const transactionType = searchParams.get('transactionType');
     const selectedDate = searchParams.get('selectedDate'); // startDate, endDate 대신 selectedDate 사용
+    const warehouseId = searchParams.get('warehouseId'); // 창고 필터 추가
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = parseInt(searchParams.get('pageSize') || '20');
 
@@ -87,6 +88,14 @@ export async function GET(
           id, 
           item_type, 
           item_id
+        ),
+        source_warehouse:source_warehouse_id(
+          id,
+          name
+        ),
+        destination_warehouse:destination_warehouse_id(
+          id,
+          name
         )
       `, { count: 'exact' })
       .in('stock_item_id', allStockItemIds)
@@ -101,8 +110,13 @@ export async function GET(
       query = query.in('stock_item_id', stockItemIds);
     }
 
-    if (transactionType && ['incoming', 'outgoing', 'disposal', 'adjustment'].includes(transactionType)) {
+    if (transactionType && ['incoming', 'outgoing', 'disposal', 'adjustment', 'transfer', 'in', 'out', 'verification'].includes(transactionType)) {
       query = query.eq('transaction_type', transactionType);
+    }
+
+    // 창고 필터링 추가 (올바른 컬럼명 사용)
+    if (warehouseId) {
+      query = query.or(`source_warehouse_id.eq.${warehouseId},destination_warehouse_id.eq.${warehouseId}`);
     }
 
     // 특정 날짜의 거래내역만 조회 (해당 날짜 00:00:00 ~ 23:59:59)
@@ -197,7 +211,16 @@ export async function GET(
               name: itemDetails?.name || '삭제된 항목',
               code_name: itemDetails?.code_name || ''
             }
-          }
+          },
+          // 창고 정보 추가 (올바른 속성명 사용)
+          warehouse: transaction.source_warehouse ? {
+            id: transaction.source_warehouse.id,
+            name: transaction.source_warehouse.name
+          } : undefined,
+          destination_warehouse: transaction.destination_warehouse ? {
+            id: transaction.destination_warehouse.id,
+            name: transaction.destination_warehouse.name
+          } : undefined
         };
       })
     );

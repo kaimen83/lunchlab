@@ -14,7 +14,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, X } from "lucide-react";
+import { Search, X, Warehouse } from "lucide-react";
+import WarehouseSelector from "@/components/stock/WarehouseSelector";
 
 interface StockTransactionsPageProps {
   companyId: string;
@@ -35,6 +36,7 @@ export default function StockTransactionsPage({ companyId, selectedWarehouseId }
     transactionType: "all",
     stockItemId: "",
     selectedDate: "",
+    warehouseId: "",
   });
 
   // 거래 내역 목록 조회
@@ -49,6 +51,7 @@ export default function StockTransactionsPage({ companyId, selectedWarehouseId }
       if (filters.transactionType && filters.transactionType !== "all") queryParams.set("transactionType", filters.transactionType);
       if (filters.stockItemId) queryParams.set("stockItemId", filters.stockItemId);
       if (filters.selectedDate) queryParams.set("selectedDate", filters.selectedDate);
+      if (filters.warehouseId && filters.warehouseId !== "all") queryParams.set("warehouseId", filters.warehouseId);
 
       const response = await fetch(
         `/api/companies/${companyId}/stock/transactions?${queryParams.toString()}`
@@ -91,6 +94,7 @@ export default function StockTransactionsPage({ companyId, selectedWarehouseId }
       transactionType: "all",
       stockItemId: "",
       selectedDate: "",
+      warehouseId: "",
     });
   };
 
@@ -107,7 +111,7 @@ export default function StockTransactionsPage({ companyId, selectedWarehouseId }
   return (
     <div className="space-y-4">
       <Card className="p-4">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <div className="space-y-2">
             <Label htmlFor="transactionType">거래 유형</Label>
             <Select
@@ -123,8 +127,26 @@ export default function StockTransactionsPage({ companyId, selectedWarehouseId }
                 <SelectItem value="out">출고</SelectItem>
                 <SelectItem value="adjustment">조정</SelectItem>
                 <SelectItem value="verification">재고실사</SelectItem>
+                <SelectItem value="transfer">창고간 이동</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="warehouse" className="flex items-center gap-2">
+              <Warehouse className="h-4 w-4" />
+              창고
+            </Label>
+            <WarehouseSelector
+              companyId={companyId}
+              selectedWarehouseId={filters.warehouseId || undefined}
+              onWarehouseChange={(warehouseId) => 
+                handleFilterChange("warehouseId", warehouseId || "all")
+              }
+              placeholder="모든 창고"
+              className="w-full"
+              showAllOption={true}
+            />
           </div>
 
           <div className="space-y-2">

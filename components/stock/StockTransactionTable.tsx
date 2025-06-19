@@ -19,7 +19,7 @@ import {
 // 재고 거래 타입 정의
 export interface StockTransaction {
   id: string;
-  transaction_type: "in" | "out" | "adjustment" | "verification";
+  transaction_type: "in" | "out" | "adjustment" | "verification" | "transfer";
   quantity: number;
   unit: string;
   created_at: string;
@@ -36,6 +36,14 @@ export interface StockTransaction {
       name: string;
       code_name?: string;
     };
+  };
+  warehouse?: {
+    id: string;
+    name: string;
+  };
+  destination_warehouse?: {
+    id: string;
+    name: string;
   };
 }
 
@@ -155,6 +163,9 @@ export function StockTransactionTable({
                 <TableHead>
                   <Skeleton className="h-4 w-20" />
                 </TableHead>
+                <TableHead>
+                  <Skeleton className="h-4 w-20" />
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -170,6 +181,9 @@ export function StockTransactionTable({
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-6 w-16" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-6 w-20" />
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-6 w-32" />
@@ -215,6 +229,7 @@ export function StockTransactionTable({
               <TableHead>유형</TableHead>
               <TableHead>항목</TableHead>
               <TableHead>수량</TableHead>
+              <TableHead>창고</TableHead>
               <TableHead>일시</TableHead>
               <TableHead>담당자</TableHead>
               <TableHead>상태</TableHead>
@@ -223,7 +238,7 @@ export function StockTransactionTable({
           <TableBody>
             {transactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-10">
+                <TableCell colSpan={7} className="text-center py-10">
                   <div className="flex flex-col items-center justify-center text-muted-foreground">
                     <ClipboardList className="h-12 w-12 mb-2 text-muted-foreground/50" />
                     <p>거래 내역이 없습니다.</p>
@@ -246,6 +261,69 @@ export function StockTransactionTable({
                   </TableCell>
                   <TableCell className="text-right">
                     {formatNumber(transaction.quantity)} {transaction.unit}
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      {(() => {
+                        // 창고간 이동인 경우
+                        if (transaction.transaction_type === "transfer") {
+                          return (
+                            <div className="text-sm">
+                              <div className="flex items-center gap-1">
+                                <span className="text-muted-foreground">출발:</span>
+                                <span>{transaction.warehouse?.name || "-"}</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <span>도착:</span>
+                                <span>{transaction.destination_warehouse?.name || "-"}</span>
+                              </div>
+                            </div>
+                          );
+                        }
+                        
+                        // 일반 거래인 경우 (입고/출고/조정/실사)
+                        let warehouse = null;
+                        let warehouseLabel = "";
+                        
+                        switch (transaction.transaction_type) {
+                          case "in":
+                            warehouse = transaction.destination_warehouse;
+                            warehouseLabel = "입고 창고";
+                            break;
+                          case "out":
+                            warehouse = transaction.warehouse;
+                            warehouseLabel = "출고 창고";
+                            break;
+                          case "adjustment":
+                            warehouse = transaction.warehouse || transaction.destination_warehouse;
+                            warehouseLabel = "조정 창고";
+                            break;
+                          case "verification":
+                            warehouse = transaction.warehouse || transaction.destination_warehouse;
+                            warehouseLabel = "실사 창고";
+                            break;
+                          default:
+                            warehouse = transaction.warehouse || transaction.destination_warehouse;
+                            warehouseLabel = "창고";
+                        }
+                        
+                        if (warehouse) {
+                          return (
+                            <div className="text-sm">
+                              {warehouse.name}
+                              <div className="text-xs text-muted-foreground">
+                                {warehouseLabel}
+                              </div>
+                            </div>
+                          );
+                        }
+                        
+                        // 창고 정보가 없는 경우
+                        return (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        );
+                      })()}
+                    </div>
                   </TableCell>
                   <TableCell>{formatDate(transaction.created_at)}</TableCell>
                   <TableCell>{transaction.created_by.name}</TableCell>
