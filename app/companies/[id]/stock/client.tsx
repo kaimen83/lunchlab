@@ -74,7 +74,7 @@ function StockClientInner({ companyId }: StockClientProps) {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | undefined>(undefined);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | null | undefined>(undefined);
 
   // 재고 데이터 가져오기
   const fetchStockItems = useCallback(async () => {
@@ -164,10 +164,12 @@ function StockClientInner({ companyId }: StockClientProps) {
     setPagination(prev => ({ ...prev, page: 1 }));
   };
 
-  const handleWarehouseChange = (warehouseId: string | undefined) => {
-    setSelectedWarehouseId(warehouseId);
+  const handleWarehouseChange = useCallback((warehouseId: string | null | undefined) => {
+    // null과 undefined를 일관되게 처리
+    const normalizedValue = warehouseId === null ? null : warehouseId;
+    setSelectedWarehouseId(normalizedValue);
     setPagination(prev => ({ ...prev, page: 1 }));
-  };
+  }, []);
 
   // 새로고침 핸들러
   const handleRefresh = () => {
@@ -185,20 +187,11 @@ function StockClientInner({ companyId }: StockClientProps) {
   return (
     <div className="space-y-6">
       {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">재고 관리</h1>
-          <p className="text-muted-foreground">
-            회사의 식자재와 용기 재고를 관리하세요.
-          </p>
-        </div>
-        <Button 
-          onClick={() => setIsTransactionModalOpen(true)}
-          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-200"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          재고 거래 생성
-        </Button>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">재고 관리</h1>
+        <p className="text-muted-foreground">
+          회사의 식자재와 용기 재고를 관리하세요.
+        </p>
       </div>
 
       {/* 에러 표시 */}
@@ -227,6 +220,21 @@ function StockClientInner({ companyId }: StockClientProps) {
             </TabsList>
 
             <TabsContent value="list" className="space-y-4">
+              {/* 재고 목록 헤더 */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">재고 목록</h2>
+                  <p className="text-sm text-gray-600">현재 보유 중인 식자재와 용기 재고를 확인하세요.</p>
+                </div>
+                <Button 
+                  onClick={() => setIsTransactionModalOpen(true)}
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-200"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  재고 거래 생성
+                </Button>
+              </div>
+
               {/* 검색 및 필터 */}
               <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
                 {/* 검색 바 */}
@@ -327,7 +335,7 @@ function StockClientInner({ companyId }: StockClientProps) {
                       setItemType('');
                       setStockGrade('all');
                       setSearchQuery('');
-                      setSelectedWarehouseId(undefined);
+                      setSelectedWarehouseId(null); // null로 통일
                       clearCart();
                     }}
                     className="h-9 px-4 text-sm text-gray-600 border-gray-300 hover:bg-gray-50 hover:text-gray-800 transition-colors ml-auto"
@@ -358,14 +366,14 @@ function StockClientInner({ companyId }: StockClientProps) {
             <TabsContent value="audit" className="space-y-4">
               <StockAuditPage 
                 companyId={companyId}
-                selectedWarehouseId={selectedWarehouseId}
+                selectedWarehouseId={selectedWarehouseId || undefined}
               />
             </TabsContent>
 
             <TabsContent value="transactions" className="space-y-4">
               <StockTransactionsPage 
                 companyId={companyId}
-                selectedWarehouseId={selectedWarehouseId}
+                selectedWarehouseId={selectedWarehouseId || undefined}
               />
             </TabsContent>
           </Tabs>

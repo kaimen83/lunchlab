@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Select,
   SelectContent,
@@ -18,7 +18,7 @@ interface Warehouse {
 
 interface WarehouseSelectorProps {
   companyId: string;
-  selectedWarehouseId?: string | null;
+  selectedWarehouseId?: string | null | undefined;
   onWarehouseChange: (warehouseId: string | null | undefined) => void;
   placeholder?: string;
   className?: string;
@@ -36,12 +36,14 @@ export default function WarehouseSelector({
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasSetDefault, setHasSetDefault] = useState(false); // 기본값 설정 여부 추적
 
   // 창고 목록 조회는 companyId가 변경될 때만 실행
   useEffect(() => {
     const fetchWarehouses = async () => {
       try {
         setLoading(true);
+        setHasSetDefault(false); // 새로운 데이터 로드 시 기본값 설정 상태 초기화
         const response = await fetch(`/api/companies/${companyId}/warehouses`);
         
         if (!response.ok) {
@@ -60,29 +62,43 @@ export default function WarehouseSelector({
     if (companyId) {
       fetchWarehouses();
     }
-  }, [companyId]); // 의존성 배열을 companyId만으로 제한
+  }, [companyId]);
 
-  // 기본 창고 설정은 별도 useEffect로 분리
+  // 기본 창고 설정 - 한 번만 실행되도록 개선
   useEffect(() => {
-    // 창고 목록이 로드되고, 선택된 창고가 없고, "전체 창고" 옵션이 없는 경우에만 기본 창고 선택
-    if (warehouses.length > 0 && !selectedWarehouseId && !showAllOption) {
+    // 로딩 완료, 창고 목록 존재, 기본값 미설정, 선택된 창고 없음, "전체" 옵션 없음인 경우에만 실행
+    if (!loading && warehouses.length > 0 && !hasSetDefault && !selectedWarehouseId && !showAllOption) {
       const defaultWarehouse = warehouses.find((w: Warehouse) => w.is_default);
       if (defaultWarehouse) {
+        setHasSetDefault(true); // 기본값 설정 완료 표시
         onWarehouseChange(defaultWarehouse.id);
       }
     }
-  }, [warehouses, selectedWarehouseId, showAllOption]); // onWarehouseChange 의존성 제거로 무한 루프 방지
+  }, [loading, warehouses.length, hasSetDefault, selectedWarehouseId, showAllOption, onWarehouseChange]);
 
-  const handleValueChange = (value: string) => {
+  // 현재 선택된 값 계산 - useMemo로 최적화하여 불필요한 재계산 방지
+  const currentValue = useMemo(() => {
+    // selectedWarehouseId가 있으면 그 값을 사용
+    if (selectedWarehouseId && selectedWarehouseId !== null && selectedWarehouseId !== '') {
+      return selectedWarehouseId;
+    }
+    
+    // selectedWarehouseId가 없고 showAllOption이 true면 'all' 반환
+    if (showAllOption) {
+      return 'all';
+    }
+    
+    // 그 외의 경우 undefined 반환
+    return undefined;
+  }, [selectedWarehouseId, showAllOption]);
+
+  const handleValueChange = useCallback((value: string) => {
     if (value === 'all') {
       onWarehouseChange(null);
     } else {
       onWarehouseChange(value);
     }
-  };
-
-  // 현재 선택된 값 계산
-  const currentValue = selectedWarehouseId || (showAllOption ? 'all' : undefined);
+  }, [onWarehouseChange]);
 
   if (loading) {
     return (

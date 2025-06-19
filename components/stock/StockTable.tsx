@@ -99,7 +99,7 @@ export function StockTable({
   const { addItem, removeItem, items: cartItems } = useStockCart();
   
   // 선택된 항목과 모달 상태 관리
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   // 장바구니에 있는 항목인지 확인하는 함수
@@ -118,8 +118,15 @@ export function StockTable({
   };
 
   // 항목 클릭 핸들러
-  const handleItemClick = (itemId: string) => {
-    setSelectedItemId(itemId);
+  const handleItemClick = (item: StockItem) => {
+    // 임시 항목이거나 유효하지 않은 ID인 경우 모달 열지 않음
+    if (!item.id || item.id.startsWith("temp_")) {
+      console.warn('유효하지 않은 항목:', item);
+      return;
+    }
+    
+    console.log('재고 항목 클릭:', { companyId, itemId: item.id, item });
+    setSelectedItem(item);
     setIsModalOpen(true);
   };
 
@@ -384,7 +391,7 @@ export function StockTable({
                           <span className="cursor-not-allowed">{item.name}</span>
                         ) : (
                           <button
-                            onClick={() => handleItemClick(item.id)}
+                            onClick={() => handleItemClick(item)}
                             className="hover:underline flex items-center text-left"
                           >
                             {item.name}
@@ -468,9 +475,15 @@ export function StockTable({
       {/* 재고 항목 상세 모달 */}
       <StockItemDetailModal
         open={isModalOpen}
-        onOpenChange={setIsModalOpen}
+        onOpenChange={(open) => {
+          setIsModalOpen(open);
+          if (!open) {
+            // 모달이 닫힐 때 선택된 항목도 초기화
+            setSelectedItem(null);
+          }
+        }}
         companyId={companyId}
-        itemId={selectedItemId}
+        item={selectedItem}
       />
     </div>
   );

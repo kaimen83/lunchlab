@@ -46,10 +46,21 @@ export async function GET(
     // URL 쿼리 파라미터 가져오기
     const searchParams = request.nextUrl.searchParams;
     const stockItemId = searchParams.get('stockItemId');
+    const stockItemIds = searchParams.getAll('stockItemIds'); // 여러 ID 지원
     const transactionType = searchParams.get('transactionType');
     const selectedDate = searchParams.get('selectedDate'); // startDate, endDate 대신 selectedDate 사용
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = parseInt(searchParams.get('pageSize') || '20');
+
+    console.log('거래 내역 조회 API 호출:', { 
+      companyId, 
+      stockItemId, 
+      stockItemIds, 
+      transactionType, 
+      selectedDate, 
+      page, 
+      pageSize 
+    });
 
     // 회사의 재고 항목 ID 목록 가져오기
     const { data: stockItems, error: stockItemsError } = await supabase
@@ -65,7 +76,7 @@ export async function GET(
       );
     }
 
-    const stockItemIds = stockItems.map(item => item.id);
+    const allStockItemIds = stockItems.map(item => item.id);
 
     // 거래 내역 조회 쿼리 시작
     let query = supabase
@@ -78,12 +89,16 @@ export async function GET(
           item_id
         )
       `, { count: 'exact' })
-      .in('stock_item_id', stockItemIds)
+      .in('stock_item_id', allStockItemIds)
       .not('notes', 'like', '%[DISPLAY_HIDDEN]%'); // DB 레벨에서 숨겨진 거래 필터링
 
     // 필터 적용
     if (stockItemId) {
+      // 단일 stockItemId 필터
       query = query.eq('stock_item_id', stockItemId);
+    } else if (stockItemIds && stockItemIds.length > 0) {
+      // 여러 stockItemIds 필터
+      query = query.in('stock_item_id', stockItemIds);
     }
 
     if (transactionType && ['incoming', 'outgoing', 'disposal', 'adjustment'].includes(transactionType)) {

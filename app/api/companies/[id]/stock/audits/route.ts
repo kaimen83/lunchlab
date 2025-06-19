@@ -546,14 +546,66 @@ export async function POST(
       console.log(`${itemsNeedingWarehouseUpdate.length}개 항목의 창고를 업데이트 중...`);
       
       for (const item of itemsNeedingWarehouseUpdate) {
-        const { error: updateError } = await supabase
-          .from('stock_items')
-          .update({ warehouse_id: finalWarehouseId })
-          .eq('id', item.id);
+        try {
+          // 먼저 대상 창고에 동일한 아이템이 있는지 확인
+          const { data: existingInTargetWarehouse, error: checkError } = await supabase
+            .from('stock_items')
+            .select('id, current_quantity')
+            .eq('company_id', companyId)
+            .eq('warehouse_id', finalWarehouseId)
+            .eq('item_type', item.item_type)
+            .eq('item_id', item.item_id)
+            .single();
 
-        if (updateError) {
-          console.error(`재고 레코드 ${item.id} 창고 업데이트 오류:`, updateError);
-          // 치명적 오류는 아니므로 경고만 출력하고 계속 진행
+          if (checkError && checkError.code !== 'PGRST116') {
+            // PGRST116은 "row not found" 오류이므로 정상
+            console.error(`재고 레코드 ${item.id} 확인 오류:`, checkError);
+            continue;
+          }
+
+          if (existingInTargetWarehouse) {
+            // 대상 창고에 이미 레코드가 있으면, 기존 레코드의 수량을 합치고 원본 레코드 삭제
+            const { error: updateError } = await supabase
+              .from('stock_items')
+              .update({ 
+                current_quantity: existingInTargetWarehouse.current_quantity + item.current_quantity 
+              })
+              .eq('id', existingInTargetWarehouse.id);
+
+            if (updateError) {
+              console.error(`재고 레코드 ${existingInTargetWarehouse.id} 수량 업데이트 오류:`, updateError);
+              continue;
+            }
+
+            // 원본 레코드 삭제
+            const { error: deleteError } = await supabase
+              .from('stock_items')
+              .delete()
+              .eq('id', item.id);
+
+            if (deleteError) {
+              console.error(`재고 레코드 ${item.id} 삭제 오류:`, deleteError);
+              continue;
+            }
+
+            // allItems에서 해당 아이템의 id를 업데이트
+            item.id = existingInTargetWarehouse.id;
+            
+          } else {
+            // 대상 창고에 레코드가 없으면 단순히 창고 ID만 업데이트
+            const { error: updateError } = await supabase
+              .from('stock_items')
+              .update({ warehouse_id: finalWarehouseId })
+              .eq('id', item.id);
+
+            if (updateError) {
+              console.error(`재고 레코드 ${item.id} 창고 업데이트 오류:`, updateError);
+              continue;
+            }
+          }
+        } catch (error) {
+          console.error(`재고 레코드 ${item.id} 처리 중 예외 발생:`, error);
+          continue;
         }
       }
       
