@@ -78,6 +78,7 @@ export function StockTransactionModal({
     transactionType,
     transactionDate,
     selectedWarehouseId,
+    destinationWarehouseId,
     useMultipleWarehouses,
     removeItem,
     updateQuantity,
@@ -85,6 +86,7 @@ export function StockTransactionModal({
     setTransactionType,
     setTransactionDate,
     setSelectedWarehouseId,
+    setDestinationWarehouseId,
     setUseMultipleWarehouses,
     processCart,
     clearCart,
@@ -95,7 +97,7 @@ export function StockTransactionModal({
   const [isCookingPlanModalOpen, setIsCookingPlanModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("quick");
 
-  // 모달이 열릴 때 장바구니 상태에 따라 초기 탭 설정
+  // 모달이 열릴 때 초기 탭 설정
   useEffect(() => {
     if (open) {
       // 장바구니에 아이템이 있으면 수동설정, 없으면 빠른 설정
@@ -269,7 +271,7 @@ export function StockTransactionModal({
                           {/* 거래 유형 */}
                           <div className="space-y-2">
                             <Label className="text-sm font-medium">거래 유형</Label>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-3 gap-2">
                               <Button
                                 type="button"
                                 variant={transactionType === "in" ? "default" : "outline"}
@@ -290,21 +292,61 @@ export function StockTransactionModal({
                                 <ArrowUp className="mr-1.5 h-3.5 w-3.5" />
                                 출고
                               </Button>
+                              <Button
+                                type="button"
+                                variant={transactionType === "transfer" ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setTransactionType("transfer")}
+                                className="justify-center"
+                              >
+                                <Warehouse className="mr-1.5 h-3.5 w-3.5" />
+                                이동
+                              </Button>
                             </div>
                           </div>
 
-                          {/* 창고 선택 */}
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium">기본 창고</Label>
-                            <WarehouseSelector
-                              companyId={companyId}
-                              selectedWarehouseId={selectedWarehouseId}
-                              onWarehouseChange={setSelectedWarehouseId}
-                              placeholder="창고 선택"
-                              className="h-9"
-                              showAllOption={false}
-                            />
-                          </div>
+                          {/* 창고 선택 - 창고간 이동이 아닌 경우 */}
+                          {transactionType !== "transfer" && (
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium">기본 창고</Label>
+                              <WarehouseSelector
+                                companyId={companyId}
+                                selectedWarehouseId={selectedWarehouseId}
+                                onWarehouseChange={setSelectedWarehouseId}
+                                placeholder="창고 선택"
+                                className="h-9"
+                                showAllOption={false}
+                              />
+                            </div>
+                          )}
+
+                          {/* 창고간 이동을 위한 원본/대상 창고 선택 */}
+                          {transactionType === "transfer" && (
+                            <>
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">원본 창고</Label>
+                                <WarehouseSelector
+                                  companyId={companyId}
+                                  selectedWarehouseId={selectedWarehouseId || undefined}
+                                  onWarehouseChange={(warehouseId) => setSelectedWarehouseId(warehouseId || null)}
+                                  placeholder="원본 창고 선택"
+                                  className="h-9"
+                                  showAllOption={false}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">대상 창고</Label>
+                                <WarehouseSelector
+                                  companyId={companyId}
+                                  selectedWarehouseId={destinationWarehouseId || undefined}
+                                  onWarehouseChange={(warehouseId) => setDestinationWarehouseId(warehouseId || null)}
+                                  placeholder="대상 창고 선택"
+                                  className="h-9"
+                                  showAllOption={false}
+                                />
+                              </div>
+                            </>
+                          )}
 
                           {/* 거래 날짜 */}
                           <div className="space-y-2">
@@ -445,10 +487,10 @@ export function StockTransactionModal({
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       "w-3 h-3 rounded-full",
-                      transactionType === "in" ? "bg-green-500" : "bg-red-500"
+                      transactionType === "in" ? "bg-green-500" : transactionType === "out" ? "bg-red-500" : "bg-blue-500"
                     )} />
                     <span className="font-medium">
-                      {transactionType === "in" ? "입고" : "출고"} 거래
+                      {transactionType === "in" ? "입고" : transactionType === "out" ? "출고" : "창고간 이동"} 거래
                     </span>
                     {useMultipleWarehouses && (
                       <Badge variant="outline" className="text-xs">

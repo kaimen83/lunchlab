@@ -211,6 +211,158 @@ export async function GET(
 }
 
 // 임시 ID 처리를 위한 함수 추가
+/**
+ * 창고간 이동 처리 함수
+ * 원본 창고에서 재고 차감, 대상 창고에서 재고 증가
+ * 주의: 마이너스 재고 허용됨
+ */
+async function handleWarehouseTransfer(
+  supabase: any,
+  adjustment: any,
+  sourceWarehouseId: string,
+  destinationWarehouseId: string,
+  companyId: string,
+  userId: string
+) {
+  const transferQuantity = Number(adjustment.quantity);
+  
+  // 1. 먼저 선택된 재고 항목의 기본 정보 조회 (item_type, item_id 등)
+  const { data: baseStockItem, error: baseStockError } = await supabase
+    .from('stock_items')
+    .select('item_type, item_id, unit')
+    .eq('id', adjustment.stockItemId)
+    .eq('company_id', companyId)
+    .single();
+
+  if (baseStockError || !baseStockItem) {
+    throw new Error(`재고 항목 정보를 찾을 수 없습니다: ${adjustment.stockItemId}`);
+  }
+
+  // 2. 원본 창고에서 같은 item_type/item_id를 가진 재고 조회 또는 생성
+  let { data: sourceStockItem, error: sourceQueryError } = await supabase
+    .from('stock_items')
+    .select('id, current_quantity')
+    .eq('warehouse_id', sourceWarehouseId)
+    .eq('company_id', companyId)
+    .eq('item_type', baseStockItem.item_type)
+    .eq('item_id', baseStockItem.item_id)
+    .single();
+
+  if (sourceQueryError || !sourceStockItem) {
+    // 원본 창고에 재고 항목이 없으면 생성 (0부터 시작)
+    const { data: newSourceStockItem, error: createSourceError } = await supabase
+      .from('stock_items')
+      .insert({
+        company_id: companyId,
+        warehouse_id: sourceWarehouseId,
+        item_type: baseStockItem.item_type,
+        item_id: baseStockItem.item_id,
+        current_quantity: 0, // 0부터 시작
+        unit: baseStockItem.unit,
+        created_at: new Date().toISOString(),
+        last_updated: new Date().toISOString()
+      })
+      .select('id, current_quantity')
+      .single();
+
+    if (createSourceError) {
+      throw new Error(`원본 창고에 재고 항목 생성 실패: ${createSourceError.message}`);
+    }
+    
+    sourceStockItem = newSourceStockItem;
+  }
+
+  // 2. 마이너스 재고 허용 - 재고 부족 검증 제거
+  // 원본 창고에서는 마이너스 재고도 허용함
+
+  // 3. 대상 창고에서 해당 항목의 재고 조회 (없으면 생성)
+  let { data: destStockItem, error: destQueryError } = await supabase
+    .from('stock_items')
+    .select('id, current_quantity')
+    .eq('warehouse_id', destinationWarehouseId)
+    .eq('company_id', companyId)
+    .eq('item_type', baseStockItem.item_type)
+    .eq('item_id', baseStockItem.item_id)
+    .single();
+
+  if (destQueryError && destQueryError.code !== 'PGRST116') { // PGRST116은 'not found' 에러
+    throw new Error(`대상 창고 재고 조회 중 오류가 발생했습니다: ${destQueryError.message}`);
+  }
+
+  // 4. 대상 창고에 재고 항목이 없으면 새로 생성
+  if (!destStockItem) {
+    const { data: newDestStockItem, error: createError } = await supabase
+      .from('stock_items')
+      .insert({
+        company_id: companyId,
+        warehouse_id: destinationWarehouseId,
+        item_type: baseStockItem.item_type,
+        item_id: baseStockItem.item_id,
+        current_quantity: 0,
+        unit: baseStockItem.unit,
+        created_at: new Date().toISOString(),
+        last_updated: new Date().toISOString()
+      })
+      .select('id, current_quantity')
+      .single();
+
+    if (createError) {
+      throw new Error(`대상 창고에 재고 항목 생성 실패: ${createError.message}`);
+    }
+    
+    destStockItem = newDestStockItem;
+  }
+
+  // 5. 트랜잭션으로 두 창고 재고 업데이트
+  const sourceNewQuantity = Number(sourceStockItem.current_quantity) - transferQuantity;
+  const destNewQuantity = Number(destStockItem.current_quantity) + transferQuantity;
+
+  // 원본 창고 재고 차감
+  const { error: sourceUpdateError } = await supabase
+    .from('stock_items')
+    .update({
+      current_quantity: sourceNewQuantity,
+      last_updated: new Date().toISOString()
+    })
+    .eq('id', sourceStockItem.id);
+
+  if (sourceUpdateError) {
+    throw new Error(`원본 창고 재고 업데이트 실패: ${sourceUpdateError.message}`);
+  }
+
+  // 대상 창고 재고 증가
+  const { error: destUpdateError } = await supabase
+    .from('stock_items')
+    .update({
+      current_quantity: destNewQuantity,
+      last_updated: new Date().toISOString()
+    })
+    .eq('id', destStockItem.id);
+
+  if (destUpdateError) {
+    // 원본 창고 복구 시도
+    await supabase
+      .from('stock_items')
+      .update({
+        current_quantity: sourceStockItem.current_quantity,
+        last_updated: new Date().toISOString()
+      })
+      .eq('id', sourceStockItem.id);
+    
+    throw new Error(`대상 창고 재고 업데이트 실패: ${destUpdateError.message}`);
+  }
+
+  return {
+    sourceStockItemId: sourceStockItem.id,
+    destStockItemId: destStockItem.id,
+    transferQuantity,
+    sourceOldQuantity: sourceStockItem.current_quantity,
+    sourceNewQuantity,
+    destOldQuantity: destStockItem.current_quantity,
+    destNewQuantity
+  };
+}
+
 async function processTemporaryIds(
   supabase: any, 
   stockItemIds: string[], 
@@ -252,11 +404,31 @@ async function processTemporaryIds(
         throw new Error(`식자재 정보를 조회할 수 없습니다: ${ingredientError.message}`);
       }
       
-      // 해당 식자재에 대한 재고 항목이 이미 존재하는지 확인
+      // 창고 ID 결정 (전달받은 ID가 있으면 우선 사용, 없으면 기본 창고 조회)
+      let targetWarehouseId = warehouseId;
+      
+      if (!targetWarehouseId) {
+        const { data: defaultWarehouse, error: warehouseError } = await supabase
+          .from('warehouses')
+          .select('id')
+          .eq('company_id', companyId)
+          .eq('is_default', true)
+          .single();
+        
+        if (warehouseError) {
+          console.error('기본 창고 조회 오류:', warehouseError);
+          throw new Error(`기본 창고를 찾을 수 없습니다: ${warehouseError.message}`);
+        }
+        
+        targetWarehouseId = defaultWarehouse.id;
+      }
+      
+      // 해당 식자재에 대한 재고 항목이 특정 창고에 이미 존재하는지 확인
       const { data: existingStockItem, error: checkError } = await supabase
         .from('stock_items')
         .select('id')
         .eq('company_id', companyId)
+        .eq('warehouse_id', targetWarehouseId)
         .eq('item_type', 'ingredient')
         .eq('item_id', ingredientId)
         .single();
@@ -270,25 +442,6 @@ async function processTemporaryIds(
         // 이미 존재하는 재고 항목이 있으면 해당 ID 사용
         processedIds[i] = existingStockItem.id;
       } else {
-        // 창고 ID 결정 (전달받은 ID가 있으면 우선 사용, 없으면 기본 창고 조회)
-        let targetWarehouseId = warehouseId;
-        
-        if (!targetWarehouseId) {
-          const { data: defaultWarehouse, error: warehouseError } = await supabase
-            .from('warehouses')
-            .select('id')
-            .eq('company_id', companyId)
-            .eq('is_default', true)
-            .single();
-          
-          if (warehouseError) {
-            console.error('기본 창고 조회 오류:', warehouseError);
-            throw new Error(`기본 창고를 찾을 수 없습니다: ${warehouseError.message}`);
-          }
-          
-          targetWarehouseId = defaultWarehouse.id;
-        }
-        
         // 존재하지 않으면 새로 생성
         const { data: newStockItem, error: createError } = await supabase
           .from('stock_items')
@@ -338,11 +491,31 @@ async function processTemporaryIds(
         throw new Error(`용기 정보를 조회할 수 없습니다: ${containerError.message}`);
       }
       
-      // 해당 용기에 대한 재고 항목이 이미 존재하는지 확인
+      // 창고 ID 결정 (전달받은 ID가 있으면 우선 사용, 없으면 기본 창고 조회)
+      let targetWarehouseId = warehouseId;
+      
+      if (!targetWarehouseId) {
+        const { data: defaultWarehouse, error: warehouseError } = await supabase
+          .from('warehouses')
+          .select('id')
+          .eq('company_id', companyId)
+          .eq('is_default', true)
+          .single();
+        
+        if (warehouseError) {
+          console.error('기본 창고 조회 오류:', warehouseError);
+          throw new Error(`기본 창고를 찾을 수 없습니다: ${warehouseError.message}`);
+        }
+        
+        targetWarehouseId = defaultWarehouse.id;
+      }
+      
+      // 해당 용기에 대한 재고 항목이 특정 창고에 이미 존재하는지 확인
       const { data: existingStockItem, error: checkError } = await supabase
         .from('stock_items')
         .select('id')
         .eq('company_id', companyId)
+        .eq('warehouse_id', targetWarehouseId)
         .eq('item_type', 'container')
         .eq('item_id', containerId)
         .single();
@@ -356,25 +529,6 @@ async function processTemporaryIds(
         // 이미 존재하는 재고 항목이 있으면 해당 ID 사용
         processedIds[i] = existingStockItem.id;
       } else {
-        // 창고 ID 결정 (전달받은 ID가 있으면 우선 사용, 없으면 기본 창고 조회)
-        let targetWarehouseId = warehouseId;
-        
-        if (!targetWarehouseId) {
-          const { data: defaultWarehouse, error: warehouseError } = await supabase
-            .from('warehouses')
-            .select('id')
-            .eq('company_id', companyId)
-            .eq('is_default', true)
-            .single();
-          
-          if (warehouseError) {
-            console.error('기본 창고 조회 오류:', warehouseError);
-            throw new Error(`기본 창고를 찾을 수 없습니다: ${warehouseError.message}`);
-          }
-          
-          targetWarehouseId = defaultWarehouse.id;
-        }
-        
         // 존재하지 않으면 새로 생성
         const { data: newStockItem, error: createError } = await supabase
           .from('stock_items')
@@ -458,7 +612,9 @@ export async function POST(
       isGroupedTransaction = false,
       warehouseId = null,
       warehouseIds = null,  // 다중 창고 지원을 위한 창고 ID 배열
-      useMultipleWarehouses = false // 다중 창고 모드 플래그
+      useMultipleWarehouses = false, // 다중 창고 모드 플래그
+      sourceWarehouseId = null,
+      destinationWarehouseId = null
     } = requestData;
 
     // 새로운 그룹화된 거래 형식 지원
@@ -498,11 +654,49 @@ export async function POST(
       }));
     }
 
-    if (!['incoming', 'outgoing', 'disposal'].includes(requestType)) {
+    if (!['incoming', 'outgoing', 'disposal', 'transfer'].includes(requestType)) {
       return NextResponse.json(
         { error: '유효하지 않은 요청 유형입니다.' },
         { status: 400 }
       );
+    }
+
+    // 창고간 이동(transfer) 타입 특별 검증
+    if (requestType === 'transfer') {
+      if (!sourceWarehouseId || !destinationWarehouseId) {
+        return NextResponse.json(
+          { error: '창고간 이동에는 원본 창고와 대상 창고가 모두 필요합니다.' },
+          { status: 400 }
+        );
+      }
+
+      if (sourceWarehouseId === destinationWarehouseId) {
+        return NextResponse.json(
+          { error: '원본 창고와 대상 창고가 같을 수 없습니다.' },
+          { status: 400 }
+        );
+      }
+
+      const { data: warehouses, error: warehouseError } = await supabase
+        .from('warehouses')
+        .select('id, company_id, name')
+        .in('id', [sourceWarehouseId, destinationWarehouseId])
+        .eq('company_id', companyId)
+        .eq('is_active', true);
+
+      if (warehouseError) {
+        return NextResponse.json(
+          { error: '창고 정보를 조회하는 중 오류가 발생했습니다.' },
+          { status: 500 }
+        );
+      }
+
+      if (!warehouses || warehouses.length !== 2) {
+        return NextResponse.json(
+          { error: '유효하지 않은 창고이거나 해당 회사에 속하지 않는 창고입니다.' },
+          { status: 400 }
+        );
+      }
     }
 
     // 다중 창고 설정 검증
@@ -656,7 +850,11 @@ export async function POST(
 
         // 거래 타입에 따라 창고 ID를 적절한 필드에 설정
         const warehouseFields: any = {};
-        if (itemWarehouseId) {
+        if (requestType === 'transfer') {
+          // 창고간 이동: 원본과 대상 창고 모두 설정
+          warehouseFields.source_warehouse_id = sourceWarehouseId;
+          warehouseFields.destination_warehouse_id = destinationWarehouseId;
+        } else if (itemWarehouseId) {
           if (requestType === 'incoming') {
             // 입고: destination_warehouse_id에 설정
             warehouseFields.destination_warehouse_id = itemWarehouseId;
@@ -695,38 +893,44 @@ export async function POST(
 
       // 2. 실제 재고 수량 업데이트 (stockAdjustments 기준)
       const stockUpdatePromises = stockAdjustments.map(async (adjustment: any) => {
-        // 현재 재고 수량 조회
-        const { data: stockItem } = await supabase
-          .from('stock_items')
-          .select('current_quantity')
-          .eq('id', adjustment.stockItemId)
-          .single();
-        
-        if (!stockItem) {
-          throw new Error(`재고 항목을 찾을 수 없습니다: ${adjustment.stockItemId}`);
-        }
-        
-        let newQuantity;
-        if (requestType === 'incoming') {
-          newQuantity = Number(stockItem.current_quantity) + Number(adjustment.quantity);
-        } else if (requestType === 'outgoing' || requestType === 'disposal') {
-          newQuantity = Number(stockItem.current_quantity) - Number(adjustment.quantity);
-        }
+        if (requestType === 'transfer') {
+          // 창고간 이동의 특별한 처리
+          return await handleWarehouseTransfer(supabase, adjustment, sourceWarehouseId, destinationWarehouseId, companyId, userId);
+        } else {
+          // 기존 로직 (입고/출고/폐기)
+          // 현재 재고 수량 조회
+          const { data: stockItem } = await supabase
+            .from('stock_items')
+            .select('current_quantity')
+            .eq('id', adjustment.stockItemId)
+            .single();
+          
+          if (!stockItem) {
+            throw new Error(`재고 항목을 찾을 수 없습니다: ${adjustment.stockItemId}`);
+          }
+          
+          let newQuantity;
+          if (requestType === 'incoming') {
+            newQuantity = Number(stockItem.current_quantity) + Number(adjustment.quantity);
+          } else if (requestType === 'outgoing' || requestType === 'disposal') {
+            newQuantity = Number(stockItem.current_quantity) - Number(adjustment.quantity);
+          }
 
-        // 재고 수량 업데이트
-        const { error: updateError } = await supabase
-          .from('stock_items')
-          .update({ 
-            current_quantity: newQuantity,
-            last_updated: new Date().toISOString()
-          })
-          .eq('id', adjustment.stockItemId);
+          // 재고 수량 업데이트
+          const { error: updateError } = await supabase
+            .from('stock_items')
+            .update({ 
+              current_quantity: newQuantity,
+              last_updated: new Date().toISOString()
+            })
+            .eq('id', adjustment.stockItemId);
 
-        if (updateError) {
-          throw new Error(`재고 수량 업데이트 오류: ${updateError.message}`);
+          if (updateError) {
+            throw new Error(`재고 수량 업데이트 오류: ${updateError.message}`);
+          }
+
+          return { stockItemId: adjustment.stockItemId, oldQuantity: stockItem.current_quantity, newQuantity };
         }
-
-        return { stockItemId: adjustment.stockItemId, oldQuantity: stockItem.current_quantity, newQuantity };
       });
 
       try {

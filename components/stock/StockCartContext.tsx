@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { StockItem } from "./StockTable";
 import { useToast } from "@/hooks/use-toast";
 
@@ -10,24 +10,29 @@ export interface CartItem {
   unit: string;
   quantity: number; // 입고/출고할 수량
   itemType: "ingredient" | "container"; // 항목 유형 추가
-  warehouseId?: string; // 개별 창고 ID 추가
+  warehouseId?: string | null; // 개별 창고 ID 추가
 }
+
+// 거래 타입을 확장하여 창고간 이동(transfer) 포함
+type TransactionType = "in" | "out" | "transfer";
 
 // 장바구니 컨텍스트 인터페이스
 interface StockCartContextType {
   items: CartItem[];
-  transactionType: "in" | "out"; // 입고 또는 출고
+  transactionType: TransactionType; // 입고, 출고 또는 창고간 이동
   transactionDate: Date; // 거래 날짜
-  selectedWarehouseId: string | undefined; // 기본 선택된 창고 ID
+  selectedWarehouseId: string | null; // 기본 선택된 창고 ID (창고간 이동 시 원본 창고)
+  destinationWarehouseId: string | null; // 창고간 이동 시 대상 창고 ID
   useMultipleWarehouses: boolean; // 다중 창고 사용 여부
   addItem: (item: StockItem) => void;
   removeItem: (stockItemId: string) => void;
   updateQuantity: (stockItemId: string, quantity: number) => void;
   updateItemWarehouse: (stockItemId: string, warehouseId: string) => void; // 개별 아이템 창고 변경
   clearCart: () => void;
-  setTransactionType: (type: "in" | "out") => void;
+  setTransactionType: (type: TransactionType) => void;
   setTransactionDate: (date: Date) => void; // 거래 날짜 설정 함수
-  setSelectedWarehouseId: (warehouseId: string | undefined) => void; // 창고 설정 함수
+  setSelectedWarehouseId: (warehouseId: string | null) => void; // 창고 설정 함수 (창고간 이동 시 원본 창고)
+  setDestinationWarehouseId: (warehouseId: string | null) => void; // 대상 창고 설정 함수
   setUseMultipleWarehouses: (use: boolean) => void; // 다중 창고 모드 설정
   processCart: (notes: string, companyId: string) => Promise<boolean>;
 }
@@ -44,15 +49,17 @@ export function StockCartProvider({
   initialWarehouseId?: string;
 }) {
   const [items, setItems] = useState<CartItem[]>([]);
-  const [transactionType, setTransactionType] = useState<"in" | "out">("in");
+  const [transactionType, setTransactionType] = useState<TransactionType>("in");
   const [transactionDate, setTransactionDate] = useState<Date>(new Date()); // 현재 날짜로 초기화
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | undefined>(initialWarehouseId); // 선택된 창고 ID
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | null>(initialWarehouseId || null); // 선택된 창고 ID
+  const [destinationWarehouseId, setDestinationWarehouseId] = useState<string | null>(null); // 창고간 이동을 위한 대상 창고 ID
   const [useMultipleWarehouses, setUseMultipleWarehouses] = useState<boolean>(false); // 다중 창고 모드
+
   const { toast } = useToast();
 
   // 상위에서 전달받은 창고 ID가 변경되면 상태 업데이트
   useEffect(() => {
-    setSelectedWarehouseId(initialWarehouseId);
+    setSelectedWarehouseId(initialWarehouseId || null);
   }, [initialWarehouseId]);
 
   // 항목 추가
@@ -110,6 +117,36 @@ export function StockCartProvider({
     );
   };
 
+
+
+  // 원본 창고 설정 (단순화)
+  const handleSelectedWarehouseChange = useCallback((warehouseId: string | null) => {
+    setSelectedWarehouseId(warehouseId);
+    
+    // 창고간 이동 모드이고, 대상 창고가 같은 창고로 설정되어 있다면 대상 창고를 null로 설정
+    if (transactionType === "transfer" && warehouseId && warehouseId === destinationWarehouseId) {
+      setDestinationWarehouseId(null);
+      toast({
+        title: "대상 창고가 초기화되었습니다",
+        description: "원본 창고와 다른 창고를 선택해주세요.",
+      });
+    }
+  }, [transactionType, destinationWarehouseId, toast]);
+
+  // 대상 창고 설정 (단순화)
+  const handleDestinationWarehouseChange = useCallback((warehouseId: string | null) => {
+    setDestinationWarehouseId(warehouseId);
+    
+    // 창고간 이동 모드이고, 원본 창고가 같은 창고로 설정되어 있다면 원본 창고를 null로 설정
+    if (transactionType === "transfer" && warehouseId && warehouseId === selectedWarehouseId) {
+      setSelectedWarehouseId(null);
+      toast({
+        title: "원본 창고가 초기화되었습니다",
+        description: "대상 창고와 다른 창고를 선택해주세요.",
+      });
+    }
+  }, [transactionType, selectedWarehouseId, toast]);
+
   // 장바구니 비우기
   const clearCart = () => {
     setItems([]);
@@ -150,6 +187,36 @@ export function StockCartProvider({
       }
     }
 
+    // 창고간 이동 시 원본과 대상 창고 모두 선택되었는지 확인
+    if (transactionType === "transfer") {
+      if (!selectedWarehouseId) {
+        toast({
+          title: "원본 창고를 선택해주세요",
+          description: "이동할 재고가 있는 원본 창고를 선택해주세요.",
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      if (!destinationWarehouseId) {
+        toast({
+          title: "대상 창고를 선택해주세요",
+          description: "재고를 이동할 대상 창고를 선택해주세요.",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      if (selectedWarehouseId === destinationWarehouseId) {
+        toast({
+          title: "원본과 대상 창고가 같습니다",
+          description: "원본 창고와 대상 창고는 서로 달라야 합니다.",
+          variant: "destructive",
+        });
+        return false;
+      }
+    }
+
     try {
       const response = await fetch(
         `/api/companies/${companyId}/stock/transactions`,
@@ -164,7 +231,10 @@ export function StockCartProvider({
             warehouseIds: useMultipleWarehouses 
               ? items.map(item => item.warehouseId)
               : items.map(() => selectedWarehouseId), // 일괄 모드일 때는 모든 아이템에 같은 창고 적용
-            requestType: transactionType === "in" ? "incoming" : "outgoing",
+            requestType: transactionType === "in" ? "incoming" : transactionType === "out" ? "outgoing" : "transfer",
+            // 창고간 이동을 위한 추가 필드
+            sourceWarehouseId: transactionType === "transfer" ? selectedWarehouseId : null,
+            destinationWarehouseId: transactionType === "transfer" ? destinationWarehouseId : null,
             notes,
             directProcess: true, // 직접 처리 플래그
             transactionDate: transactionDate.toISOString(), // 거래 날짜 추가
@@ -182,9 +252,11 @@ export function StockCartProvider({
         ? `다중 창고 거래 (${new Set(items.map(item => item.warehouseId)).size}개 창고)`
         : `단일 창고 거래`;
 
+      const transactionTypeName = transactionType === "in" ? "입고" : transactionType === "out" ? "출고" : "창고간 이동";
+      
       toast({
         title: "일괄 거래가 생성되었습니다",
-        description: `${transactionType === "in" ? "입고" : "출고"} 거래가 성공적으로 처리되었습니다. (${warehouseInfo})`,
+        description: `${transactionTypeName} 거래가 성공적으로 처리되었습니다. (${warehouseInfo})`,
       });
 
       // 성공 후 장바구니 비우기
@@ -207,6 +279,7 @@ export function StockCartProvider({
     transactionType,
     transactionDate,
     selectedWarehouseId,
+    destinationWarehouseId,
     useMultipleWarehouses,
     addItem,
     removeItem,
@@ -215,7 +288,8 @@ export function StockCartProvider({
     clearCart,
     setTransactionType,
     setTransactionDate,
-    setSelectedWarehouseId,
+    setSelectedWarehouseId: handleSelectedWarehouseChange,
+    setDestinationWarehouseId: handleDestinationWarehouseChange,
     setUseMultipleWarehouses,
     processCart,
   };
