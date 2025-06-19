@@ -131,7 +131,7 @@ export async function POST(
 
     // 요청 본문 파싱
     const body: CreateStockAuditRequest = await request.json();
-    const { name, description, audit_date, item_types = ['ingredient', 'container'] } = body;
+    const { name, description, audit_date, item_types = ['ingredient', 'container'], warehouse_id } = body;
 
     if (!name || name.trim() === '') {
       return NextResponse.json(
@@ -147,6 +147,26 @@ export async function POST(
       );
     }
 
+    // 창고 ID 결정 (요청에서 제공되지 않으면 기본 창고 사용)
+    let finalWarehouseId = warehouse_id;
+    if (!finalWarehouseId) {
+      const { data: defaultWarehouse, error: warehouseError } = await supabase
+        .from('warehouses')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('is_default', true)
+        .single();
+
+      if (warehouseError || !defaultWarehouse) {
+        return NextResponse.json(
+          { error: '기본 창고를 찾을 수 없습니다. 창고를 먼저 설정해주세요.' },
+          { status: 400 }
+        );
+      }
+      
+      finalWarehouseId = defaultWarehouse.id;
+    }
+
     // 트랜잭션 시작: 실사 세션 생성 + 실사 항목 생성
     const { data: audit, error: auditError } = await supabase
       .from('stock_audits')
@@ -155,6 +175,7 @@ export async function POST(
         name: name.trim(),
         description: description?.trim(),
         audit_date: audit_date, // 사용자가 선택한 실사 날짜
+        warehouse_id: finalWarehouseId, // 창고 ID 추가
         created_by: userId,
         status: 'in_progress'
       })
@@ -195,11 +216,11 @@ export async function POST(
       }
 
       if (ingredients && ingredients.length > 0) {
-        // 해당 식자재들의 재고 정보 조회
+        // 해당 식자재들의 재고 정보 조회 (전체 창고 대상)
         const ingredientIds = ingredients.map(ing => ing.id);
         const { data: stockItems, error: stockError } = await supabase
           .from('stock_items')
-          .select('id, item_id, current_quantity')
+          .select('id, item_id, current_quantity, warehouse_id')
           .eq('company_id', companyId)
           .eq('item_type', 'ingredient')
           .in('item_id', ingredientIds);
@@ -225,7 +246,8 @@ export async function POST(
             item_name: ingredient.name,
             unit: ingredient.unit || 'EA',
             current_quantity: stockItem?.current_quantity || 0,
-            has_stock_record: !!stockItem
+            has_stock_record: !!stockItem,
+            needs_warehouse_update: stockItem && stockItem.warehouse_id !== finalWarehouseId
           });
         }
       }
@@ -251,11 +273,11 @@ export async function POST(
       }
 
       if (containers && containers.length > 0) {
-        // 해당 용기들의 재고 정보 조회
+        // 해당 용기들의 재고 정보 조회 (전체 창고 대상)
         const containerIds = containers.map(cont => cont.id);
         const { data: stockItems, error: stockError } = await supabase
           .from('stock_items')
-          .select('id, item_id, current_quantity')
+          .select('id, item_id, current_quantity, warehouse_id')
           .eq('company_id', companyId)
           .eq('item_type', 'container')
           .in('item_id', containerIds);
@@ -292,7 +314,7 @@ export async function POST(
             const subContainerIds = subContainers.map(sub => sub.id);
             const { data: subStockItems, error: subStockError } = await supabase
               .from('stock_items')
-              .select('id, item_id, current_quantity')
+              .select('id, item_id, current_quantity, warehouse_id')
               .eq('company_id', companyId)
               .eq('item_type', 'container')
               .in('item_id', subContainerIds);
@@ -329,7 +351,8 @@ export async function POST(
               item_name: topContainer.name, // 상위 그룹명 사용
               unit: '개',
               current_quantity: maxQuantity, // 하위 중 최대 수량
-              has_stock_record: !!maxStockItem
+              has_stock_record: !!maxStockItem,
+              needs_warehouse_update: maxStockItem && maxStockItem.warehouse_id !== finalWarehouseId
             });
           } else {
             // 하위 컨테이너가 없으면 그 자체로 처리
@@ -341,7 +364,8 @@ export async function POST(
               item_name: topContainer.name,
               unit: '개',
               current_quantity: stockItem?.current_quantity || 0,
-              has_stock_record: !!stockItem
+              has_stock_record: !!stockItem,
+              needs_warehouse_update: stockItem && stockItem.warehouse_id !== finalWarehouseId
             });
           }
         }
@@ -389,7 +413,7 @@ export async function POST(
       if (ingredientIds.length > 0) {
         const { data: ingredientStockItems, error: ingredientStockError } = await supabase
           .from('stock_items')
-          .select('id, item_type, item_id, current_quantity')
+          .select('id, item_type, item_id, current_quantity, warehouse_id')
           .eq('company_id', companyId)
           .eq('item_type', 'ingredient')
           .in('item_id', ingredientIds);
@@ -415,7 +439,7 @@ export async function POST(
       if (containerIds.length > 0) {
         const { data: containerStockItems, error: containerStockError } = await supabase
           .from('stock_items')
-          .select('id, item_type, item_id, current_quantity')
+          .select('id, item_type, item_id, current_quantity, warehouse_id')
           .eq('company_id', companyId)
           .eq('item_type', 'container')
           .in('item_id', containerIds);
@@ -450,6 +474,7 @@ export async function POST(
             targetItem.id = existingItem.id;
             targetItem.has_stock_record = true;
             targetItem.current_quantity = existingItem.current_quantity;
+            targetItem.needs_warehouse_update = existingItem.warehouse_id !== finalWarehouseId;
           }
         }
       }
@@ -469,7 +494,8 @@ export async function POST(
           item_type: item.item_type,
           item_id: item.item_id,
           current_quantity: 0,
-          unit: item.unit
+          unit: item.unit,
+          warehouse_id: finalWarehouseId // 창고 ID 추가
         }));
 
         const { data: createdStockItems, error: stockItemsCreateError } = await supabase
@@ -512,6 +538,26 @@ export async function POST(
       } else {
         console.log('모든 항목이 이미 재고 레코드를 가지고 있어 생성 건너뜀');
       }
+    }
+
+    // 창고 업데이트가 필요한 항목들 처리
+    const itemsNeedingWarehouseUpdate = allItems.filter(item => item.needs_warehouse_update);
+    if (itemsNeedingWarehouseUpdate.length > 0) {
+      console.log(`${itemsNeedingWarehouseUpdate.length}개 항목의 창고를 업데이트 중...`);
+      
+      for (const item of itemsNeedingWarehouseUpdate) {
+        const { error: updateError } = await supabase
+          .from('stock_items')
+          .update({ warehouse_id: finalWarehouseId })
+          .eq('id', item.id);
+
+        if (updateError) {
+          console.error(`재고 레코드 ${item.id} 창고 업데이트 오류:`, updateError);
+          // 치명적 오류는 아니므로 경고만 출력하고 계속 진행
+        }
+      }
+      
+      console.log(`창고 업데이트 완료: ${itemsNeedingWarehouseUpdate.length}개`);
     }
 
     // 실사 항목 데이터 준비

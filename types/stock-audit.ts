@@ -6,6 +6,7 @@ export interface StockAudit {
   description?: string;
   status: 'in_progress' | 'completed' | 'cancelled';
   audit_date: string; // 실사 날짜 (사용자가 선택한 실사 수행 날짜)
+  warehouse_id: string; // 창고 ID
   created_by: string; // Clerk user ID
   created_at: string;
   completed_at?: string;
@@ -36,6 +37,7 @@ export interface CreateStockAuditRequest {
   name: string;
   description?: string;
   audit_date: string; // 실사 날짜 (YYYY-MM-DD 형식)
+  warehouse_id?: string; // 창고 ID (선택사항, 없으면 기본 창고 사용)
   item_types?: ('ingredient' | 'container')[]; // 포함할 항목 타입
 }
 

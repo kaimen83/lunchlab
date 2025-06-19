@@ -25,19 +25,21 @@ import {
   RotateCcw
 } from "lucide-react";
 import { StockAudit, StockAuditItem, StockAuditDetailResponse, CreateStockAuditRequest } from "@/types/stock-audit";
+import WarehouseSelector from "@/components/stock/WarehouseSelector";
 
 interface StockAuditPageProps {
   companyId: string;
   selectedWarehouseId?: string;
 }
 
-export default function StockAuditPage({ companyId, selectedWarehouseId }: StockAuditPageProps) {
+export default function StockAuditPage({ companyId, selectedWarehouseId: initialWarehouseId }: StockAuditPageProps) {
   const router = useRouter();
   const { toast } = useToast();
   
   // 상태 관리
   const [audits, setAudits] = useState<StockAudit[]>([]);
   const [currentAudit, setCurrentAudit] = useState<StockAuditDetailResponse | null>(null);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | undefined>(initialWarehouseId);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [editingItem, setEditingItem] = useState<StockAuditItem | null>(null);
@@ -76,7 +78,17 @@ export default function StockAuditPage({ companyId, selectedWarehouseId }: Stock
     setNewAuditForm(prev => ({
       ...prev,
       name: getAuditNameByDate(date),
-      audit_date: format(date, 'yyyy-MM-dd')
+      audit_date: format(date, 'yyyy-MM-dd'),
+      warehouse_id: selectedWarehouseId || '' // 창고 ID 유지
+    }));
+  };
+
+  // 창고 변경 핸들러
+  const handleWarehouseChange = (warehouseId: string | undefined) => {
+    setSelectedWarehouseId(warehouseId);
+    setNewAuditForm(prev => ({
+      ...prev,
+      warehouse_id: warehouseId || ''
     }));
   };
 
@@ -85,6 +97,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId }: Stock
     name: getAuditNameByDate(new Date()),
     description: '',
     audit_date: format(new Date(), 'yyyy-MM-dd'), // YYYY-MM-DD 형식
+    warehouse_id: selectedWarehouseId || '', // 창고 ID 추가
     item_types: ['ingredient', 'container'] as ('ingredient' | 'container')[]
   });
   
@@ -188,6 +201,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId }: Stock
         name: getAuditNameByDate(today), 
         description: '', 
         audit_date: format(today, 'yyyy-MM-dd'),
+        warehouse_id: selectedWarehouseId || '', // 창고 ID 추가
         item_types: ['ingredient', 'container'] 
       });
       setIsCreateModalOpen(false); // 모달 닫기
@@ -556,6 +570,22 @@ export default function StockAuditPage({ companyId, selectedWarehouseId }: Stock
                 </p>
               </div>
               
+              {/* 창고 선택 */}
+              <div>
+                <Label htmlFor="warehouse-selector">창고</Label>
+                <WarehouseSelector
+                  companyId={companyId}
+                  selectedWarehouseId={selectedWarehouseId}
+                  onWarehouseChange={handleWarehouseChange}
+                  placeholder="창고를 선택하세요"
+                  className="w-full"
+                  showAllOption={false}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  실사를 진행할 창고를 선택하세요. 선택하지 않으면 기본 창고가 사용됩니다.
+                </p>
+              </div>
+
               {/* 실사 날짜 선택 */}
               <div>
                 <Label htmlFor="audit-date">실사 날짜</Label>

@@ -220,13 +220,18 @@ async function processTemporaryIds(
 ): Promise<string[]> {
   const processedIds = [...stockItemIds]; // 기존 ID 배열 복사
   
+  console.log('processTemporaryIds - 입력된 ID들:', stockItemIds);
+  
   for (let i = 0; i < stockItemIds.length; i++) {
     const id = stockItemIds[i];
+    console.log(`처리 중인 ID: ${id}`);
     
-    // 임시 식자재 ID인지 확인 (temp_ingredient_로 시작하는지)
-    if (id.startsWith('temp_ingredient_')) {
+    // 임시 식자재 ID인지 확인 (temp_ingredient_ 또는 ingredient_로 시작하는지)
+    if (id.startsWith('temp_ingredient_') || id.startsWith('ingredient_')) {
       // 임시 ID에서 실제 식자재 ID 추출
-      const ingredientId = id.replace('temp_ingredient_', '');
+      const ingredientId = id.startsWith('temp_ingredient_') 
+        ? id.replace('temp_ingredient_', '')
+        : id.replace('ingredient_', '');
       
       // UUID 형식 검증
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -307,10 +312,12 @@ async function processTemporaryIds(
         processedIds[i] = newStockItem.id;
       }
     }
-    // temp_container_로 시작하는 경우도 처리 (필요시)
-    else if (id.startsWith('temp_container_')) {
+    // temp_container_ 또는 container_로 시작하는 경우 처리
+    else if (id.startsWith('temp_container_') || id.startsWith('container_')) {
       // 임시 ID에서 실제 용기 ID 추출
-      const containerId = id.replace('temp_container_', '');
+      const containerId = id.startsWith('temp_container_') 
+        ? id.replace('temp_container_', '')
+        : id.replace('container_', '');
       
       // UUID 형식 검증
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
