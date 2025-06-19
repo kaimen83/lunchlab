@@ -84,6 +84,11 @@
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
   }
+
+  /* 추가 grid 컬럼 클래스 */
+  .grid-cols-14 {
+    grid-template-columns: repeat(14, minmax(0, 1fr));
+  }
 }
 
 /* 인쇄용 스타일 */

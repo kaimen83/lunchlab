@@ -685,9 +685,16 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle>{currentAudit.audit.name}</CardTitle>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {currentAudit.audit.description}
-                    </p>
+                    <div className="flex items-center space-x-3 mt-1">
+                      <p className="text-sm text-gray-500">
+                        {currentAudit.audit.description}
+                      </p>
+                      {currentAudit?.warehouse && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                          📦 {currentAudit.warehouse.name}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   
                   {currentAudit.audit.status === 'in_progress' && (
@@ -830,8 +837,9 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
                   
                   {/* 컬럼 헤더 */}
                   <div className="bg-gray-50 px-4 py-3 border-b">
-                    <div className="grid grid-cols-12 gap-4 text-sm font-medium text-gray-700">
+                    <div className="grid grid-cols-14 gap-3 text-sm font-medium text-gray-700">
                       <div className="col-span-4">항목명</div>
+                      <div className="col-span-2 text-center">창고</div>
                       <div className="col-span-2 text-center">장부량</div>
                       <div className="col-span-2 text-center">실사량</div>
                       <div className="col-span-2 text-center">차이</div>
@@ -856,7 +864,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
                       
                       return (
                         <div key={item.id} className="px-4 py-3 hover:bg-gray-50">
-                          <div className="grid grid-cols-12 gap-4 items-center text-sm">
+                          <div className="grid grid-cols-14 gap-3 items-center text-sm">
                             {/* 항목명 */}
                             <div className="col-span-4">
                               <div className="font-medium">{item.item_name}</div>
@@ -864,6 +872,13 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
                                 {item.item_type === 'ingredient' ? '식자재' : '용기'}
                                 {item.unit && ` • ${item.unit}`}
                               </div>
+                            </div>
+                            
+                            {/* 창고 */}
+                            <div className="col-span-2 text-center">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                                {currentAudit?.warehouse?.name || '미지정'}
+                              </span>
                             </div>
                             
                             {/* 장부량 */}

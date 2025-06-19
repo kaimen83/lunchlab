@@ -55,6 +55,18 @@ export async function GET(
       );
     }
 
+    // 창고 정보 조회
+    const { data: warehouse, error: warehouseError } = await supabase
+      .from('warehouses')
+      .select('id, name')
+      .eq('id', audit.warehouse_id)
+      .single();
+
+    if (warehouseError) {
+      console.error('창고 정보 조회 오류:', warehouseError);
+      // 창고 정보 조회 실패는 치명적 오류가 아니므로 계속 진행
+    }
+
     // 쿼리 파라미터 처리
     const searchParams = request.nextUrl.searchParams;
     const page = parseInt(searchParams.get('page') || '1');
@@ -126,6 +138,7 @@ export async function GET(
       audit,
       items: items || [],
       stats,
+      warehouse: warehouse || undefined,
       pagination: {
         total: count || 0,
         page,

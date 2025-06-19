@@ -72,6 +72,10 @@ export interface StockAuditDetailResponse {
   audit: StockAudit;
   items: StockAuditItem[];
   stats: StockAuditStats;
+  warehouse?: {
+    id: string;
+    name: string;
+  };
   pagination?: {
     total: number;
     page: number;
