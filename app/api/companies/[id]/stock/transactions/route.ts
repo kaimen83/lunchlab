@@ -79,7 +79,7 @@ export async function GET(
 
     const allStockItemIds = stockItems.map(item => item.id);
 
-    // 거래 내역 조회 쿼리 시작
+    // 거래 내역 조회 쿼리 시작 (stock_item의 warehouse 정보도 포함)
     let query = supabase
       .from('stock_transactions')
       .select(`
@@ -87,7 +87,11 @@ export async function GET(
         stock_item:stock_item_id(
           id, 
           item_type, 
-          item_id
+          item_id,
+          warehouse:warehouse_id(
+            id,
+            name
+          )
         ),
         source_warehouse:source_warehouse_id(
           id,
@@ -212,15 +216,21 @@ export async function GET(
               code_name: itemDetails?.code_name || ''
             }
           },
-          // 창고 정보 추가 (올바른 속성명 사용)
+          // 창고 정보 추가 - stock_item의 warehouse 정보를 우선 사용
           warehouse: transaction.source_warehouse ? {
             id: transaction.source_warehouse.id,
             name: transaction.source_warehouse.name
-          } : undefined,
+          } : (stockItem?.warehouse ? {
+            id: stockItem.warehouse.id,
+            name: stockItem.warehouse.name
+          } : undefined),
           destination_warehouse: transaction.destination_warehouse ? {
             id: transaction.destination_warehouse.id,
             name: transaction.destination_warehouse.name
-          } : undefined
+          } : (transaction.transaction_type === 'incoming' && stockItem?.warehouse ? {
+            id: stockItem.warehouse.id,
+            name: stockItem.warehouse.name
+          } : undefined)
         };
       })
     );
