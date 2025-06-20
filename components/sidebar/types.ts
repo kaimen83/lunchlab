@@ -3,14 +3,19 @@ import { Dispatch, SetStateAction } from 'react';
 
 // 컴포넌트 Props 정의
 export interface CompanySidebarProps {
-  companies: Array<Company & { role: string }>;
+  companies: Array<Company & { role: string; features: CompanyFeatureData[] }>;
   isMobile?: boolean;
   isSheetOpen?: boolean;
-  setIsSheetOpen?: Dispatch<SetStateAction<boolean>>;
+  setIsSheetOpen?: (open: boolean) => void;
 }
 
 // 회사 기능 관련 타입
-export type CompanyFeature = 'ingredients' | 'menus' | 'settings' | 'mealPlanning' | 'cookingPlan' | 'inventory';
+export type CompanyFeature = 'ingredients' | 'menus' | 'mealPlanning' | 'cookingPlan' | 'inventory';
+
+interface CompanyFeatureData {
+  feature_name: string;
+  is_enabled: boolean;
+}
 
 // 사이드바 메뉴 항목 타입
 export interface SidebarMenuItem {
@@ -22,10 +27,9 @@ export interface SidebarMenuItem {
 }
 
 // 회사 정보와 기능 타입
-export interface CompanyWithFeatures {
-  id: string;
-  name: string;
+export interface CompanyWithFeatures extends Company {
   role: string;
+  features: CompanyFeatureData[];
   isCurrentCompany: boolean;
   isExpanded: boolean;
   requestCount: number;
@@ -35,7 +39,6 @@ export interface CompanyWithFeatures {
   hasMealPlanningFeature: boolean;
   hasCookingPlanFeature: boolean;
   hasInventoryFeature: boolean;
-  // 낙관적 UI 업데이트를 위한 추가 속성
-  navigationInProgress?: string | null;
+  navigationInProgress: string | null;
   navigateToTab?: (url: string) => void;
 } 

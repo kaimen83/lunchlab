@@ -2,11 +2,17 @@ import { Company } from '@/lib/types';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { CompanyJoinRequest } from './types';
 
-interface CompanyWithRole extends Company {
-  role: string;
+interface CompanyFeature {
+  feature_name: string;
+  is_enabled: boolean;
 }
 
-// 사용자가 속한 회사 목록을 가져오는 함수
+interface CompanyWithRole extends Company {
+  role: string;
+  features: CompanyFeature[];
+}
+
+// 사용자가 속한 회사 목록과 기능 정보를 함께 가져오는 함수
 export async function getUserCompanies(userId: string): Promise<{
   companies: CompanyWithRole[];
   error: Error | null;
@@ -32,10 +38,16 @@ export async function getUserCompanies(userId: string): Promise<{
     // 회사 ID 배열 추출
     const companyIds = memberships.map(m => m.company_id);
     
-    // 회사 정보 조회
-    const { data: companies, error: companiesError } = await supabase
+    // 회사 정보와 기능 정보를 JOIN하여 한 번에 조회
+    const { data: companiesWithFeatures, error: companiesError } = await supabase
       .from('companies')
-      .select('*')
+      .select(`
+        *,
+        company_features (
+          feature_name,
+          is_enabled
+        )
+      `)
       .in('id', companyIds);
     
     if (companiesError) {
@@ -43,12 +55,21 @@ export async function getUserCompanies(userId: string): Promise<{
       return { companies: [], error: new Error(companiesError.message) };
     }
     
-    // 회사 정보와 역할 정보 합치기
-    const companiesWithRole = companies.map(company => {
+    // 회사 정보와 역할 정보, 기능 정보 합치기
+    const companiesWithRole = companiesWithFeatures.map(company => {
       const membership = memberships.find(m => m.company_id === company.id);
+      const features = (company.company_features || [])
+        .filter((feature: any) => feature.is_enabled)
+        .map((feature: any) => ({
+          feature_name: feature.feature_name,
+          is_enabled: feature.is_enabled
+        }));
+      
       return {
         ...company,
-        role: membership ? membership.role : 'unknown'
+        role: membership ? membership.role : 'unknown',
+        features,
+        company_features: undefined // 원본 데이터 제거
       } as CompanyWithRole;
     });
     
