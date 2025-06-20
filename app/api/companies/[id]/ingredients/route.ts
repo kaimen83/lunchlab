@@ -151,13 +151,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     // Promise.all을 사용하여 전체 개수와 페이지 데이터를 병렬로 가져옴
     const [countResult, dataResult] = await Promise.all([
-      // 전체 식재료 개수 조회 (검색어가 있는 경우 필터링)
+      // 전체 식재료 개수 조회 (검색어가 있는 경우 식재료명과 코드명 모두에서 검색)
       (search 
         ? supabase
             .from('ingredients')
             .select('id', { count: 'exact', head: true })
             .eq('company_id', companyId)
-            .ilike('name', `%${search}%`)
+            .or(`name.ilike.%${search}%,code_name.ilike.%${search}%`)
         : supabase
             .from('ingredients')
             .select('id', { count: 'exact', head: true })
