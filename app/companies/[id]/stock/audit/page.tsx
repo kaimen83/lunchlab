@@ -637,49 +637,55 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
         </Dialog>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* 실사 목록 */}
+      <div className="grid gap-4 lg:grid-cols-4">
+        {/* 실사 목록 - 컴팩트한 디자인 */}
         <div className="lg:col-span-1">
           <Card>
-            <CardHeader>
-              <CardTitle>실사 목록</CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">실사 목록</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2">
               {audits.map((audit) => (
                 <div
                   key={audit.id}
-                  className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                  className={`p-2.5 rounded-md border cursor-pointer transition-colors ${
                     currentAudit?.audit.id === audit.id 
                       ? 'border-blue-500 bg-blue-50' 
-                      : 'border-gray-200 hover:border-gray-300'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                   }`}
                   onClick={() => fetchAuditDetail(audit.id, 1)}
                 >
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-sm">{audit.name}</h3>
-                    <Badge variant={audit.status === 'completed' ? 'default' : 'secondary'}>
+                  <div className="flex items-start justify-between mb-1">
+                    <h3 className="font-medium text-sm leading-tight line-clamp-2">{audit.name}</h3>
+                    <Badge 
+                      variant={audit.status === 'completed' ? 'default' : 'secondary'}
+                      className="text-xs px-1.5 py-0.5 ml-2 flex-shrink-0"
+                    >
                       {audit.status === 'completed' ? '완료' : '진행중'}
                     </Badge>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {new Date(audit.created_at).toLocaleDateString()}
+                  <p className="text-xs text-gray-500">
+                    {new Date(audit.created_at).toLocaleDateString('ko-KR', {
+                      month: 'short',
+                      day: 'numeric'
+                    })}
                   </p>
                 </div>
               ))}
               
               {audits.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <ClipboardCheck className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                  <p>진행 중인 실사가 없습니다.</p>
-                  <p className="text-sm">새 실사를 시작해보세요.</p>
+                <div className="text-center py-6 text-gray-500">
+                  <ClipboardCheck className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm">실사가 없습니다</p>
+                  <p className="text-xs">새 실사를 시작하세요</p>
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* 실사 상세 */}
-        <div className="lg:col-span-2">
+        {/* 실사 상세 - 더 넓은 영역 */}
+        <div className="lg:col-span-3">
           {currentAudit ? (
             <Card>
               <CardHeader className="pb-4">
