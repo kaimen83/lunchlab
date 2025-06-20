@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { StockTransaction, StockTransactionTable, PaginationInfo } from "@/components/stock/StockTransactionTable";
 import { useToast } from "@/hooks/use-toast";
@@ -19,10 +19,9 @@ import WarehouseSelector from "@/components/stock/WarehouseSelector";
 
 interface StockTransactionsPageProps {
   companyId: string;
-  selectedWarehouseId?: string;
 }
 
-export default function StockTransactionsPage({ companyId, selectedWarehouseId }: StockTransactionsPageProps) {
+export default function StockTransactionsPage({ companyId }: StockTransactionsPageProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
@@ -42,6 +41,9 @@ export default function StockTransactionsPage({ companyId, selectedWarehouseId }
 
   // 디바운싱을 위한 검색어 상태 분리
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // 초기 마운트 상태를 추적하는 ref 추가
+  const isInitialMount = useRef(true);
 
   // 거래 내역 목록 조회
   const fetchTransactions = useCallback(async () => {
@@ -79,10 +81,16 @@ export default function StockTransactionsPage({ companyId, selectedWarehouseId }
     } finally {
       setIsLoading(false);
     }
-  }, [companyId, pagination.page, filters, toast]);
+  }, [companyId, pagination.page, filters]); // toast 제거로 불필요한 재생성 방지
 
-  // 디바운싱된 검색 처리
+  // 디바운싱된 검색 처리 - 초기 마운트 시에는 실행하지 않도록 수정
   useEffect(() => {
+    // 초기 마운트 시에는 디바운싱 로직을 실행하지 않음
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
     const timeoutId = setTimeout(() => {
       setFilters(prev => ({ ...prev, itemName: searchQuery }));
       setPagination(prev => ({ ...prev, page: 1 }));

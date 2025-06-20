@@ -376,7 +376,6 @@ function StockClientInner({ companyId }: StockClientProps) {
             <TabsContent value="transactions" className="space-y-4">
               <StockTransactionsPage 
                 companyId={companyId}
-                selectedWarehouseId={selectedWarehouseId || undefined}
               />
             </TabsContent>
           </Tabs>

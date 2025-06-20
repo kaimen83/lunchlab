@@ -125,15 +125,26 @@ export async function GET(
 
     const allStockItemIds = stockItems.map(item => item.id);
 
-    // 거래 내역 조회 쿼리 시작 (stock_item의 warehouse 정보도 포함)
+    // 거래 내역 조회 쿼리 시작 (비정규화된 데이터 활용으로 JOIN 최소화)
     let query = supabase
       .from('stock_transactions')
       .select(`
-        *,
+        id,
+        stock_item_id,
+        transaction_type,
+        quantity,
+        transaction_date,
+        user_id,
+        reference_id,
+        reference_type,
+        notes,
+        created_at,
+        item_name,
+        item_code,
+        item_type,
+        unit,
         stock_item:stock_item_id(
-          id, 
-          item_type, 
-          item_id,
+          id,
           warehouse:warehouse_id(
             id,
             name
@@ -195,91 +206,50 @@ export async function GET(
       );
     }
 
-    // 항목 상세 정보 가져오기
-    const transactionsWithDetails = await Promise.all(
-      transactions.map(async (transaction) => {
-        const stockItem = transaction.stock_item;
-        let itemDetails = null;
-        let itemUnit = '개'; // 기본 단위는 '개'로 설정
+    // 비정규화된 데이터를 활용하여 별도 조회 없이 거래 정보 구성
+    const transactionsWithDetails = transactions.map((transaction: any) => {
+      const stockItem = transaction.stock_item;
 
-        if (stockItem && typeof stockItem === 'object' && 'item_type' in stockItem) {
-          if (stockItem.item_type === 'ingredient') {
-            const { data: ingredient } = await supabase
-              .from('ingredients')
-              .select('id, name, unit, code_name')
-              .eq('id', stockItem.item_id)
-              .single();
-            
-            itemDetails = ingredient;
-            if (ingredient?.unit) {
-              itemUnit = ingredient.unit; // 식자재의 경우 단위 정보 저장
-            }
-          } else if (stockItem.item_type === 'container') {
-            const { data: container } = await supabase
-              .from('containers')
-              .select('id, name, code_name, parent_container_id')
-              .eq('id', stockItem.item_id)
-              .single();
-            
-            // 최상위 그룹이 있는 경우 그룹 정보를 조회, 없으면 자기 자신
-            if (container?.parent_container_id) {
-              // 상위 그룹 정보 조회
-              const { data: parentContainer } = await supabase
-                .from('containers')
-                .select('id, name, code_name')
-                .eq('id', container.parent_container_id)
-                .is('parent_container_id', null) // 최상위 레벨만
-                .single();
-              
-              itemDetails = parentContainer || container; // 상위 그룹이 있으면 그룹 정보, 없으면 원래 정보
-            } else {
-              itemDetails = container; // 이미 최상위 레벨인 경우
-            }
-            // 용기는 항상 '개' 단위 사용
+      // 클라이언트 컴포넌트에서 필요한 구조로 변환 (비정규화된 데이터 활용)
+      return {
+        id: transaction.id,
+        transaction_type: transaction.transaction_type === 'incoming' ? 'in' : 
+                          transaction.transaction_type === 'outgoing' ? 'out' : 
+                          transaction.transaction_type,
+        quantity: transaction.quantity,
+        unit: transaction.unit || '개', // 비정규화된 단위 데이터 사용, 없으면 기본값 '개'
+        created_at: transaction.transaction_date || transaction.created_at,
+        notes: transaction.notes || '',
+        status: 'completed', // 기본값 설정
+        created_by: {
+          id: transaction.user_id || '',
+          name: '사용자' // user_name 컬럼이 없으므로 기본값 사용
+        },
+        stock_item: {
+          id: stockItem?.id || '',
+          item_type: transaction.item_type || '', // 비정규화된 데이터 사용
+          details: {
+            name: transaction.item_name || '삭제된 항목', // 비정규화된 데이터 사용
+            code_name: transaction.item_code || ''         // 비정규화된 데이터 사용
           }
-        }
-
-        // 클라이언트 컴포넌트에서 필요한 구조로 변환
-        return {
-          id: transaction.id,
-          transaction_type: transaction.transaction_type === 'incoming' ? 'in' : 
-                            transaction.transaction_type === 'outgoing' ? 'out' : 
-                            transaction.transaction_type,
-          quantity: transaction.quantity,
-          unit: itemUnit, // 저장된 단위 정보 사용
-          created_at: transaction.transaction_date || transaction.created_at,
-          notes: transaction.notes || '',
-          status: 'completed', // 기본값 설정
-          created_by: {
-            id: transaction.user_id || '',
-            name: transaction.user_name || '시스템'
-          },
-          stock_item: {
-            id: stockItem?.id || '',
-            item_type: stockItem?.item_type || '',
-            details: {
-              name: itemDetails?.name || '삭제된 항목',
-              code_name: itemDetails?.code_name || ''
-            }
-          },
-          // 창고 정보 추가 - stock_item의 warehouse 정보를 우선 사용
-          warehouse: transaction.source_warehouse ? {
-            id: transaction.source_warehouse.id,
-            name: transaction.source_warehouse.name
-          } : (stockItem?.warehouse ? {
-            id: stockItem.warehouse.id,
-            name: stockItem.warehouse.name
-          } : undefined),
-          destination_warehouse: transaction.destination_warehouse ? {
-            id: transaction.destination_warehouse.id,
-            name: transaction.destination_warehouse.name
-          } : (transaction.transaction_type === 'incoming' && stockItem?.warehouse ? {
-            id: stockItem.warehouse.id,
-            name: stockItem.warehouse.name
-          } : undefined)
-        };
-      })
-    );
+        },
+        // 창고 정보 추가 - 각 거래 타입에 따라 적절한 창고 정보 설정
+        warehouse: transaction.source_warehouse ? {
+          id: transaction.source_warehouse.id,
+          name: transaction.source_warehouse.name
+        } : (stockItem && stockItem.warehouse ? {
+          id: stockItem.warehouse.id,
+          name: stockItem.warehouse.name
+        } : undefined),
+        destination_warehouse: transaction.destination_warehouse ? {
+          id: transaction.destination_warehouse.id,
+          name: transaction.destination_warehouse.name
+        } : (transaction.transaction_type === 'incoming' && stockItem && stockItem.warehouse ? {
+          id: stockItem.warehouse.id,
+          name: stockItem.warehouse.name
+        } : undefined)
+      };
+    });
 
     // 날짜순으로 정렬 (DB에서 이미 정렬했지만 안전을 위해)
     const finalTransactions = transactionsWithDetails
@@ -926,6 +896,62 @@ export async function POST(
         }
       });
 
+      // 0. 비정규화된 데이터 조회 (성능 최적화를 위해 미리 모든 항목 조회)
+      const allStockItemIdsForDenormalization = [...new Set(transactionItems.map((item: any) => item.stockItemId))];
+      
+      // 재고 항목 기본 정보 조회
+      const { data: stockItemsInfo, error: stockItemsInfoError } = await supabase
+        .from('stock_items')
+        .select('id, item_type, item_id, unit')
+        .in('id', allStockItemIdsForDenormalization);
+
+      if (stockItemsInfoError) {
+        throw new Error(`재고 항목 정보 조회 오류: ${stockItemsInfoError.message}`);
+      }
+
+      // 비정규화된 데이터 맵 생성
+      const denormalizedDataMap = new Map();
+      
+      // 각 재고 항목에 대해 상세 정보 조회
+      for (const stockItem of stockItemsInfo) {
+        try {
+          let itemDetails = null;
+          
+          if (stockItem.item_type === 'ingredient') {
+            const { data: ingredient } = await supabase
+              .from('ingredients')
+              .select('name, code_name')
+              .eq('id', stockItem.item_id)
+              .single();
+            itemDetails = ingredient;
+          } else if (stockItem.item_type === 'container') {
+            const { data: container } = await supabase
+              .from('containers')
+              .select('name, code_name')
+              .eq('id', stockItem.item_id)
+              .single();
+            itemDetails = container;
+          }
+          
+          // 비정규화된 데이터 저장
+          denormalizedDataMap.set(stockItem.id, {
+            item_name: itemDetails?.name || '삭제된 항목',
+            item_code: itemDetails?.code_name || '',
+            item_type: stockItem.item_type,
+            unit: stockItem.unit || ''
+          });
+        } catch (error) {
+          console.warn(`항목 상세 정보 조회 실패 (ID: ${stockItem.id}):`, error);
+          // 실패한 경우 기본값 설정
+          denormalizedDataMap.set(stockItem.id, {
+            item_name: '삭제된 항목',
+            item_code: '',
+            item_type: stockItem.item_type,
+            unit: stockItem.unit || ''
+          });
+        }
+      }
+
       // 1. 모든 개별 거래 내역 생성 (transactionItems 기준)
       const transactionPromises = transactionItems.map(async (item: any, index: number) => {
         // 실제 재고 차감에 사용되는 거래인지 확인
@@ -958,6 +984,14 @@ export async function POST(
           }
         }
 
+        // 비정규화된 데이터 가져오기
+        const denormalizedData = denormalizedDataMap.get(item.stockItemId) || {
+          item_name: '알 수 없는 항목',
+          item_code: '',
+          item_type: '',
+          unit: ''
+        };
+
         const { data: transaction, error: transactionError } = await supabase
           .from('stock_transactions')
           .insert({
@@ -969,6 +1003,11 @@ export async function POST(
             reference_id: referenceId,
             reference_type: referenceType,
             ...warehouseFields, // 창고 필드 추가
+            // 비정규화된 데이터 추가 (성능 최적화용)
+            item_name: denormalizedData.item_name,
+            item_code: denormalizedData.item_code,
+            item_type: denormalizedData.item_type,
+            unit: denormalizedData.unit,
             notes: isGroupedTransaction ? 
               (isMaxInGroup && isMaxQuantityInGroup ? 
                 `${notes} - ${item.itemName} [ACTUAL_STOCK_CHANGE]` : 
