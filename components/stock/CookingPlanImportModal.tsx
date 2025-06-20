@@ -371,6 +371,8 @@ export function CookingPlanImportModal({
       const transactionItems: { stockItemId: string; quantity: number; itemName: string; isMaxInGroup?: boolean; }[] = [];
       // 실제 재고 차감용 데이터 (그룹별 최대값)
       const stockAdjustments: { stockItemId: string; quantity: number; }[] = [];
+      // 처리된 항목들에 대응하는 창고 ID 배열
+      const processedWarehouseIds: string[] = [];
       // 용기 그룹별 수량 추적 (parentId를 키로 사용)
       const containerGroups: Map<string, { 
         maxQuantity: number; 
@@ -382,6 +384,13 @@ export function CookingPlanImportModal({
 
       for (const item of selectedItemsData) {
         try {
+          // 처리 수량이 0인 항목은 거래내역에서 제외
+          const quantity = getActualQuantity(item);
+          if (quantity <= 0) {
+            console.log(`수량이 0인 항목 제외: ${item.name} (수량: ${quantity})`);
+            continue;
+          }
+
           let targetItemId = item.id;
           let searchName = item.name;
           let parentId: string | null = null;
@@ -426,8 +435,6 @@ export function CookingPlanImportModal({
             finalStockItemId = stockItem.id;
           }
 
-          const quantity = getActualQuantity(item);
-
           // 용기 그룹별 처리
           if (item.item_type === 'container' && parentId) {
             // 같은 parent를 가진 용기들을 그룹핑 (parentId를 키로 사용)
@@ -441,7 +448,7 @@ export function CookingPlanImportModal({
               const group = containerGroups.get(groupKey)!;
               group.items.push({ name: item.name, quantity, stockItemId: parentStockItemId });
               
-              // 최대 수량 업데이트
+              // 최대 수량 업데이트 (수량이 0보다 큰 경우에만)
               if (quantity > group.maxQuantity) {
                 group.maxQuantity = quantity;
                 group.maxItem = item.name;
@@ -467,6 +474,10 @@ export function CookingPlanImportModal({
               stockItemId: finalStockItemId,
               quantity
             });
+
+            // 처리된 항목의 창고 ID 추가
+            const warehouseId = getActualWarehouseId(item);
+            processedWarehouseIds.push(warehouseId || selectedWarehouseId!);
           }
         } catch (error) {
           console.error(`${item.name} 처리 오류:`, error);
@@ -474,23 +485,35 @@ export function CookingPlanImportModal({
         }
       }
 
-      // 용기 그룹별 처리: 모든 아이템을 transactionItems에 추가하되, 최대값만 표시용으로 마킹
+      // 용기 그룹별 처리: 수량이 0보다 큰 아이템만 transactionItems에 추가하되, 최대값만 표시용으로 마킹
       containerGroups.forEach(group => {
-        // 모든 그룹 아이템을 거래 기록에 추가
-        group.items.forEach(item => {
+        const filteredItems = group.items.filter(item => item.quantity > 0); // 수량이 0인 항목 제외
+        
+        // 수량이 0보다 큰 그룹 아이템만 거래 기록에 추가
+        filteredItems.forEach(item => {
           transactionItems.push({
             stockItemId: item.stockItemId,
             quantity: item.quantity,
             itemName: item.name,
             isMaxInGroup: item.name === group.maxItem // 최대값 아이템만 표시용으로 마킹
           });
+          
+          // 처리된 각 항목에 대한 창고 ID 추가
+          // 용기 그룹의 경우 원본 아이템에서 창고 정보를 찾아야 함
+          const originalItem = selectedItemsData.find(original => original.name === item.name);
+          if (originalItem) {
+            const warehouseId = getActualWarehouseId(originalItem);
+            processedWarehouseIds.push(warehouseId || selectedWarehouseId!);
+          }
         });
         
-        // 최대 수량만 실제 재고 차감에 추가
-        stockAdjustments.push({
-          stockItemId: group.stockItemId,
-          quantity: group.maxQuantity
-        });
+        // 최대 수량이 0보다 큰 경우에만 실제 재고 차감에 추가
+        if (group.maxQuantity > 0) {
+          stockAdjustments.push({
+            stockItemId: group.stockItemId,
+            quantity: group.maxQuantity
+          });
+        }
       });
 
       if (transactionItems.length === 0) {
@@ -553,6 +576,10 @@ export function CookingPlanImportModal({
 
       const successful = transactionItems.length;
       const failed = failedItems.length;
+      
+      // 수량이 0인 항목들 계산 (선택되었지만 처리되지 않은 항목들)
+      const selectedItemsWithZeroQuantity = selectedItemsData.filter(item => getActualQuantity(item) <= 0);
+      const excludedCount = selectedItemsWithZeroQuantity.length;
 
       // 그룹화 정보 표시
       let groupInfo = '';
@@ -563,15 +590,21 @@ export function CookingPlanImportModal({
         groupInfo = `용기 그룹 최적화: ${groupDetails}`;
       }
 
+      // 제외된 항목 정보 추가
+      let excludedInfo = '';
+      if (excludedCount > 0) {
+        excludedInfo = ` (수량 0인 ${excludedCount}개 항목 제외됨)`;
+      }
+
       if (failed > 0) {
         toast({
-          title: `일부 항목 처리 완료 (${successful}/${selectedItems.size})`,
-          description: `실패한 항목: ${failedItems.join(', ')}`,
+          title: `일부 항목 처리 완료 (${successful}/${selectedItems.size - excludedCount})`,
+          description: `실패한 항목: ${failedItems.join(', ')}${excludedInfo}`,
         });
       } else {
         toast({
           title: `일괄 ${transactionMode === 'incoming' ? '입고' : '출고'} 완료`,
-          description: `${successful}개 항목이 성공적으로 ${transactionMode === 'incoming' ? '입고' : '출고'} 처리되었습니다.${groupInfo ? ` ${groupInfo}` : ''}`,
+          description: `${successful}개 항목이 성공적으로 ${transactionMode === 'incoming' ? '입고' : '출고'} 처리되었습니다.${groupInfo ? ` ${groupInfo}` : ''}${excludedInfo}`,
         });
       }
 
@@ -845,12 +878,16 @@ export function CookingPlanImportModal({
                         </TableHeader>
                         <TableBody>
                           {allItems.map((item) => {
+                            const actualQuantity = getActualQuantity(item);
+                            const isZeroQuantity = actualQuantity <= 0;
+                            
                             return (
                               <TableRow 
                                 key={item.id}
                                 className={cn(
                                   "hover:bg-muted/50",
-                                  selectedItems.has(item.id) && "bg-muted"
+                                  selectedItems.has(item.id) && "bg-muted",
+                                  isZeroQuantity && "opacity-50" // 수량이 0인 항목은 흐리게 표시
                                 )}
                               >
                                 <TableCell className="py-2">
@@ -900,20 +937,28 @@ export function CookingPlanImportModal({
                                       type="number"
                                       min="0"
                                       step="0.1"
-                                      value={getActualQuantity(item)}
+                                      value={actualQuantity}
                                       onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                                      className="w-20 h-7 text-right text-xs font-mono"
+                                      className={cn(
+                                        "w-20 h-7 text-right text-xs font-mono",
+                                        isZeroQuantity && "border-gray-300 text-gray-400"
+                                      )}
                                     />
                                     <div className="flex flex-col items-end">
                                       <span className="text-xs text-muted-foreground">
                                         {item.unit}
                                       </span>
-                                      {editedQuantities.has(item.id) && (
+                                      {isZeroQuantity && (
+                                        <span className="text-xs text-red-500">
+                                          (거래 제외)
+                                        </span>
+                                      )}
+                                      {editedQuantities.has(item.id) && !isZeroQuantity && (
                                         <span className="text-xs text-orange-600">
                                           (수정됨)
                                         </span>
                                       )}
-                                      {transactionMode === 'incoming' && item.order_quantity !== undefined && item.package_amount && !editedQuantities.has(item.id) && (
+                                      {transactionMode === 'incoming' && item.order_quantity !== undefined && item.package_amount && !editedQuantities.has(item.id) && !isZeroQuantity && (
                                         <span className="text-xs text-blue-600">
                                           ({item.order_quantity}개 × {item.package_amount}{item.unit})
                                         </span>

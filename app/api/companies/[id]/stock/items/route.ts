@@ -153,7 +153,7 @@ async function getFilteredItemIds(
 
     const { data: ingredients } = await ingredientQuery;
     if (ingredients) {
-      itemIds.push(...ingredients.map(item => ({ 
+      itemIds.push(...ingredients.map((item: any) => ({ 
         id: item.id, 
         type: 'ingredient' as const, 
         name: item.name 
@@ -161,8 +161,8 @@ async function getFilteredItemIds(
     }
   }
 
-  // 용기 조회 (최상위만)
-  if (!itemType || itemType === 'container') {
+  // 용기 조회 (최상위만) - 등급 필터가 'all'인 경우에만 조회
+  if ((!itemType || itemType === 'container') && (!stockGrade || stockGrade === 'all')) {
     let containerQuery = supabase
       .from('containers')
       .select('id, name')
@@ -178,7 +178,7 @@ async function getFilteredItemIds(
 
     const { data: containers } = await containerQuery;
     if (containers) {
-      itemIds.push(...containers.map(item => ({ 
+      itemIds.push(...containers.map((item: any) => ({ 
         id: item.id, 
         type: 'container' as const, 
         name: item.name 
