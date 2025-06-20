@@ -91,18 +91,13 @@ export async function GET(
       itemsQuery = itemsQuery.eq('item_type', itemType);
     }
 
-    if (search && search.trim() !== '') {
-      itemsQuery = itemsQuery.ilike('item_name', `%${search.trim()}%`);
-    }
+    // 검색 필터는 일단 적용하지 않고, 모든 데이터를 가져온 후 애플리케이션 레벨에서 필터링
 
     // 가나다 순 정렬 적용
     itemsQuery = itemsQuery.order('item_name', { ascending: true });
 
-    // 페이지네이션 적용
-    const offset = (page - 1) * pageSize;
-    itemsQuery = itemsQuery.range(offset, offset + pageSize - 1);
-
-    const { data: auditItems, error: itemsError, count } = await itemsQuery;
+    // 모든 데이터를 가져옴 (애플리케이션 레벨에서 필터링 및 페이지네이션 처리)
+    const { data: auditItems, error: itemsError } = await itemsQuery;
 
     if (itemsError) {
       console.error('실사 항목 조회 오류:', itemsError);
@@ -158,6 +153,27 @@ export async function GET(
       })
     );
 
+    // 검색 필터 적용 - 항목명, 코드, 등급으로 검색
+    let filteredItems = enrichedItems;
+    if (search && search.trim() !== '') {
+      const searchTerm = search.trim().toLowerCase();
+      filteredItems = enrichedItems.filter(item => {
+        const itemName = (item.item_name || '').toLowerCase();
+        const codeName = (item.code_name || '').toLowerCase();
+        const stockGrade = (item.stock_grade || '').toLowerCase();
+        
+        return itemName.includes(searchTerm) || 
+               codeName.includes(searchTerm) || 
+               stockGrade.includes(searchTerm);
+      });
+    }
+
+    // 페이지네이션 적용 (필터링된 결과에 대해)
+    const totalFilteredCount = filteredItems.length;
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedItems = filteredItems.slice(startIndex, endIndex);
+
     // 통계 정보 조회
     const { data: statsData, error: statsError } = await supabase
       .from('stock_audit_items')
@@ -188,14 +204,14 @@ export async function GET(
 
     const response: StockAuditDetailResponse = {
       audit,
-      items: enrichedItems || [],
+      items: paginatedItems || [],
       stats,
       warehouse: warehouse || undefined,
       pagination: {
-        total: count || 0,
+        total: totalFilteredCount,
         page,
         pageSize,
-        pageCount: Math.ceil((count || 0) / pageSize)
+        pageCount: Math.ceil(totalFilteredCount / pageSize)
       }
     };
 

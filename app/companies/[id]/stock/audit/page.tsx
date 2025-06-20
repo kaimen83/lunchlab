@@ -85,8 +85,8 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
   };
 
   // 창고 변경 핸들러
-  const handleWarehouseChange = (warehouseId: string | undefined) => {
-    setSelectedWarehouseId(warehouseId);
+  const handleWarehouseChange = (warehouseId: string | null | undefined) => {
+    setSelectedWarehouseId(warehouseId || undefined);
     setNewAuditForm(prev => ({
       ...prev,
       warehouse_id: warehouseId || ''
@@ -777,7 +777,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <Input
-                          placeholder="항목 검색..."
+                          placeholder="항목명, 코드, 등급으로 검색..."
                           value={filters.search}
                           onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
                           className="pl-10"
