@@ -56,15 +56,20 @@ export async function GET(
     }
 
     // 창고 정보 조회
-    const { data: warehouse, error: warehouseError } = await supabase
-      .from('warehouses')
-      .select('id, name')
-      .eq('id', audit.warehouse_id)
-      .single();
+    let warehouse = null;
+    if (audit.warehouse_id) {
+      const { data: warehouseData, error: warehouseError } = await supabase
+        .from('warehouses')
+        .select('id, name')
+        .eq('id', audit.warehouse_id)
+        .single();
 
-    if (warehouseError) {
-      console.error('창고 정보 조회 오류:', warehouseError);
-      // 창고 정보 조회 실패는 치명적 오류가 아니므로 계속 진행
+      if (warehouseError) {
+        console.error('창고 정보 조회 오류:', warehouseError);
+        // 창고 정보 조회 실패는 치명적 오류가 아니므로 계속 진행
+      } else {
+        warehouse = warehouseData;
+      }
     }
 
     // 쿼리 파라미터 처리

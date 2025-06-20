@@ -216,13 +216,14 @@ export async function POST(
       }
 
       if (ingredients && ingredients.length > 0) {
-        // 해당 식자재들의 재고 정보 조회 (전체 창고 대상)
+        // 해당 식자재들의 재고 정보 조회 (선택된 창고만 대상)
         const ingredientIds = ingredients.map(ing => ing.id);
         const { data: stockItems, error: stockError } = await supabase
           .from('stock_items')
           .select('id, item_id, current_quantity, warehouse_id')
           .eq('company_id', companyId)
           .eq('item_type', 'ingredient')
+          .eq('warehouse_id', finalWarehouseId) // 선택된 창고만 필터링
           .in('item_id', ingredientIds);
 
         if (stockError) {
@@ -274,13 +275,14 @@ export async function POST(
       }
 
       if (containers && containers.length > 0) {
-        // 해당 용기들의 재고 정보 조회 (전체 창고 대상)
+        // 해당 용기들의 재고 정보 조회 (선택된 창고만 대상)
         const containerIds = containers.map(cont => cont.id);
         const { data: stockItems, error: stockError } = await supabase
           .from('stock_items')
           .select('id, item_id, current_quantity, warehouse_id')
           .eq('company_id', companyId)
           .eq('item_type', 'container')
+          .eq('warehouse_id', finalWarehouseId) // 선택된 창고만 필터링
           .in('item_id', containerIds);
 
         if (stockError) {
@@ -318,6 +320,7 @@ export async function POST(
               .select('id, item_id, current_quantity, warehouse_id')
               .eq('company_id', companyId)
               .eq('item_type', 'container')
+              .eq('warehouse_id', finalWarehouseId) // 선택된 창고만 필터링
               .in('item_id', subContainerIds);
 
             if (subStockError) {

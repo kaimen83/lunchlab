@@ -718,14 +718,12 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <CardTitle className="text-xl">{currentAudit.audit.name}</CardTitle>
-                      {currentAudit?.warehouse && (
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 shadow-sm">
-                          <Warehouse className="h-3.5 w-3.5 text-slate-600" />
-                          <span className="text-xs font-medium text-slate-700">
-                            {currentAudit.warehouse.name}
-                          </span>
-                        </div>
-                      )}
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 shadow-sm">
+                        <Warehouse className="h-3.5 w-3.5 text-slate-600" />
+                        <span className="text-xs font-medium text-slate-700">
+                          {currentAudit?.warehouse?.name || '미지정'}
+                        </span>
+                      </div>
                     </div>
                     {currentAudit.audit.description && (
                       <p className="text-sm text-gray-600 leading-relaxed">
