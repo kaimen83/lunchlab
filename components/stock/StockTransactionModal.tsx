@@ -62,6 +62,7 @@ import { cn } from "@/lib/utils";
 import { useStockCart } from "./StockCartContext";
 import WarehouseSelector from "./WarehouseSelector";
 import { CookingPlanImportModal } from "./CookingPlanImportModal";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // 수량 포맷 함수
 const formatQuantity = (quantity: number, unit: string) => {
@@ -200,6 +201,15 @@ export function StockTransactionModal({
     // 초기 탭은 모달이 다시 열릴 때 장바구니 상태에 따라 설정됨
     onOpenChange(false);
   };
+
+  // 창고간 이동 시 원본과 대상 창고가 같은지 확인
+  const isSameWarehouse = transactionType === "transfer" && 
+    selectedWarehouseId && 
+    destinationWarehouseId && 
+    selectedWarehouseId === destinationWarehouseId;
+
+  // 처리 버튼 비활성화 조건
+  const isProcessDisabled = isProcessing || isSameWarehouse;
 
   return (
     <>
@@ -398,6 +408,16 @@ export function StockTransactionModal({
                           </div>
                         </div>
 
+                        {/* 창고간 이동 시 같은 창고 선택 경고 */}
+                        {isSameWarehouse && (
+                          <Alert variant="destructive">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertDescription>
+                              원본 창고와 대상 창고가 같습니다. 서로 다른 창고를 선택해주세요.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+
                         {/* 다중 창고 모드 토글 */}
                         <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border">
                           <div className="flex items-center gap-3">
@@ -525,14 +545,14 @@ export function StockTransactionModal({
                   <Button
                     variant="outline"
                     onClick={handleClose}
-                    disabled={isProcessing}
+                    disabled={!!isProcessDisabled}
                     className="flex-1"
                   >
                     취소
                   </Button>
                   <Button
                     onClick={handleProcess}
-                    disabled={isProcessing}
+                    disabled={!!isProcessDisabled}
                     className={cn(
                       "flex-1 font-medium relative overflow-hidden",
                       transactionType === "in" 
