@@ -200,7 +200,7 @@ export async function POST(
     if (item_types.includes('ingredient')) {
       const { data: ingredients, error: ingredientsError } = await supabase
         .from('ingredients')
-        .select('id, name, unit')
+        .select('id, name, unit, code_name')
         .eq('company_id', companyId)
         .not('stock_grade', 'is', null); // 재고관리 등급이 있는 식자재만
 
@@ -244,6 +244,7 @@ export async function POST(
             item_type: 'ingredient',
             item_id: ingredient.id,
             item_name: ingredient.name,
+            item_code: ingredient.code_name, // 검색 성능 향상을 위해 코드명 추가
             unit: ingredient.unit || 'EA',
             current_quantity: stockItem?.current_quantity || 0,
             has_stock_record: !!stockItem,
@@ -257,7 +258,7 @@ export async function POST(
     if (item_types.includes('container')) {
       const { data: containers, error: containersError } = await supabase
         .from('containers')
-        .select('id, name, price')
+        .select('id, name, price, code_name')
         .eq('company_id', companyId)
         .is('parent_container_id', null); // 상위 그룹이 없는 컨테이너만 조회
 
@@ -349,6 +350,7 @@ export async function POST(
               item_type: 'container',
               item_id: topContainer.id, // 상위 그룹 ID 사용
               item_name: topContainer.name, // 상위 그룹명 사용
+              item_code: topContainer.code_name, // 검색 성능 향상을 위해 코드명 추가
               unit: '개',
               current_quantity: maxQuantity, // 하위 중 최대 수량
               has_stock_record: !!maxStockItem,
@@ -362,6 +364,7 @@ export async function POST(
               item_type: 'container',
               item_id: topContainer.id,
               item_name: topContainer.name,
+              item_code: topContainer.code_name, // 검색 성능 향상을 위해 코드명 추가
               unit: '개',
               current_quantity: stockItem?.current_quantity || 0,
               has_stock_record: !!stockItem,
@@ -617,6 +620,7 @@ export async function POST(
       audit_id: audit.id,
       stock_item_id: item.id, // 이제 모든 항목이 stock_item_id를 가짐
       item_name: item.item_name,
+      item_code: item.item_code, // 검색 성능 향상을 위해 코드명 저장
       item_type: item.item_type,
       unit: item.unit,
       book_quantity: item.current_quantity,

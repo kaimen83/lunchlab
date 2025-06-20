@@ -91,13 +91,20 @@ export async function GET(
       itemsQuery = itemsQuery.eq('item_type', itemType);
     }
 
-    // 검색 필터는 일단 적용하지 않고, 모든 데이터를 가져온 후 애플리케이션 레벨에서 필터링
+    // 검색 필터 적용 (item_code가 있으면 데이터베이스 레벨에서 빠른 검색 가능)
+    if (search && search.trim() !== '') {
+      const searchTerm = search.trim();
+      itemsQuery = itemsQuery.or(`item_name.ilike.%${searchTerm}%,item_code.ilike.%${searchTerm}%`);
+    }
 
     // 가나다 순 정렬 적용
     itemsQuery = itemsQuery.order('item_name', { ascending: true });
 
-    // 모든 데이터를 가져옴 (애플리케이션 레벨에서 필터링 및 페이지네이션 처리)
-    const { data: auditItems, error: itemsError } = await itemsQuery;
+    // 페이지네이션 적용 (데이터베이스 레벨에서 처리)
+    const dbStartIndex = (page - 1) * pageSize;
+    itemsQuery = itemsQuery.range(dbStartIndex, dbStartIndex + pageSize - 1);
+
+    const { data: auditItems, error: itemsError, count } = await itemsQuery;
 
     if (itemsError) {
       console.error('실사 항목 조회 오류:', itemsError);
@@ -153,26 +160,8 @@ export async function GET(
       })
     );
 
-    // 검색 필터 적용 - 항목명, 코드, 등급으로 검색
-    let filteredItems = enrichedItems;
-    if (search && search.trim() !== '') {
-      const searchTerm = search.trim().toLowerCase();
-      filteredItems = enrichedItems.filter(item => {
-        const itemName = (item.item_name || '').toLowerCase();
-        const codeName = (item.code_name || '').toLowerCase();
-        const stockGrade = (item.stock_grade || '').toLowerCase();
-        
-        return itemName.includes(searchTerm) || 
-               codeName.includes(searchTerm) || 
-               stockGrade.includes(searchTerm);
-      });
-    }
-
-    // 페이지네이션 적용 (필터링된 결과에 대해)
-    const totalFilteredCount = filteredItems.length;
-    const startIndex = (page - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    const paginatedItems = filteredItems.slice(startIndex, endIndex);
+    // 데이터베이스에서 이미 필터링과 페이지네이션이 적용되었으므로 enrichedItems를 그대로 사용
+    const paginatedItems = enrichedItems;
 
     // 통계 정보 조회
     const { data: statsData, error: statsError } = await supabase
@@ -208,10 +197,10 @@ export async function GET(
       stats,
       warehouse: warehouse || undefined,
       pagination: {
-        total: totalFilteredCount,
+        total: count || 0,
         page,
         pageSize,
-        pageCount: Math.ceil(totalFilteredCount / pageSize)
+        pageCount: Math.ceil((count || 0) / pageSize)
       }
     };
 

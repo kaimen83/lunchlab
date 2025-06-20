@@ -19,6 +19,7 @@ export interface StockAuditItem {
   audit_id: string;
   stock_item_id: string;
   item_name: string;
+  item_code?: string; // 식자재/용기 코드명 (검색 성능 향상을 위해 저장)
   item_type: 'ingredient' | 'container';
   unit?: string;
   book_quantity: number; // 장부상 재고량
@@ -30,7 +31,7 @@ export interface StockAuditItem {
   audited_at?: string;
   created_at: string;
   updated_at: string;
-  code_name?: string; // 식자재/용기 코드명
+  code_name?: string; // 식자재/용기 코드명 (하위 호환성을 위해 유지)
   stock_grade?: string; // 재고 등급 (식자재만 해당)
 }
 
