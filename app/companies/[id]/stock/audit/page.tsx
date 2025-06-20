@@ -23,7 +23,8 @@ import {
   Edit3,
   Save,
   RotateCcw,
-  Warehouse
+  Warehouse,
+  X
 } from "lucide-react";
 import { StockAudit, StockAuditItem, StockAuditDetailResponse, CreateStockAuditRequest } from "@/types/stock-audit";
 import WarehouseSelector from "@/components/stock/WarehouseSelector";
@@ -59,6 +60,29 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
     itemType: 'all',
     search: ''
   });
+
+  // 검색 입력 상태 (실제 검색과 분리)
+  const [searchInput, setSearchInput] = useState('');
+
+  // 검색 실행 함수
+  const handleSearch = () => {
+    setFilters(prev => ({ ...prev, search: searchInput }));
+    setCurrentPage(1); // 검색 시 첫 페이지로 이동
+  };
+
+  // 검색 초기화 함수
+  const handleClearSearch = () => {
+    setSearchInput('');
+    setFilters(prev => ({ ...prev, search: '' }));
+    setCurrentPage(1);
+  };
+
+  // 엔터키로 검색
+  const handleSearchKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
   
   // 선택된 날짜 기반 실사명 생성
   const getAuditNameByDate = (date: Date) => {
@@ -774,14 +798,36 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
                 <div className="space-y-4">
                   <div className="flex space-x-3 items-center">
                     <div className="flex-1">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <Input
-                          placeholder="항목명, 코드, 등급으로 검색..."
-                          value={filters.search}
-                          onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                          className="pl-10"
-                        />
+                      <div className="flex space-x-2">
+                        <div className="relative flex-1">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            placeholder="항목명, 코드, 등급으로 검색..."
+                            value={searchInput}
+                            onChange={(e) => setSearchInput(e.target.value)}
+                            onKeyPress={handleSearchKeyPress}
+                            className="pl-10"
+                          />
+                        </div>
+                        <Button
+                          onClick={handleSearch}
+                          variant="outline"
+                          size="default"
+                          className="px-4"
+                        >
+                          <Search className="h-4 w-4 mr-2" />
+                          검색
+                        </Button>
+                        {filters.search && (
+                          <Button
+                            onClick={handleClearSearch}
+                            variant="ghost"
+                            size="default"
+                            className="px-3"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                     
