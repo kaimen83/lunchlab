@@ -117,8 +117,6 @@ export function StockCartProvider({
     );
   };
 
-
-
   // 원본 창고 설정 (단순화)
   const handleSelectedWarehouseChange = useCallback((warehouseId: string | null) => {
     setSelectedWarehouseId(warehouseId);
@@ -228,6 +226,7 @@ export function StockCartProvider({
           body: JSON.stringify({
             stockItemIds: items.map(item => item.stockItemId),
             quantities: items.map(item => item.quantity),
+            warehouseId: selectedWarehouseId, // 단일 창고 모드를 위한 기본 창고 ID 추가
             warehouseIds: useMultipleWarehouses 
               ? items.map(item => item.warehouseId)
               : items.map(() => selectedWarehouseId), // 일괄 모드일 때는 모든 아이템에 같은 창고 적용
