@@ -328,7 +328,7 @@ export function StockItemDetailModal({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[80vh] max-w-6xl mx-auto overflow-y-auto" closeButton={false}>
+      <SheetContent side="bottom" className="h-[95vh] max-w-7xl mx-auto overflow-y-auto" closeButton={false}>
         <SheetHeader className="mb-4">
           <div className="flex items-center justify-between">
             <SheetTitle className="flex items-center">
