@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { StockTransaction, StockTransactionTable, PaginationInfo } from "@/components/stock/StockTransactionTable";
 import { useToast } from "@/hooks/use-toast";
@@ -14,7 +14,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, X, Warehouse } from "lucide-react";
+import { Search, X, Warehouse, Filter, RotateCcw, Package2, Calendar } from "lucide-react";
 import WarehouseSelector from "@/components/stock/WarehouseSelector";
 
 interface StockTransactionsPageProps {
@@ -37,10 +37,14 @@ export default function StockTransactionsPage({ companyId, selectedWarehouseId }
     stockItemId: "",
     selectedDate: "",
     warehouseId: "",
+    itemName: "",
   });
 
+  // 디바운싱을 위한 검색어 상태 분리
+  const [searchQuery, setSearchQuery] = useState("");
+
   // 거래 내역 목록 조회
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     setIsLoading(true);
     try {
       const queryParams = new URLSearchParams({
@@ -52,6 +56,7 @@ export default function StockTransactionsPage({ companyId, selectedWarehouseId }
       if (filters.stockItemId) queryParams.set("stockItemId", filters.stockItemId);
       if (filters.selectedDate) queryParams.set("selectedDate", filters.selectedDate);
       if (filters.warehouseId && filters.warehouseId !== "all") queryParams.set("warehouseId", filters.warehouseId);
+      if (filters.itemName && filters.itemName.trim()) queryParams.set("itemName", filters.itemName.trim());
 
       const response = await fetch(
         `/api/companies/${companyId}/stock/transactions?${queryParams.toString()}`
@@ -74,7 +79,17 @@ export default function StockTransactionsPage({ companyId, selectedWarehouseId }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [companyId, pagination.page, filters, toast]);
+
+  // 디바운싱된 검색 처리
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setFilters(prev => ({ ...prev, itemName: searchQuery }));
+      setPagination(prev => ({ ...prev, page: 1 }));
+    }, 500); // 500ms 디바운싱
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   // 필터 변경 핸들러
   const handleFilterChange = (name: string, value: string) => {
@@ -90,11 +105,13 @@ export default function StockTransactionsPage({ companyId, selectedWarehouseId }
 
   // 필터 초기화 핸들러
   const handleResetFilters = () => {
+    setSearchQuery(""); // 검색어도 초기화
     setFilters({
       transactionType: "all",
       stockItemId: "",
       selectedDate: "",
       warehouseId: "",
+      itemName: "",
     });
   };
 
@@ -106,23 +123,40 @@ export default function StockTransactionsPage({ companyId, selectedWarehouseId }
   // 초기 데이터 로딩 및 필터/페이지 변경 시 데이터 다시 로딩
   useEffect(() => {
     fetchTransactions();
-  }, [companyId, pagination.page, filters]);
+  }, [fetchTransactions]);
 
   return (
     <div className="space-y-4">
-      <Card className="p-4">
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="space-y-2">
-            <Label htmlFor="transactionType">거래 유형</Label>
+      {/* 컴팩트한 필터 영역 */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+        {/* 검색 바 */}
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="식자재명, 용기명 또는 코드명으로 검색..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+            />
+          </div>
+        </div>
+
+        {/* 필터 컨트롤 */}
+        <div className="flex flex-wrap items-center gap-4">
+          {/* 거래 유형 */}
+          <div className="flex items-center gap-3">
+            <Label className="text-sm font-medium text-gray-700 min-w-fit">유형</Label>
             <Select
               value={filters.transactionType}
               onValueChange={(value) => handleFilterChange("transactionType", value)}
             >
-              <SelectTrigger id="transactionType">
-                <SelectValue placeholder="모든 유형" />
+              <SelectTrigger className="w-32 h-9 bg-white border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
+                <SelectValue placeholder="전체" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">모든 유형</SelectItem>
+                <SelectItem value="all">전체</SelectItem>
                 <SelectItem value="in">입고</SelectItem>
                 <SelectItem value="out">출고</SelectItem>
                 <SelectItem value="adjustment">조정</SelectItem>
@@ -132,55 +166,46 @@ export default function StockTransactionsPage({ companyId, selectedWarehouseId }
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="warehouse" className="flex items-center gap-2">
-              <Warehouse className="h-4 w-4" />
-              창고
-            </Label>
+          {/* 창고 */}
+          <div className="flex items-center gap-3">
+            <Label className="text-sm font-medium text-gray-700 min-w-fit">창고</Label>
             <WarehouseSelector
               companyId={companyId}
               selectedWarehouseId={filters.warehouseId || undefined}
               onWarehouseChange={(warehouseId) => 
                 handleFilterChange("warehouseId", warehouseId || "all")
               }
-              placeholder="모든 창고"
-              className="w-full"
+              placeholder="전체"
+              className="w-36"
               showAllOption={true}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="selectedDate">거래 날짜</Label>
+          {/* 거래 날짜 */}
+          <div className="flex items-center gap-3">
+            <Label className="text-sm font-medium text-gray-700 min-w-fit">날짜</Label>
             <Input
-              id="selectedDate"
               type="date"
               value={filters.selectedDate}
               onChange={handleDateChange}
-              className="w-full"
-              placeholder="날짜를 선택하세요"
+              className="w-40 h-9 bg-white border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
 
-          <div className="flex items-end space-x-2">
-            <Button
-              variant="outline"
-              onClick={handleResetFilters}
-              className="flex items-center gap-1"
-            >
-              <X className="h-4 w-4" />
-              초기화
-            </Button>
-            <Button
-              onClick={fetchTransactions}
-              className="flex items-center gap-1"
-            >
-              <Search className="h-4 w-4" />
-              검색
-            </Button>
-          </div>
+          {/* 초기화 버튼 */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleResetFilters}
+            className="h-9 px-4 text-sm text-gray-600 border-gray-300 hover:bg-gray-50 hover:text-gray-800 transition-colors ml-auto"
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            초기화
+          </Button>
         </div>
-      </Card>
+      </div>
 
+      {/* 거래 내역 테이블 */}
       <StockTransactionTable
         transactions={transactions}
         pagination={pagination}

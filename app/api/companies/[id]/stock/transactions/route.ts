@@ -50,6 +50,7 @@ export async function GET(
     const transactionType = searchParams.get('transactionType');
     const selectedDate = searchParams.get('selectedDate'); // startDate, endDate 대신 selectedDate 사용
     const warehouseId = searchParams.get('warehouseId'); // 창고 필터 추가
+    const itemName = searchParams.get('itemName'); // 항목 이름 검색 추가
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = parseInt(searchParams.get('pageSize') || '20');
 
@@ -58,16 +59,61 @@ export async function GET(
       stockItemId, 
       stockItemIds, 
       transactionType, 
-      selectedDate, 
+      selectedDate,
+      itemName, // 로그에 추가
       page, 
       pageSize 
     });
 
     // 회사의 재고 항목 ID 목록 가져오기
-    const { data: stockItems, error: stockItemsError } = await supabase
+    let stockItemsQuery = supabase
       .from('stock_items')
-      .select('id')
+      .select(`
+        id,
+        item_type,
+        item_id
+      `)
       .eq('company_id', companyId);
+
+    // 항목 이름으로 검색하는 경우 필터링 추가
+    if (itemName && itemName.trim()) {
+      // 식자재 이름으로 검색
+      const { data: matchingIngredients } = await supabase
+        .from('ingredients')
+        .select('id')
+        .eq('company_id', companyId)
+        .or(`name.ilike.%${itemName.trim()}%,code_name.ilike.%${itemName.trim()}%`);
+      
+      // 용기 이름으로 검색  
+      const { data: matchingContainers } = await supabase
+        .from('containers')
+        .select('id')
+        .eq('company_id', companyId)
+        .or(`name.ilike.%${itemName.trim()}%,code_name.ilike.%${itemName.trim()}%`);
+
+      const ingredientIds = matchingIngredients?.map(item => item.id) || [];
+      const containerIds = matchingContainers?.map(item => item.id) || [];
+
+      // 검색된 식자재/용기 ID를 가진 stock_items만 필터링
+      if (ingredientIds.length > 0 || containerIds.length > 0) {
+        stockItemsQuery = stockItemsQuery.or(
+          `and(item_type.eq.ingredient,item_id.in.(${ingredientIds.join(',')})),and(item_type.eq.container,item_id.in.(${containerIds.join(',')}))`
+        );
+      } else {
+        // 검색 결과가 없으면 빈 배열 반환
+        return NextResponse.json({
+          transactions: [],
+          pagination: {
+            total: 0,
+            page: 1,
+            pageSize: pageSize,
+            pageCount: 0,
+          }
+        });
+      }
+    }
+
+    const { data: stockItems, error: stockItemsError } = await stockItemsQuery;
 
     if (stockItemsError) {
       console.error('재고 항목 조회 오류:', stockItemsError);
