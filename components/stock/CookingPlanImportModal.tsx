@@ -557,9 +557,7 @@ export function CookingPlanImportModal({
             transactionItems, // 개별 거래 기록용 (isMaxInGroup 정보 포함)
             stockAdjustments, // 실제 재고 차감/증가용
             warehouseId: selectedWarehouseId, // 단일 창고 모드를 위한 기본 창고 ID 추가
-            warehouseIds: useMultipleWarehouses 
-              ? selectedItemsData.map(item => getActualWarehouseId(item))
-              : selectedItemsData.map(() => selectedWarehouseId), // 일괄 모드일 때는 모든 아이템에 같은 창고 적용
+            warehouseIds: processedWarehouseIds, // 실제 처리된 항목들에 대응하는 창고 ID들
             requestType: transactionMode === 'incoming' ? 'incoming' : 'outgoing',
             notes: `조리계획서 기반 ${transactionMode === 'incoming' ? '입고' : '출고'} (${cookingPlanData?.date || format(selectedDate!, 'yyyy-MM-dd')}) - ${transactionMode === 'incoming' ? '발주량 기준' : '그룹별 최대 수량 적용'}${useMultipleWarehouses ? ' (다중 창고)' : ''}`,
             directProcess: true,
