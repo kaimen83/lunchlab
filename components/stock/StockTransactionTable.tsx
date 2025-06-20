@@ -227,7 +227,8 @@ export function StockTransactionTable({
           <TableHeader>
             <TableRow>
               <TableHead>유형</TableHead>
-              <TableHead>항목</TableHead>
+              <TableHead>항목명</TableHead>
+              <TableHead>코드</TableHead>
               <TableHead>수량</TableHead>
               <TableHead>창고</TableHead>
               <TableHead>일시</TableHead>
@@ -238,7 +239,7 @@ export function StockTransactionTable({
           <TableBody>
             {transactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-10">
+                <TableCell colSpan={8} className="text-center py-10">
                   <div className="flex flex-col items-center justify-center text-muted-foreground">
                     <ClipboardList className="h-12 w-12 mb-2 text-muted-foreground/50" />
                     <p>거래 내역이 없습니다.</p>
@@ -253,10 +254,14 @@ export function StockTransactionTable({
                   </TableCell>
                   <TableCell className="font-medium">
                     {transaction.stock_item.details.name}
-                    {transaction.stock_item.details.code_name && (
-                      <span className="text-xs text-muted-foreground ml-2">
-                        ({transaction.stock_item.details.code_name})
+                  </TableCell>
+                  <TableCell>
+                    {transaction.stock_item.details.code_name ? (
+                      <span className="font-mono text-sm text-gray-700">
+                        {transaction.stock_item.details.code_name}
                       </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
                     )}
                   </TableCell>
                   <TableCell className="text-right">
