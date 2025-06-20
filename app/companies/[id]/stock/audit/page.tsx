@@ -867,17 +867,20 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
                   
                   {/* 컬럼 헤더 */}
                   <div className="bg-gray-50 px-4 py-3 border-b">
-                    <div className="grid grid-cols-14 gap-3 text-sm font-medium text-gray-700">
-                      <div className="col-span-4">항목명</div>
-                      <div className="col-span-2 text-center">창고</div>
-                      <div className="col-span-2 text-center">장부량</div>
-                      <div className="col-span-2 text-center">실사량</div>
-                      <div className="col-span-2 text-center">차이</div>
-                      <div className="col-span-2 text-center">메모</div>
+                    <div className="flex gap-3 text-sm font-medium text-gray-700">
+                      <div className="flex-1 min-w-[200px]">항목명</div>
+                      <div className="w-20 text-center">코드</div>
+                      <div className="w-16 text-center">등급</div>
+                      <div className="w-20 text-center">창고</div>
+                      <div className="w-20 text-center">장부량</div>
+                      <div className="w-20 text-center">실사량</div>
+                      <div className="w-20 text-center">차이</div>
+                      <div className="w-24 text-center">메모</div>
                     </div>
                   </div>
                   
-                  <div className="divide-y">
+                  {/* 실사 항목 목록 */}
+                  <div className="divide-y divide-gray-200">
                     {getPaginatedItems().map((item) => {
                       const pendingData = pendingChanges.get(item.id);
                       const actualQuantity = pendingData?.actual_quantity !== undefined 
@@ -894,30 +897,49 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
                       
                       return (
                         <div key={item.id} className="px-4 py-3 hover:bg-gray-50">
-                          <div className="grid grid-cols-14 gap-3 items-center text-sm">
+                          <div className="flex gap-3 items-center text-sm">
                             {/* 항목명 */}
-                            <div className="col-span-4">
-                              <div className="font-medium">{item.item_name}</div>
-                              <div className="text-xs text-gray-500">
-                                {item.item_type === 'ingredient' ? '식자재' : '용기'}
-                                {item.unit && ` • ${item.unit}`}
+                            <div className="flex-1 min-w-[200px]">
+                              <div className="font-medium text-gray-900">{item.item_name}</div>
+                              <div className="text-gray-500">
+                                {item.item_type === 'ingredient' ? '식자재' : '용기'} • {item.unit || '-'}
                               </div>
                             </div>
                             
+                            {/* 코드 */}
+                            <div className="w-20 text-center">
+                              {item.code_name ? (
+                                <span className="inline-block px-2 py-1 text-xs font-mono bg-gray-100 text-gray-800 rounded">
+                                  {item.code_name}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </div>
+                            
+                            {/* 등급 */}
+                            <div className="w-16 text-center">
+                              {item.stock_grade ? (
+                                <span className="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
+                                  {item.stock_grade}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </div>
+                            
                             {/* 창고 */}
-                            <div className="col-span-2 text-center">
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                                {currentAudit?.warehouse?.name || '미지정'}
-                              </span>
+                            <div className="w-20 text-center text-gray-600">
+                              {selectedWarehouseId ? '지정됨' : '미지정'}
                             </div>
                             
                             {/* 장부량 */}
-                            <div className="col-span-2 text-center font-mono">
-                              {item.book_quantity}
+                            <div className="w-20 text-center font-medium">
+                              {item.book_quantity.toLocaleString()}
                             </div>
                             
-                            {/* 실사량 (편집 가능) */}
-                            <div className="col-span-2 text-center">
+                            {/* 실사량 */}
+                            <div className="w-20 text-center">
                               {currentAudit.audit.status === 'in_progress' ? (
                                 <EditableCell 
                                   item={item} 
@@ -935,16 +957,20 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
                             </div>
                             
                             {/* 차이 */}
-                            <div className="col-span-2 text-center font-mono">
+                            <div className="w-20 text-center">
                               {difference !== null && difference !== undefined ? (
-                                <span className={difference > 0 ? 'text-blue-600' : difference < 0 ? 'text-red-600' : 'text-gray-600'}>
-                                  {difference > 0 ? '+' : ''}{difference}
+                                <span className={`font-medium ${
+                                  difference > 0 ? 'text-green-600' : 
+                                  difference < 0 ? 'text-red-600' : 
+                                  'text-gray-600'
+                                }`}>
+                                  {difference > 0 ? '+' : ''}{difference.toLocaleString()}
                                 </span>
                               ) : '-'}
                             </div>
                             
-                            {/* 메모 (편집 가능) */}
-                            <div className="col-span-2">
+                            {/* 메모 */}
+                            <div className="w-24 text-center">
                               {currentAudit.audit.status === 'in_progress' ? (
                                 <EditableCell 
                                   item={item} 

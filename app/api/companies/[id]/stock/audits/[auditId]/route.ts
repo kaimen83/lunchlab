@@ -77,7 +77,13 @@ export async function GET(
     // 실사 항목 조회 (가나다 순 정렬)
     let itemsQuery = supabase
       .from('stock_audit_items')
-      .select('*', { count: 'exact' })
+      .select(`
+        *,
+        stock_items!inner(
+          item_type,
+          item_id
+        )
+      `, { count: 'exact' })
       .eq('audit_id', auditId);
 
     // 필터 적용
@@ -96,7 +102,7 @@ export async function GET(
     const offset = (page - 1) * pageSize;
     itemsQuery = itemsQuery.range(offset, offset + pageSize - 1);
 
-    const { data: items, error: itemsError, count } = await itemsQuery;
+    const { data: auditItems, error: itemsError, count } = await itemsQuery;
 
     if (itemsError) {
       console.error('실사 항목 조회 오류:', itemsError);
@@ -105,6 +111,52 @@ export async function GET(
         { status: 500 }
       );
     }
+
+    // 실사 항목에 코드와 등급 정보 추가
+    const enrichedItems = await Promise.all(
+      (auditItems || []).map(async (item) => {
+        const stockItem = item.stock_items;
+        let codeName = null;
+        let stockGrade = null;
+        
+        if (stockItem && stockItem.item_type && stockItem.item_id) {
+          // 식자재인 경우 ingredients 테이블에서 코드와 등급 조회
+          if (stockItem.item_type === 'ingredient') {
+            const { data: ingredientData } = await supabase
+              .from('ingredients')
+              .select('code_name, stock_grade')
+              .eq('id', stockItem.item_id)
+              .single();
+            
+            if (ingredientData) {
+              codeName = ingredientData.code_name;
+              stockGrade = ingredientData.stock_grade;
+            }
+          }
+          // 용기인 경우 containers 테이블에서 코드 조회
+          else if (stockItem.item_type === 'container') {
+            const { data: containerData } = await supabase
+              .from('containers')
+              .select('code_name')
+              .eq('id', stockItem.item_id)
+              .single();
+            
+            if (containerData) {
+              codeName = containerData.code_name;
+              // 용기는 등급이 없으므로 stockGrade는 null 유지
+            }
+          }
+        }
+
+        // stock_items 정보 제거하고 코드/등급 정보 추가
+        const { stock_items, ...itemWithoutStockItems } = item;
+        return {
+          ...itemWithoutStockItems,
+          code_name: codeName,
+          stock_grade: stockGrade
+        };
+      })
+    );
 
     // 통계 정보 조회
     const { data: statsData, error: statsError } = await supabase
@@ -136,7 +188,7 @@ export async function GET(
 
     const response: StockAuditDetailResponse = {
       audit,
-      items: items || [],
+      items: enrichedItems || [],
       stats,
       warehouse: warehouse || undefined,
       pagination: {

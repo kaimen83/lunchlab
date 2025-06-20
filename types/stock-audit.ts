@@ -30,6 +30,8 @@ export interface StockAuditItem {
   audited_at?: string;
   created_at: string;
   updated_at: string;
+  code_name?: string; // 식자재/용기 코드명
+  stock_grade?: string; // 재고 등급 (식자재만 해당)
 }
 
 // 실사 생성 요청 타입
