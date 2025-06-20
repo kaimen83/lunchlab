@@ -594,12 +594,14 @@ export function StockItemDetailModal({
                       </div>
                       <div>
                         <h4 className="text-sm font-medium text-muted-foreground">계산 방법</h4>
-                        <p className="text-sm">
-                          {historicalData.calculationMethod || (
-                            historicalData.warehouseCount && historicalData.warehouseCount > 1 
-                              ? `${historicalData.warehouseCount}개 창고 합계` 
-                              : "전체 재고 계산"
-                          )}
+                        <div className="text-sm">
+                          <span>
+                            {historicalData.calculationMethod || (
+                              historicalData.warehouseCount && historicalData.warehouseCount > 1 
+                                ? `${historicalData.warehouseCount}개 창고 합계` 
+                                : "전체 재고 계산"
+                            )}
+                          </span>
                           {historicalData.baseSnapshot && (
                             <span className="block text-xs text-muted-foreground mt-1">
                               기준 스냅샷: {format(new Date(historicalData.baseSnapshot.date), "yyyy-MM-dd", { locale: ko })}
@@ -615,7 +617,7 @@ export function StockItemDetailModal({
                               ))}
                             </div>
                           )}
-                        </p>
+                        </div>
                       </div>
                     </div>
                   </div>
