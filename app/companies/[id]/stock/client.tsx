@@ -120,6 +120,7 @@ function StockClientInner({ companyId }: StockClientProps) {
         title: '오류',
         description: errorMessage,
         variant: 'destructive',
+        duration: 1000,
       });
     } finally {
       setIsLoading(false);

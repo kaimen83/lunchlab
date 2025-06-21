@@ -57,6 +57,7 @@
     "date-fns": "^3.6.0",
     "lucide-react": "^0.487.0",
     "next": "15.2.4",
+    "playwright": "^1.53.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.55.0",

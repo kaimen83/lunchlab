@@ -327,10 +327,10 @@ export async function PATCH(
           try {
             console.log(`재고 반영 중: ${item.item_name} (${item.stock_item_id}) - ${item.actual_quantity}`);
             
-            // 먼저 현재 재고 정보 확인
+            // 먼저 현재 재고 정보 확인 (창고 정보 포함)
             const { data: currentStock, error: selectError } = await supabase
               .from('stock_items')
-              .select('id, current_quantity, company_id')
+              .select('id, current_quantity, company_id, warehouse_id')
               .eq('id', item.stock_item_id)
               .single();
             
@@ -340,9 +340,16 @@ export async function PATCH(
               continue;
             }
             
-            console.log(`현재 재고 확인: ${item.item_name} - 기존: ${currentStock.current_quantity}, 신규: ${item.actual_quantity}`);
+            // 창고 ID 일치 확인 (실사 대상 창고와 재고 아이템의 창고가 같은지 확인)
+            if (audit.warehouse_id && currentStock.warehouse_id !== audit.warehouse_id) {
+              console.error(`창고 불일치 (${item.item_name}): 실사 창고=${audit.warehouse_id}, 재고 창고=${currentStock.warehouse_id}`);
+              errors.push(`${item.item_name}: 창고 불일치 오류 - 실사 대상 창고와 재고 아이템의 창고가 다릅니다`);
+              continue;
+            }
             
-            // 재고량 업데이트
+            console.log(`현재 재고 확인: ${item.item_name} - 기존: ${currentStock.current_quantity}, 신규: ${item.actual_quantity}, 창고: ${currentStock.warehouse_id}`);
+            
+            // 재고량 업데이트 - 창고 ID도 함께 확인하여 보안 강화
             const { data: updateResult, error: updateError } = await supabase
               .from('stock_items')
               .update({ 
@@ -350,8 +357,9 @@ export async function PATCH(
                 last_updated: new Date().toISOString()
               })
               .eq('id', item.stock_item_id)
-              .eq('company_id', companyId) // 추가 보안을 위해 company_id도 확인
-              .select('id, current_quantity');
+              .eq('company_id', companyId) // 회사 ID 확인
+              .eq('warehouse_id', audit.warehouse_id || currentStock.warehouse_id) // 창고 ID 확인
+              .select('id, current_quantity, warehouse_id');
 
             if (updateError) {
               console.error(`재고량 업데이트 오류 (${item.item_name}):`, updateError);
@@ -360,14 +368,14 @@ export async function PATCH(
               console.log(`재고량 업데이트 성공: ${item.item_name} -> ${updateResult[0].current_quantity}`);
               updatedCount++;
               
-              // 재고 거래 기록 생성 (실사 조정) - 실사 날짜를 거래 날짜로 사용
+              // 재고 거래 기록 생성 (실사 조정) - 현재 시간을 거래 날짜로 사용
               const { error: transactionError } = await supabase
                 .from('stock_transactions')
                 .insert({
                   stock_item_id: item.stock_item_id,
                   transaction_type: 'adjustment',
                   quantity: Number(item.difference) || 0,
-                  transaction_date: audit.audit_date, // 실사 날짜를 거래 날짜로 사용
+                  transaction_date: new Date().toISOString(), // 현재 시간을 거래 날짜로 사용
                   user_id: userId,
                   reference_id: auditId,
                   reference_type: 'stock_audit',
@@ -452,6 +460,103 @@ export async function PATCH(
 
   } catch (error) {
     console.error('실사 완료 API 오류:', error);
+    return NextResponse.json(
+      { error: '서버 오류가 발생했습니다.' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * 재고 실사 삭제 API
+ * 
+ * @route DELETE /api/companies/[id]/stock/audits/[auditId]
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; auditId: string }> }
+) {
+  try {
+    const { id: companyId, auditId } = await params;
+    const { userId } = await auth();
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: '인증이 필요합니다.' },
+        { status: 401 }
+      );
+    }
+
+    const supabase = createServerSupabaseClient();
+
+    // 사용자가 회사의 멤버인지 확인
+    const { data: membership, error: membershipError } = await supabase
+      .from('company_memberships')
+      .select('role')
+      .eq('company_id', companyId)
+      .eq('user_id', userId)
+      .single();
+
+    if (membershipError || !membership) {
+      return NextResponse.json(
+        { error: '이 회사에 접근할 권한이 없습니다.' },
+        { status: 403 }
+      );
+    }
+
+    // 소유자 또는 관리자만 삭제 가능
+    if (membership.role !== 'owner' && membership.role !== 'admin') {
+      return NextResponse.json(
+        { error: '실사를 삭제할 권한이 없습니다. 소유자 또는 관리자만 삭제할 수 있습니다.' },
+        { status: 403 }
+      );
+    }
+
+    // 실사 세션 존재 확인
+    const { data: audit, error: auditError } = await supabase
+      .from('stock_audits')
+      .select('*')
+      .eq('id', auditId)
+      .eq('company_id', companyId)
+      .single();
+
+    if (auditError || !audit) {
+      return NextResponse.json(
+        { error: '실사 정보를 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
+    // 완료된 실사는 삭제 불가
+    if (audit.status === 'completed') {
+      return NextResponse.json(
+        { error: '완료된 실사는 삭제할 수 없습니다.' },
+        { status: 400 }
+      );
+    }
+
+    // 실사 삭제 (CASCADE로 stock_audit_items도 자동 삭제됨)
+    const { error: deleteError } = await supabase
+      .from('stock_audits')
+      .delete()
+      .eq('id', auditId)
+      .eq('company_id', companyId);
+
+    if (deleteError) {
+      console.error('실사 삭제 오류:', deleteError);
+      return NextResponse.json(
+        { error: '실사를 삭제하는데 실패했습니다.' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      message: '실사가 성공적으로 삭제되었습니다.',
+      deletedAuditId: auditId
+    });
+
+  } catch (error) {
+    console.error('실사 삭제 API 오류:', error);
     return NextResponse.json(
       { error: '서버 오류가 발생했습니다.' },
       { status: 500 }

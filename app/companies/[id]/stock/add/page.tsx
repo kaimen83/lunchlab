@@ -134,6 +134,7 @@ export default function AddStockItemPage({ params }: AddStockItemPageProps) {
         title: "오류 발생",
         description: "식자재 목록을 가져오는 중 문제가 발생했습니다.",
         variant: "destructive",
+        duration: 1000,
       });
     } finally {
       setIsLoading(false);
@@ -158,6 +159,7 @@ export default function AddStockItemPage({ params }: AddStockItemPageProps) {
         title: "오류 발생",
         description: "용기 목록을 가져오는 중 문제가 발생했습니다.",
         variant: "destructive",
+        duration: 1000,
       });
     } finally {
       setIsLoading(false);
@@ -208,6 +210,7 @@ export default function AddStockItemPage({ params }: AddStockItemPageProps) {
       toast({
         title: "재고 항목이 생성되었습니다",
         description: "재고 항목이 성공적으로 추가되었습니다.",
+        duration: 1000,
       });
 
       // 생성된 항목 페이지로 이동
@@ -218,6 +221,7 @@ export default function AddStockItemPage({ params }: AddStockItemPageProps) {
         title: "재고 항목 생성 실패",
         description: error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다",
         variant: "destructive",
+        duration: 1000,
       });
     } finally {
       setIsSubmitting(false);

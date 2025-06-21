@@ -151,6 +151,7 @@ export function StockItemDetailModal({
         title: "오류 발생",
         description: error instanceof Error ? error.message : "재고 항목 정보를 가져오는 중 문제가 발생했습니다.",
         variant: "destructive",
+        duration: 1000,
       });
     } finally {
       setIsLoading(false);
@@ -210,6 +211,7 @@ export function StockItemDetailModal({
         title: "오류 발생",
         description: error instanceof Error ? error.message : "거래 내역을 가져오는 중 문제가 발생했습니다.",
         variant: "destructive",
+        duration: 1000,
       });
     }
   };
@@ -235,6 +237,7 @@ export function StockItemDetailModal({
         toast({
           title: "조회 완료",
           description: `${format(new Date(dateString), 'yyyy년 MM월 dd일', { locale: ko })} 재고 현황을 조회했습니다.`,
+          duration: 1000,
         });
       } else {
         // 404 오류 또는 데이터가 없는 경우
@@ -243,12 +246,14 @@ export function StockItemDetailModal({
             title: "데이터 없음",
             description: `${format(new Date(dateString), 'yyyy년 MM월 dd일', { locale: ko })}에는 재고 데이터가 없습니다. 재고 생성 이후의 날짜를 선택해주세요.`,
             variant: "default",
+            duration: 1000,
           });
         } else {
           toast({
             title: "조회 실패",
             description: result.error || "특정 날짜 재고 조회 중 문제가 발생했습니다.",
             variant: "destructive",
+            duration: 1000,
           });
         }
         setHistoricalData(null);
@@ -259,6 +264,7 @@ export function StockItemDetailModal({
         title: "조회 실패",
         description: "네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
         variant: "destructive",
+        duration: 1000,
       });
       setHistoricalData(null);
     } finally {

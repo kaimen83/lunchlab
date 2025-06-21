@@ -148,6 +148,7 @@ export default function StockItemsPage({ companyId, selectedItemType = "ingredie
         title: "오류 발생",
         description: "재고 항목을 가져오는 중 문제가 발생했습니다.",
         variant: "destructive",
+        duration: 1000,
       });
     } finally {
       setIsLoading(false);

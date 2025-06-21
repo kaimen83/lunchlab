@@ -24,7 +24,8 @@ import {
   Save,
   RotateCcw,
   Warehouse,
-  X
+  X,
+  Trash2
 } from "lucide-react";
 import { StockAudit, StockAuditItem, StockAuditDetailResponse, CreateStockAuditRequest } from "@/types/stock-audit";
 import WarehouseSelector from "@/components/stock/WarehouseSelector";
@@ -45,6 +46,8 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [editingItem, setEditingItem] = useState<StockAuditItem | null>(null);
+  const [userRole, setUserRole] = useState<'owner' | 'admin' | 'member' | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // 엑셀시트 형태 편집을 위한 상태
   const [pendingChanges, setPendingChanges] = useState<Map<string, { actual_quantity?: number; notes?: string }>>(new Map());
@@ -135,6 +138,20 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
     notes: ''
   });
 
+  // 사용자 권한 조회
+  const fetchUserRole = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/membership`);
+      if (!response.ok) throw new Error('사용자 권한 조회 실패');
+      
+      const data = await response.json();
+      setUserRole(data.role);
+    } catch (error) {
+      console.error('사용자 권한 조회 오류:', error);
+      setUserRole('member'); // 기본값으로 member 설정
+    }
+  }, [companyId]);
+
   // 실사 목록 조회
   const fetchAudits = useCallback(async () => {
     try {
@@ -149,6 +166,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
         title: "오류 발생",
         description: "실사 목록을 가져오는 중 문제가 발생했습니다.",
         variant: "destructive",
+        duration: 1000,
       });
     }
   }, [companyId, toast]);
@@ -177,6 +195,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
         title: "오류 발생",
         description: "실사 상세 정보를 가져오는 중 문제가 발생했습니다.",
         variant: "destructive",
+        duration: 1000,
       });
     } finally {
       setIsLoading(false);
@@ -190,6 +209,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
         title: "입력 오류",
         description: "실사명을 입력해주세요.",
         variant: "destructive",
+        duration: 1000,
       });
       return;
     }
@@ -217,6 +237,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
       toast({
         title: "실사 생성 완료",
         description: itemsInfo,
+        duration: 1000,
       });
       
       // 폼 초기화 및 목록 새로고침
@@ -240,6 +261,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
         title: "오류 발생",
         description: error instanceof Error ? error.message : "실사 생성 중 문제가 발생했습니다.",
         variant: "destructive",
+        duration: 1000,
       });
     } finally {
       setIsCreating(false);
@@ -253,6 +275,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
         title: "입력 오류",
         description: "실사량을 입력해주세요.",
         variant: "destructive",
+        duration: 1000,
       });
       return;
     }
@@ -275,6 +298,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
       toast({
         title: "업데이트 완료",
         description: "실사량이 성공적으로 업데이트되었습니다.",
+        duration: 1000,
       });
       
       // 폼 초기화 및 상세 정보 새로고침
@@ -289,6 +313,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
         title: "오류 발생",
         description: "실사량 업데이트 중 문제가 발생했습니다.",
         variant: "destructive",
+        duration: 1000,
       });
     }
   };
@@ -321,6 +346,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
       toast({
         title: "저장 완료",
         description: `${data.updated_count}개 항목이 성공적으로 저장되었습니다.`,
+        duration: 1000,
       });
       
       // 변경사항 초기화 및 데이터 새로고침
@@ -334,6 +360,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
         title: "저장 실패",
         description: error instanceof Error ? error.message : "저장 중 문제가 발생했습니다.",
         variant: "destructive",
+        duration: 1000,
       });
     } finally {
       setIsSaving(false);
@@ -347,6 +374,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
     toast({
       title: "변경사항 취소",
       description: "모든 변경사항이 취소되었습니다.",
+      duration: 1000,
     });
   };
 
@@ -388,6 +416,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
         description: applyDifferences 
           ? `실사가 완료되고 ${data.applied_count || 0}개 항목의 재고량이 반영되었습니다.`
           : "실사가 완료되었습니다.",
+        duration: 1000,
       });
       
       await fetchAudits();
@@ -398,6 +427,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
         title: "오류 발생",
         description: "실사 완료 처리 중 문제가 발생했습니다.",
         variant: "destructive",
+        duration: 1000,
       });
     }
   };
@@ -424,7 +454,50 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
     completeAudit(shouldApply);
   };
 
+  // 실사 삭제 함수
+  const deleteAudit = async (auditId: string) => {
+    if (!window.confirm('정말로 이 실사를 삭제하시겠습니까?\n삭제된 실사는 복구할 수 없습니다.')) {
+      return;
+    }
 
+    try {
+      setIsDeleting(true);
+      
+      const response = await fetch(`/api/companies/${companyId}/stock/audits/${auditId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '실사 삭제 실패');
+      }
+
+      toast({
+        title: "삭제 완료",
+        description: "실사가 성공적으로 삭제되었습니다.",
+        duration: 1000,
+      });
+
+      // 실사 목록 새로고침
+      await fetchAudits();
+      
+      // 삭제된 실사가 현재 선택된 실사라면 선택 해제
+      if (currentAudit?.audit.id === auditId) {
+        setCurrentAudit(null);
+      }
+      
+    } catch (error) {
+      console.error('실사 삭제 오류:', error);
+      toast({
+        title: "삭제 실패",
+        description: error instanceof Error ? error.message : "실사 삭제 중 문제가 발생했습니다.",
+        variant: "destructive",
+        duration: 1000,
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // 상태별 색상 및 아이콘
   const getStatusInfo = (status: string) => {
@@ -548,8 +621,9 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
 
   // 초기 데이터 로딩
   useEffect(() => {
+    fetchUserRole();
     fetchAudits();
-  }, [fetchAudits]);
+  }, [fetchUserRole, fetchAudits]);
 
   // 필터 변경 시 상세 정보 새로고침 (페이지는 1로 리셋)
   useEffect(() => {
@@ -672,28 +746,51 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
               {audits.map((audit) => (
                 <div
                   key={audit.id}
-                  className={`p-2.5 rounded-md border cursor-pointer transition-colors ${
+                  className={`p-2.5 rounded-md border transition-colors ${
                     currentAudit?.audit.id === audit.id 
                       ? 'border-blue-500 bg-blue-50' 
                       : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                   }`}
-                  onClick={() => fetchAuditDetail(audit.id, 1)}
                 >
-                  <div className="flex items-start justify-between mb-1">
-                    <h3 className="font-medium text-sm leading-tight line-clamp-2">{audit.name}</h3>
-                    <Badge 
-                      variant={audit.status === 'completed' ? 'default' : 'secondary'}
-                      className="text-xs px-1.5 py-0.5 ml-2 flex-shrink-0"
-                    >
-                      {audit.status === 'completed' ? '완료' : '진행중'}
-                    </Badge>
+                  <div 
+                    className="cursor-pointer"
+                    onClick={() => fetchAuditDetail(audit.id, 1)}
+                  >
+                    <div className="flex items-start justify-between mb-1">
+                      <h3 className="font-medium text-sm leading-tight line-clamp-2">{audit.name}</h3>
+                      <Badge 
+                        variant={audit.status === 'completed' ? 'default' : 'secondary'}
+                        className="text-xs px-1.5 py-0.5 ml-2 flex-shrink-0"
+                      >
+                        {audit.status === 'completed' ? '완료' : '진행중'}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {new Date(audit.created_at).toLocaleDateString('ko-KR', {
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    {new Date(audit.created_at).toLocaleDateString('ko-KR', {
-                      month: 'short',
-                      day: 'numeric'
-                    })}
-                  </p>
+                  
+                  {/* 삭제 버튼 - 소유자/관리자만 표시, 완료되지 않은 실사만 */}
+                  {(userRole === 'owner' || userRole === 'admin') && audit.status !== 'completed' && (
+                    <div className="flex justify-end mt-2 pt-2 border-t border-gray-100">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteAudit(audit.id);
+                        }}
+                        disabled={isDeleting}
+                        className="h-6 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        삭제
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
               
@@ -980,7 +1077,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
                             
                             {/* 창고 */}
                             <div className="w-20 text-center text-gray-600">
-                              {selectedWarehouseId ? '지정됨' : '미지정'}
+                              {currentAudit?.warehouse?.name || '미지정'}
                             </div>
                             
                             {/* 장부량 */}

@@ -247,6 +247,7 @@ export function CookingPlanImportModal({
         title: '날짜를 선택해주세요',
         description: '조리계획서를 조회할 날짜를 선택해주세요.',
         variant: 'destructive',
+        duration: 1000,
       });
       return;
     }
@@ -275,11 +276,13 @@ export function CookingPlanImportModal({
         toast({
           title: '조리계획서가 없습니다',
           description: result.data.message || '해당 날짜의 조리계획서가 없습니다.',
+          duration: 1000,
         });
       } else {
         toast({
           title: '조리계획서를 불러왔습니다',
           description: `식재료 ${result.data.ingredients.length}개, 용기 ${result.data.containers.length}개 항목을 찾았습니다.`,
+          duration: 1000,
         });
       }
     } catch (error) {
@@ -288,6 +291,7 @@ export function CookingPlanImportModal({
         title: '조회 실패',
         description: '조리계획서를 조회하는 중 오류가 발생했습니다.',
         variant: 'destructive',
+        duration: 1000,
       });
     } finally {
       safeSetState(() => setIsLoading(false));
@@ -355,6 +359,7 @@ export function CookingPlanImportModal({
         title: '항목을 선택해주세요',
         description: '출고할 항목을 선택해주세요.',
         variant: 'destructive',
+        duration: 1000,
       });
       return;
     }
@@ -521,6 +526,7 @@ export function CookingPlanImportModal({
           title: '처리할 수 있는 항목이 없습니다',
           description: failedItems.length > 0 ? `실패한 항목: ${failedItems.join(', ')}` : '모든 항목 처리에 실패했습니다.',
           variant: 'destructive',
+          duration: 1000,
         });
         return;
       }
@@ -533,6 +539,7 @@ export function CookingPlanImportModal({
             title: '창고가 선택되지 않은 항목이 있습니다',
             description: `${itemsWithoutWarehouse.map(item => item.name).join(", ")}의 창고를 선택해주세요.`,
             variant: 'destructive',
+            duration: 1000,
           });
           return;
         }
@@ -541,6 +548,7 @@ export function CookingPlanImportModal({
           title: '창고를 선택해주세요',
           description: '거래를 처리할 창고를 선택해주세요.',
           variant: 'destructive',
+          duration: 1000,
         });
         return;
       }
@@ -598,11 +606,13 @@ export function CookingPlanImportModal({
         toast({
           title: `일부 항목 처리 완료 (${successful}/${selectedItems.size - excludedCount})`,
           description: `실패한 항목: ${failedItems.join(', ')}${excludedInfo}`,
+          duration: 1000,
         });
       } else {
         toast({
           title: `일괄 ${transactionMode === 'incoming' ? '입고' : '출고'} 완료`,
           description: `${successful}개 항목이 성공적으로 ${transactionMode === 'incoming' ? '입고' : '출고'} 처리되었습니다.${groupInfo ? ` ${groupInfo}` : ''}${excludedInfo}`,
+          duration: 1000,
         });
       }
 
@@ -621,6 +631,7 @@ export function CookingPlanImportModal({
         title: `${transactionMode === 'incoming' ? '입고' : '출고'} 처리 실패`,
         description: error instanceof Error ? error.message : `일괄 ${transactionMode === 'incoming' ? '입고' : '출고'} 처리 중 오류가 발생했습니다.`,
         variant: 'destructive',
+        duration: 1000,
       });
     } finally {
       safeSetState(() => setIsProcessing(false));

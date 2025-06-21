@@ -84,6 +84,7 @@ export default function StockItemDetailPage({ params }: StockItemDetailProps) {
         title: "오류 발생",
         description: "재고 항목 정보를 가져오는 중 문제가 발생했습니다.",
         variant: "destructive",
+        duration: 1000,
       });
     } finally {
       setIsLoading(false);
@@ -116,6 +117,7 @@ export default function StockItemDetailPage({ params }: StockItemDetailProps) {
         title: "오류 발생",
         description: "거래 내역을 가져오는 중 문제가 발생했습니다.",
         variant: "destructive",
+        duration: 1000,
       });
     }
   };
@@ -148,6 +150,7 @@ export default function StockItemDetailPage({ params }: StockItemDetailProps) {
       toast({
         title: "거래가 생성되었습니다",
         description: `${transactionData.type === "in" ? "입고" : "출고"} 거래가 성공적으로 처리되었습니다.`,
+        duration: 1000,
       });
 
       // 거래 처리 후 재고 정보 및 거래 내역 갱신
@@ -166,6 +169,7 @@ export default function StockItemDetailPage({ params }: StockItemDetailProps) {
         title: "거래 생성 실패",
         description: error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다",
         variant: "destructive",
+        duration: 1000,
       });
     } finally {
       setIsTransacting(false);

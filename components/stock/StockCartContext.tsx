@@ -70,6 +70,7 @@ export function StockCartProvider({
         title: "이미 추가된 항목입니다",
         description: "장바구니에 이미 추가된 항목입니다.",
         variant: "default",
+        duration: 1000,
       });
       return;
     }
@@ -91,6 +92,7 @@ export function StockCartProvider({
     toast({
       title: "항목이 추가되었습니다",
       description: `${item.name || item.details?.name || "알 수 없음"}이(가) 장바구니에 추가되었습니다.`,
+      duration: 1000,
     });
   };
 
@@ -127,6 +129,7 @@ export function StockCartProvider({
       toast({
         title: "대상 창고가 초기화되었습니다",
         description: "원본 창고와 다른 창고를 선택해주세요.",
+        duration: 1000,
       });
     }
   }, [transactionType, destinationWarehouseId, toast]);
@@ -141,6 +144,7 @@ export function StockCartProvider({
       toast({
         title: "원본 창고가 초기화되었습니다",
         description: "대상 창고와 다른 창고를 선택해주세요.",
+        duration: 1000,
       });
     }
   }, [transactionType, selectedWarehouseId, toast]);
@@ -158,6 +162,7 @@ export function StockCartProvider({
         title: "장바구니가 비어있습니다",
         description: "처리할 항목이 없습니다.",
         variant: "destructive",
+        duration: 1000,
       });
       return false;
     }
@@ -170,6 +175,7 @@ export function StockCartProvider({
           title: "창고가 선택되지 않은 항목이 있습니다",
           description: `${itemsWithoutWarehouse.map(item => item.name).join(", ")}의 창고를 선택해주세요.`,
           variant: "destructive",
+          duration: 1000,
         });
         return false;
       }
@@ -180,6 +186,7 @@ export function StockCartProvider({
           title: "창고를 선택해주세요",
           description: "거래를 처리할 창고를 선택해주세요.",
           variant: "destructive",
+          duration: 1000,
         });
         return false;
       }
@@ -192,6 +199,7 @@ export function StockCartProvider({
           title: "원본 창고를 선택해주세요",
           description: "이동할 재고가 있는 원본 창고를 선택해주세요.",
           variant: "destructive",
+          duration: 1000,
         });
         return false;
       }
@@ -201,6 +209,7 @@ export function StockCartProvider({
           title: "대상 창고를 선택해주세요",
           description: "재고를 이동할 대상 창고를 선택해주세요.",
           variant: "destructive",
+          duration: 1000,
         });
         return false;
       }
@@ -210,6 +219,7 @@ export function StockCartProvider({
           title: "원본과 대상 창고가 같습니다",
           description: "원본 창고와 대상 창고는 서로 달라야 합니다.",
           variant: "destructive",
+          duration: 1000,
         });
         return false;
       }
@@ -256,6 +266,7 @@ export function StockCartProvider({
       toast({
         title: "일괄 거래가 생성되었습니다",
         description: `${transactionTypeName} 거래가 성공적으로 처리되었습니다. (${warehouseInfo})`,
+        duration: 1000,
       });
 
       // 성공 후 장바구니 비우기
@@ -268,6 +279,7 @@ export function StockCartProvider({
         title: "일괄 거래 생성 실패",
         description: error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다",
         variant: "destructive",
+        duration: 1000,
       });
       return false;
     }
