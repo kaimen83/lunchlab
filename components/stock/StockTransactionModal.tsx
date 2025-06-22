@@ -214,17 +214,17 @@ export function StockTransactionModal({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="text-xl">재고 거래 생성</DialogTitle>
             <DialogDescription>
               재고 항목을 선택하여 입고 또는 출고 거래를 생성합니다
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-hidden">
-            <Tabs className="w-full h-full" value={activeTab} onValueChange={handleTabChange}>
-              <div className="pb-4">
+          <div className="flex-1 min-h-0">
+            <Tabs className="w-full h-full flex flex-col" value={activeTab} onValueChange={handleTabChange}>
+              <div className="pb-4 flex-shrink-0">
                 <TabsList className="grid w-full grid-cols-2 bg-muted/50">
                   <TabsTrigger value="quick" className="gap-2">
                     <Zap className="h-4 w-4" />
@@ -238,9 +238,9 @@ export function StockTransactionModal({
               </div>
 
               {/* 빠른 설정 탭 */}
-              <TabsContent value="quick" className="mt-4 h-full">
-                <ScrollArea className="h-[55vh]">
-                  <div className="space-y-6 pr-4">
+              <TabsContent value="quick" className="mt-4 flex-1 min-h-0">
+                <div className="h-full max-h-[calc(90vh-200px)] overflow-y-auto pr-2">
+                  <div className="space-y-6">
                     <div className="flex items-center gap-2 mb-3">
                       <Zap className="h-4 w-4 text-primary" />
                       <Label className="text-sm font-medium">조리계획서에서 자동 불러오기</Label>
@@ -277,13 +277,13 @@ export function StockTransactionModal({
                       </Card>
                     </div>
                   </div>
-                </ScrollArea>
+                </div>
               </TabsContent>
 
               {/* 수동 설정 탭 */}
-              <TabsContent value="manual" className="mt-4 h-full">
-                <ScrollArea className="h-[55vh]">
-                  <div className="space-y-6 pr-4">
+              <TabsContent value="manual" className="mt-4 flex-1 min-h-0">
+                <div className="h-full max-h-[calc(90vh-200px)] overflow-y-auto pr-2">
+                  <div className="space-y-6">
                     {/* 거래 설정 섹션 */}
                     <Card>
                       <CardHeader className="pb-3">
@@ -473,7 +473,8 @@ export function StockTransactionModal({
                             </p>
                           </div>
                         ) : (
-                          <div className="space-y-2 max-h-64 overflow-y-auto">
+                          <div className="max-h-60 overflow-y-auto">
+                            <div className="space-y-2 pr-2">
                             {items.map((item, index) => (
                               <CartItemRow
                                 key={item.stockItemId}
@@ -486,6 +487,7 @@ export function StockTransactionModal({
                                 isLast={index === items.length - 1}
                               />
                             ))}
+                            </div>
                           </div>
                         )}
                       </CardContent>
@@ -509,37 +511,15 @@ export function StockTransactionModal({
                       </Card>
                     )}
                   </div>
-                </ScrollArea>
+                </div>
               </TabsContent>
             </Tabs>
           </div>
 
           {/* 실행 버튼 */}
           {items.length > 0 && (
-            <DialogFooter className="border-t pt-4">
-              <div className="w-full space-y-4">
-                {/* 요약 정보 */}
-                <div className="flex items-center justify-between text-sm bg-muted/50 rounded-lg p-4">
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "w-3 h-3 rounded-full",
-                      transactionType === "in" ? "bg-green-500" : transactionType === "out" ? "bg-red-500" : "bg-blue-500"
-                    )} />
-                    <span className="font-medium">
-                      {transactionType === "in" ? "입고" : transactionType === "out" ? "출고" : "창고간 이동"} 거래
-                    </span>
-                    {useMultipleWarehouses && (
-                      <Badge variant="outline" className="text-xs">
-                        다중 창고
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Package className="h-4 w-4" />
-                    <span>{items.length}개 항목</span>
-                  </div>
-                </div>
-                
+            <DialogFooter className="border-t pt-4 flex-shrink-0">
+              <div className="w-full">
                 {/* 버튼들 */}
                 <div className="flex gap-3">
                   <Button
@@ -570,10 +550,12 @@ export function StockTransactionModal({
                       <>
                         {transactionType === "in" ? (
                           <ArrowDown className="mr-2 h-4 w-4" />
-                        ) : (
+                        ) : transactionType === "out" ? (
                           <ArrowUp className="mr-2 h-4 w-4" />
+                        ) : (
+                          <Warehouse className="mr-2 h-4 w-4" />
                         )}
-                        {transactionType === "in" ? "입고" : "출고"} 처리
+                        {transactionType === "in" ? "입고" : transactionType === "out" ? "출고" : "이동"} 처리 ({items.length}개)
                       </>
                     )}
                   </Button>
