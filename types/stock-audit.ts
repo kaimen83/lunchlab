@@ -42,7 +42,7 @@ export interface CreateStockAuditRequest {
   audit_date: string; // 실사 날짜 (YYYY-MM-DD 형식)
   warehouse_id?: string; // 창고 ID (선택사항, 없으면 기본 창고 사용)
   item_types?: ('ingredient' | 'container')[]; // 포함할 항목 타입
-  stock_grade?: string; // 재고등급 필터 (선택사항, 없으면 모든 등급)
+  stock_grades?: string[]; // 재고등급 필터 배열 (복수 선택 가능, '용기'도 포함)
 }
 
 // 실사 항목 업데이트 요청 타입

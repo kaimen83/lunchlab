@@ -131,7 +131,7 @@ export async function POST(
 
     // 요청 본문 파싱
     const body: CreateStockAuditRequest = await request.json();
-    const { name, description, audit_date, item_types = ['ingredient', 'container'], warehouse_id, stock_grade } = body;
+    const { name, description, audit_date, item_types = ['ingredient'], warehouse_id, stock_grades = [] } = body;
 
     if (!name || name.trim() === '') {
       return NextResponse.json(
@@ -204,9 +204,16 @@ export async function POST(
         .eq('company_id', companyId)
         .not('stock_grade', 'is', null); // 재고관리 등급이 있는 식자재만
       
-      // 재고등급 필터 적용
-      if (stock_grade && stock_grade.trim() !== '') {
-        ingredientsQuery = ingredientsQuery.eq('stock_grade', stock_grade.trim());
+      // 재고등급 필터 적용 (복수 등급 지원)
+      if (stock_grades && stock_grades.length > 0) {
+        // '용기'를 제외한 등급들만 필터링
+        const ingredientGrades = stock_grades.filter(g => g !== '용기');
+        if (ingredientGrades.length > 0) {
+          ingredientsQuery = ingredientsQuery.in('stock_grade', ingredientGrades);
+        } else if (!stock_grades.includes('용기')) {
+          // 용기만 선택하고 식자재 등급이 없으면 식자재는 조회하지 않음
+          ingredientsQuery = ingredientsQuery.in('stock_grade', ['__no_match__']); // 절대 매치되지 않는 값
+        }
       }
       
       const { data: ingredients, error: ingredientsError } = await ingredientsQuery;
@@ -392,6 +399,7 @@ export async function POST(
     }
 
     console.log(`실사 생성: 회사 ${companyId}에서 ${allItems.length}개 항목 조회됨`);
+    console.log(`선택된 재고등급: ${stock_grades.length > 0 ? stock_grades.join(', ') : '전체'}`);
     console.log(`항목 타입별 분포:`, allItems.reduce((acc, item) => {
       acc[item.item_type] = (acc[item.item_type] || 0) + 1;
       return acc;

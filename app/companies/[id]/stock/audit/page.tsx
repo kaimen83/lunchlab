@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -90,7 +90,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
   };
   
   // 선택된 날짜와 창고 기반 실사명 생성
-  const getAuditNameByDate = (date: Date, warehouseId?: string) => {
+  const getAuditNameByDate = (date: Date, warehouseId?: string, stockGrades?: string[]) => {
     const year = date.getFullYear();
     const month = date.getMonth() + 1;
     const day = date.getDate();
@@ -99,7 +99,25 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
     const warehouse = warehouses.find(w => w.id === warehouseId);
     const warehouseName = warehouse?.name || '미지정창고';
     
-    return `${year}년 ${month}월 ${day}일 ${warehouseName} 실사`;
+    // 등급 표시
+    let gradeSuffix = '';
+    if (stockGrades && stockGrades.length > 0) {
+      // '용기'를 제외한 등급들만 필터링
+      const grades = stockGrades.filter(g => g !== '용기');
+      if (grades.length > 0) {
+        gradeSuffix = `(${grades.join(', ')} 등급)`;
+      }
+      // 용기만 선택된 경우
+      if (stockGrades.includes('용기') && grades.length === 0) {
+        gradeSuffix = '(용기)';
+      }
+      // 등급과 용기가 함께 선택된 경우
+      if (stockGrades.includes('용기') && grades.length > 0) {
+        gradeSuffix = `(${grades.join(', ')} 등급, 용기)`;
+      }
+    }
+    
+    return `${year}년 ${month}월 ${day}일 ${warehouseName} 실사${gradeSuffix}`;
   };
 
   // 날짜 선택 상태
@@ -112,7 +130,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
     setSelectedAuditDate(date);
     setNewAuditForm(prev => ({
       ...prev,
-      name: getAuditNameByDate(date, selectedWarehouseId),
+      name: getAuditNameByDate(date, selectedWarehouseId, prev.stock_grades),
       audit_date: format(date, 'yyyy-MM-dd'),
       warehouse_id: selectedWarehouseId || '' // 창고 ID 유지
     }));
@@ -124,8 +142,34 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
     setNewAuditForm(prev => ({
       ...prev,
       warehouse_id: warehouseId || '',
-      name: getAuditNameByDate(selectedAuditDate, warehouseId || undefined) // 창고 변경 시 실사명도 업데이트
+      name: getAuditNameByDate(selectedAuditDate, warehouseId || undefined, prev.stock_grades) // 창고 변경 시 실사명도 업데이트
     }));
+  };
+
+  // 재고등급 체크박스 변경 핸들러
+  const handleStockGradeChange = (grade: string, checked: boolean) => {
+    setNewAuditForm(prev => {
+      const currentGrades = prev.stock_grades || [];
+      let newGrades: string[];
+      
+      if (checked) {
+        newGrades = [...currentGrades, grade];
+      } else {
+        newGrades = currentGrades.filter(g => g !== grade);
+      }
+      
+      // item_types 업데이트: '용기' 선택 여부에 따라 container 포함/제외
+      const newItemTypes = newGrades.includes('용기') 
+        ? ['ingredient', 'container'] as ('ingredient' | 'container')[]
+        : ['ingredient'] as ('ingredient' | 'container')[];
+      
+      return {
+        ...prev,
+        stock_grades: newGrades,
+        item_types: newItemTypes,
+        name: getAuditNameByDate(selectedAuditDate, selectedWarehouseId, newGrades)
+      };
+    });
   };
 
   // 새 실사 생성 폼 - 초기값은 빈 상태로 시작
@@ -134,8 +178,8 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
     description: '',
     audit_date: format(new Date(), 'yyyy-MM-dd'), // YYYY-MM-DD 형식
     warehouse_id: selectedWarehouseId || '', // 창고 ID 추가
-    item_types: ['ingredient', 'container'] as ('ingredient' | 'container')[],
-    stock_grade: '' // 재고등급 필터 추가
+    item_types: ['ingredient'] as ('ingredient' | 'container')[], // 기본값은 식자재만
+    stock_grades: [] as string[] // 재고등급 필터 배열
   });
   
   // 모달 상태 관리
@@ -267,12 +311,12 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
       const today = new Date();
       setSelectedAuditDate(today);
       setNewAuditForm({ 
-        name: getAuditNameByDate(today, selectedWarehouseId), 
+        name: getAuditNameByDate(today, selectedWarehouseId, []), 
         description: '', 
         audit_date: format(today, 'yyyy-MM-dd'),
         warehouse_id: selectedWarehouseId || '', // 창고 ID 추가
-        item_types: ['ingredient', 'container'],
-        stock_grade: '' // 재고등급 초기화
+        item_types: ['ingredient'], // 기본값은 식자재만
+        stock_grades: [] // 재고등급 초기화
       });
       setIsCreateModalOpen(false); // 모달 닫기
       await fetchAudits();
@@ -655,7 +699,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
     if (warehouses.length > 0 && !newAuditForm.name) {
       setNewAuditForm(prev => ({
         ...prev,
-        name: getAuditNameByDate(selectedAuditDate, selectedWarehouseId)
+        name: getAuditNameByDate(selectedAuditDate, selectedWarehouseId, prev.stock_grades)
       }));
     }
   }, [warehouses, selectedWarehouseId, selectedAuditDate]);
@@ -700,7 +744,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
               <div className="bg-blue-50 p-3 rounded-lg">
                 <p className="text-sm text-blue-800">
                   <strong>안내:</strong> 선택한 조건에 맞는 재고 항목들에 대해 실사가 생성됩니다.
-                  재고등급을 선택하면 해당 등급의 식자재만 실사 대상이 됩니다.
+                  재고등급을 선택하면 해당 등급의 식자재만, '용기'를 선택하면 용기가 포함됩니다.
                 </p>
               </div>
               
@@ -722,25 +766,39 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
               
               {/* 재고등급 선택 */}
               <div>
-                <Label htmlFor="stock-grade">재고등급 (선택사항)</Label>
-                <Select value={newAuditForm.stock_grade || 'all'} onValueChange={(value) => 
-                  setNewAuditForm(prev => ({ ...prev, stock_grade: value === 'all' ? '' : value }))
-                }>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="모든 등급" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">모든 등급</SelectItem>
-                    <SelectItem value="가">가등급</SelectItem>
-                    <SelectItem value="나">나등급</SelectItem>
-                    <SelectItem value="다">다등급</SelectItem>
-                    <SelectItem value="A">A등급</SelectItem>
-                    <SelectItem value="B">B등급</SelectItem>
-                    <SelectItem value="C">C등급</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-gray-500 mt-1">
-                  특정 등급의 식자재만 실사하려면 등급을 선택하세요. 선택하지 않으면 모든 등급이 포함됩니다.
+                <Label>재고등급 선택 (복수 선택 가능)</Label>
+                <div className="grid grid-cols-2 gap-3 mt-2">
+                  {['가', '나', '다', 'A', 'B', 'C'].map((grade) => (
+                    <div key={grade} className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`grade-${grade}`}
+                        checked={newAuditForm.stock_grades?.includes(grade) || false}
+                        onCheckedChange={(checked) => handleStockGradeChange(grade, checked as boolean)}
+                      />
+                      <label 
+                        htmlFor={`grade-${grade}`} 
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        {grade}등급
+                      </label>
+                    </div>
+                  ))}
+                  <div className="flex items-center space-x-2 col-span-2">
+                    <Checkbox 
+                      id="grade-container"
+                      checked={newAuditForm.stock_grades?.includes('용기') || false}
+                      onCheckedChange={(checked) => handleStockGradeChange('용기', checked as boolean)}
+                    />
+                    <label 
+                      htmlFor="grade-container" 
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      용기 포함
+                    </label>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  실사할 재고 등급을 선택하세요. 선택하지 않으면 모든 등급이 포함됩니다.
                 </p>
               </div>
 
