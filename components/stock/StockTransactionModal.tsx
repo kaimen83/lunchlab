@@ -173,6 +173,8 @@ export function StockTransactionModal({
     }
     // 조리계획서에서 아이템을 가져오면 수동 설정 탭으로 이동
     setActiveTab("manual");
+    // 모달 닫기
+    onOpenChange(false);
   };
 
   // 장바구니에 항목이 추가될 때 자동으로 수동 설정 탭으로 전환

@@ -736,7 +736,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
               새 실사 시작
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>새 재고 실사 생성</DialogTitle>
             </DialogHeader>

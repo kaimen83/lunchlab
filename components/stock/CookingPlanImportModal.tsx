@@ -619,11 +619,8 @@ export function CookingPlanImportModal({
       // 성공한 경우 모달 닫기 및 새로고침
       if (successful > 0) {
         onImportComplete();
-        setTimeout(() => {
-          if (isMountedRef.current) {
-            onOpenChange(false);
-          }
-        }, 100);
+        // 즉시 모달 닫기 (timeout 제거)
+        onOpenChange(false);
       }
     } catch (error) {
       console.error(`일괄 ${transactionMode === 'incoming' ? '입고' : '출고'} 처리 오류:`, error);
