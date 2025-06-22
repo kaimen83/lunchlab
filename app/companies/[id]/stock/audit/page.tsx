@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -43,6 +44,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
   const [audits, setAudits] = useState<StockAudit[]>([]);
   const [currentAudit, setCurrentAudit] = useState<StockAuditDetailResponse | null>(null);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | undefined>(initialWarehouseId);
+  const [warehouses, setWarehouses] = useState<{id: string, name: string}[]>([]); // 창고 목록
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [editingItem, setEditingItem] = useState<StockAuditItem | null>(null);
@@ -87,12 +89,17 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
     }
   };
   
-  // 선택된 날짜 기반 실사명 생성
-  const getAuditNameByDate = (date: Date) => {
+  // 선택된 날짜와 창고 기반 실사명 생성
+  const getAuditNameByDate = (date: Date, warehouseId?: string) => {
     const year = date.getFullYear();
     const month = date.getMonth() + 1;
     const day = date.getDate();
-    return `${year}년 ${month}월 ${day}일 정기실사`;
+    
+    // 창고명 찾기
+    const warehouse = warehouses.find(w => w.id === warehouseId);
+    const warehouseName = warehouse?.name || '미지정창고';
+    
+    return `${year}년 ${month}월 ${day}일 ${warehouseName} 실사`;
   };
 
   // 날짜 선택 상태
@@ -105,7 +112,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
     setSelectedAuditDate(date);
     setNewAuditForm(prev => ({
       ...prev,
-      name: getAuditNameByDate(date),
+      name: getAuditNameByDate(date, selectedWarehouseId),
       audit_date: format(date, 'yyyy-MM-dd'),
       warehouse_id: selectedWarehouseId || '' // 창고 ID 유지
     }));
@@ -116,17 +123,19 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
     setSelectedWarehouseId(warehouseId || undefined);
     setNewAuditForm(prev => ({
       ...prev,
-      warehouse_id: warehouseId || ''
+      warehouse_id: warehouseId || '',
+      name: getAuditNameByDate(selectedAuditDate, warehouseId || undefined) // 창고 변경 시 실사명도 업데이트
     }));
   };
 
-  // 새 실사 생성 폼
+  // 새 실사 생성 폼 - 초기값은 빈 상태로 시작
   const [newAuditForm, setNewAuditForm] = useState({
-    name: getAuditNameByDate(new Date()),
+    name: '',
     description: '',
     audit_date: format(new Date(), 'yyyy-MM-dd'), // YYYY-MM-DD 형식
     warehouse_id: selectedWarehouseId || '', // 창고 ID 추가
-    item_types: ['ingredient', 'container'] as ('ingredient' | 'container')[]
+    item_types: ['ingredient', 'container'] as ('ingredient' | 'container')[],
+    stock_grade: '' // 재고등급 필터 추가
   });
   
   // 모달 상태 관리
@@ -149,6 +158,20 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
     } catch (error) {
       console.error('사용자 권한 조회 오류:', error);
       setUserRole('member'); // 기본값으로 member 설정
+    }
+  }, [companyId]);
+
+  // 창고 목록 조회
+  const fetchWarehouses = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/warehouses`);
+      if (!response.ok) throw new Error('창고 목록 조회 실패');
+      
+      const data = await response.json();
+      setWarehouses(data.warehouses || []);
+    } catch (error) {
+      console.error('창고 목록 조회 오류:', error);
+      setWarehouses([]);
     }
   }, [companyId]);
 
@@ -244,11 +267,12 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
       const today = new Date();
       setSelectedAuditDate(today);
       setNewAuditForm({ 
-        name: getAuditNameByDate(today), 
+        name: getAuditNameByDate(today, selectedWarehouseId), 
         description: '', 
         audit_date: format(today, 'yyyy-MM-dd'),
         warehouse_id: selectedWarehouseId || '', // 창고 ID 추가
-        item_types: ['ingredient', 'container'] 
+        item_types: ['ingredient', 'container'],
+        stock_grade: '' // 재고등급 초기화
       });
       setIsCreateModalOpen(false); // 모달 닫기
       await fetchAudits();
@@ -623,7 +647,18 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
   useEffect(() => {
     fetchUserRole();
     fetchAudits();
-  }, [fetchUserRole, fetchAudits]);
+    fetchWarehouses();
+  }, [fetchUserRole, fetchAudits, fetchWarehouses]);
+
+  // 창고 목록을 가져온 후 실사명 초기값 설정
+  useEffect(() => {
+    if (warehouses.length > 0 && !newAuditForm.name) {
+      setNewAuditForm(prev => ({
+        ...prev,
+        name: getAuditNameByDate(selectedAuditDate, selectedWarehouseId)
+      }));
+    }
+  }, [warehouses, selectedWarehouseId, selectedAuditDate]);
 
   // 필터 변경 시 상세 정보 새로고침 (페이지는 1로 리셋)
   useEffect(() => {
@@ -664,8 +699,8 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
             <div className="space-y-4">
               <div className="bg-blue-50 p-3 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <strong>안내:</strong> 현재 등록된 모든 식자재와 용기 재고에 대해 실사 항목이 생성됩니다.
-                  항목이 많을 경우 페이지네이션으로 나누어 표시됩니다.
+                  <strong>안내:</strong> 선택한 조건에 맞는 재고 항목들에 대해 실사가 생성됩니다.
+                  재고등급을 선택하면 해당 등급의 식자재만 실사 대상이 됩니다.
                 </p>
               </div>
               
@@ -682,6 +717,30 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   실사를 진행할 창고를 선택하세요. 선택하지 않으면 기본 창고가 사용됩니다.
+                </p>
+              </div>
+              
+              {/* 재고등급 선택 */}
+              <div>
+                <Label htmlFor="stock-grade">재고등급 (선택사항)</Label>
+                <Select value={newAuditForm.stock_grade || 'all'} onValueChange={(value) => 
+                  setNewAuditForm(prev => ({ ...prev, stock_grade: value === 'all' ? '' : value }))
+                }>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="모든 등급" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">모든 등급</SelectItem>
+                    <SelectItem value="가">가등급</SelectItem>
+                    <SelectItem value="나">나등급</SelectItem>
+                    <SelectItem value="다">다등급</SelectItem>
+                    <SelectItem value="A">A등급</SelectItem>
+                    <SelectItem value="B">B등급</SelectItem>
+                    <SelectItem value="C">C등급</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500 mt-1">
+                  특정 등급의 식자재만 실사하려면 등급을 선택하세요. 선택하지 않으면 모든 등급이 포함됩니다.
                 </p>
               </div>
 

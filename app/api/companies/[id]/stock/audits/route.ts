@@ -131,7 +131,7 @@ export async function POST(
 
     // 요청 본문 파싱
     const body: CreateStockAuditRequest = await request.json();
-    const { name, description, audit_date, item_types = ['ingredient', 'container'], warehouse_id } = body;
+    const { name, description, audit_date, item_types = ['ingredient', 'container'], warehouse_id, stock_grade } = body;
 
     if (!name || name.trim() === '') {
       return NextResponse.json(
@@ -198,11 +198,18 @@ export async function POST(
 
     // 1. 식자재 항목 조회 (재고 정보와 함께)
     if (item_types.includes('ingredient')) {
-      const { data: ingredients, error: ingredientsError } = await supabase
+      let ingredientsQuery = supabase
         .from('ingredients')
         .select('id, name, unit, code_name, stock_grade')
         .eq('company_id', companyId)
         .not('stock_grade', 'is', null); // 재고관리 등급이 있는 식자재만
+      
+      // 재고등급 필터 적용
+      if (stock_grade && stock_grade.trim() !== '') {
+        ingredientsQuery = ingredientsQuery.eq('stock_grade', stock_grade.trim());
+      }
+      
+      const { data: ingredients, error: ingredientsError } = await ingredientsQuery;
 
       if (ingredientsError) {
         console.error('식자재 조회 오류:', ingredientsError);
