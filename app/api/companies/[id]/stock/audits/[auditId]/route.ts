@@ -303,7 +303,7 @@ export async function PATCH(
     if (apply_differences || action === 'apply_differences') {
       const { data: auditedItems, error: auditedError } = await supabase
         .from('stock_audit_items')
-        .select('stock_item_id, actual_quantity, difference, status, item_name')
+        .select('stock_item_id, actual_quantity, difference, status, item_name, item_code')
         .eq('audit_id', auditId)
         .in('status', ['completed', 'discrepancy'])
         .not('actual_quantity', 'is', null);
@@ -330,7 +330,7 @@ export async function PATCH(
             // 먼저 현재 재고 정보 확인 (창고 정보 포함)
             const { data: currentStock, error: selectError } = await supabase
               .from('stock_items')
-              .select('id, current_quantity, company_id, warehouse_id')
+              .select('id, current_quantity, company_id, warehouse_id, item_type, unit')
               .eq('id', item.stock_item_id)
               .single();
             
@@ -379,7 +379,12 @@ export async function PATCH(
                   user_id: userId,
                   reference_id: auditId,
                   reference_type: 'stock_audit',
-                  notes: `실사 조정: ${item.item_name} (실사량: ${item.actual_quantity})`
+                  notes: `실사 조정: ${item.item_name} (실사량: ${item.actual_quantity})`,
+                  // 비정규화된 데이터 추가 (거래 내역 표시용)
+                  item_name: item.item_name,
+                  item_code: item.item_code,
+                  item_type: currentStock.item_type || 'unknown',
+                  unit: currentStock.unit || '개'
                 });
               
               if (transactionError) {
