@@ -210,7 +210,7 @@ export async function POST(
         const ingredientGrades = stock_grades.filter(g => g !== '용기');
         if (ingredientGrades.length > 0) {
           ingredientsQuery = ingredientsQuery.in('stock_grade', ingredientGrades);
-        } else if (!stock_grades.includes('용기')) {
+        } else if (stock_grades.includes('용기') && ingredientGrades.length === 0) {
           // 용기만 선택하고 식자재 등급이 없으면 식자재는 조회하지 않음
           ingredientsQuery = ingredientsQuery.in('stock_grade', ['__no_match__']); // 절대 매치되지 않는 값
         }

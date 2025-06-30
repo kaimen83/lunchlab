@@ -859,7 +859,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
                       htmlFor="grade-container" 
                       className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                     >
-                      용기 포함
+                      용기
                     </label>
                   </div>
                 </div>
