@@ -459,6 +459,7 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
     });
   };
 
+
   // 실사 완료 처리
   const completeAudit = async (applyDifferences: boolean = false) => {
     if (!currentAudit) return;
@@ -588,36 +589,6 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
     });
   };
 
-  // 키보드 네비게이션 처리
-  const handleKeyDown = (e: React.KeyboardEvent, itemId: string, field: 'actual_quantity' | 'notes') => {
-    if (!currentAudit) return;
-
-    const items = getPaginatedItems();
-    const currentIndex = items.findIndex(item => item.id === itemId);
-    
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      // Tab: 다음 편집 가능한 셀로 이동
-      if (field === 'actual_quantity') {
-        setEditingCell({ itemId, field: 'notes' });
-      } else {
-        const nextIndex = currentIndex + 1;
-        if (nextIndex < items.length) {
-          setEditingCell({ itemId: items[nextIndex].id, field: 'actual_quantity' });
-        }
-      }
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      // Enter: 다음 행의 같은 필드로 이동
-      const nextIndex = currentIndex + 1;
-      if (nextIndex < items.length) {
-        setEditingCell({ itemId: items[nextIndex].id, field });
-      }
-    } else if (e.key === 'Escape') {
-      // Escape: 편집 취소
-      setEditingCell(null);
-    }
-  };
 
   // 페이지네이션된 항목 가져오기 (이제 서버에서 처리됨)
   const getPaginatedItems = () => {
@@ -651,18 +622,113 @@ export default function StockAuditPage({ companyId, selectedWarehouseId: initial
     const pendingValue = pendingChanges.get(item.id)?.[field];
     const currentValue = pendingValue !== undefined ? pendingValue : (item[field] ?? '');
     const hasChanges = pendingChanges.has(item.id) && pendingChanges.get(item.id)?.[field] !== undefined;
+    const [localValue, setLocalValue] = useState(currentValue);
+    const [isComposing, setIsComposing] = useState(false);
+
+    // 편집 시작 시 로컬 값 초기화
+    useEffect(() => {
+      if (isEditing) {
+        setLocalValue(currentValue);
+      }
+    }, [isEditing, currentValue]);
+
+    // 키보드 이벤트 처리 (수정됨)
+    const handleCellKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter' && !isComposing) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Enter 키: 현재 값 저장하고 다음 행으로 이동
+        updateCellValue(item.id, field, localValue);
+        
+        // 한글 입력 완료를 위한 짧은 지연 후 다음 셀로 이동
+        setTimeout(() => {
+          const items = getPaginatedItems();
+          const currentIndex = items.findIndex(i => i.id === item.id);
+          const nextIndex = currentIndex + 1;
+          
+          if (nextIndex < items.length) {
+            setEditingCell({ itemId: items[nextIndex].id, field });
+          } else {
+            setEditingCell(null);
+          }
+        }, 50);
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Tab 키: 현재 값 저장하고 다음 필드로 이동
+        updateCellValue(item.id, field, localValue);
+        
+        setTimeout(() => {
+          if (field === 'actual_quantity') {
+            setEditingCell({ itemId: item.id, field: 'notes' });
+          } else {
+            const items = getPaginatedItems();
+            const currentIndex = items.findIndex(i => i.id === item.id);
+            const nextIndex = currentIndex + 1;
+            
+            if (nextIndex < items.length) {
+              setEditingCell({ itemId: items[nextIndex].id, field: 'actual_quantity' });
+            } else {
+              setEditingCell(null);
+            }
+          }
+        }, 10);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Escape 키: 변경사항 취소하고 편집 종료
+        setLocalValue(currentValue);
+        setEditingCell(null);
+      }
+    };
 
     if (isEditing) {
+      // 메모 필드 (한글 입력 문제 해결을 위해 onBlur에서만 저장)
+      if (field === 'notes') {
+        return (
+          <Input
+            type="text"
+            value={localValue}
+            onChange={(e) => setLocalValue(e.target.value)}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={() => setIsComposing(false)}
+            onKeyDown={handleCellKeyDown}
+            onBlur={() => {
+              // 블러 시 값이 변경되었을 때만 업데이트
+              if (localValue !== currentValue) {
+                updateCellValue(item.id, field, localValue);
+              }
+              setEditingCell(null);
+              setIsComposing(false);
+            }}
+            autoFocus
+            className={`h-8 text-sm ${hasChanges ? 'border-orange-400 bg-orange-50' : ''}`}
+          />
+        );
+      }
+      
+      // 숫자 필드 (실시간 업데이트 유지)
       return (
         <Input
-          type={type}
-          value={currentValue}
-          onChange={(e) => updateCellValue(item.id, field, e.target.value)}
-          onKeyDown={(e) => handleKeyDown(e, item.id, field)}
-          onBlur={() => setEditingCell(null)}
+          type="number"
+          value={localValue}
+          onChange={(e) => {
+            const value = e.target.value;
+            setLocalValue(value);
+            // 숫자는 실시간으로 업데이트 (한글 입력 이슈 없음)
+            updateCellValue(item.id, field, value);
+          }}
+          onKeyDown={handleCellKeyDown}
+          onBlur={() => {
+            updateCellValue(item.id, field, localValue);
+            setEditingCell(null);
+          }}
           autoFocus
           className={`h-8 text-sm ${hasChanges ? 'border-orange-400 bg-orange-50' : ''}`}
-          step={type === 'number' ? '0.001' : undefined}
+          step="0.001"
         />
       );
     }
