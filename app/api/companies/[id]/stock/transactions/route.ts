@@ -678,8 +678,14 @@ export async function POST(
       warehouseIds = null,  // 다중 창고 지원을 위한 창고 ID 배열
       useMultipleWarehouses = false, // 다중 창고 모드 플래그
       sourceWarehouseId = null,
-      destinationWarehouseId = null
+      destinationWarehouseId = null,
+      cookingPlanDate = null  // 조리계획서 날짜 추가
     } = requestData;
+
+    // 조리계획서 날짜가 있으면 notes에 포함
+    if (cookingPlanDate) {
+      notes = `${notes} [조리계획서:${cookingPlanDate}]`;
+    }
 
     // 새로운 그룹화된 거래 형식 지원
     if (isGroupedTransaction && transactionItems && stockAdjustments) {

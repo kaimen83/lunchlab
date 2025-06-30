@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Calendar as CalendarIcon, FileText, Loader2, ShoppingCart, Search, CheckCircle2, AlertCircle, Plus, X, Tag, Package, Clock, Users, ChefHat, Warehouse } from 'lucide-react';
+import { Calendar as CalendarIcon, FileText, Loader2, ShoppingCart, Search, CheckCircle2, AlertCircle, Plus, X, Tag, Package, Clock, Users, ChefHat, Warehouse, List, ArrowDown, ArrowUp, ChevronRight } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -56,6 +56,16 @@ interface CookingPlanData {
   message?: string;
 }
 
+interface CookingPlanListItem {
+  date: string;
+  meal_times: string[];
+  total_headcount: number;
+  stock_status: {
+    incoming: boolean;
+    outgoing: boolean;
+  };
+}
+
 interface CookingPlanImportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -77,6 +87,14 @@ export function CookingPlanImportModal({
   const [isProcessing, setIsProcessing] = useState(false);
   const [cookingPlanData, setCookingPlanData] = useState<CookingPlanData | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  
+  // 조리계획서 목록 관련 상태
+  const [cookingPlanList, setCookingPlanList] = useState<CookingPlanListItem[]>([]);
+  const [activeView, setActiveView] = useState<'list' | 'calendar'>('list');
+  const [dateRange, setDateRange] = useState({
+    start: format(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1), 'yyyy-MM-dd'),
+    end: format(new Date(new Date().getFullYear(), new Date().getMonth() + 2, 0), 'yyyy-MM-dd')
+  });
   
   // 거래 모드 상태 (입고/출고)
   const [transactionMode, setTransactionMode] = useState<'incoming' | 'outgoing'>('outgoing');
@@ -240,6 +258,40 @@ export function CookingPlanImportModal({
     }
   };
 
+  // 조리계획서 목록 가져오기
+  const fetchCookingPlanList = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        `/api/companies/${companyId}/cooking-plans?startDate=${dateRange.start}&endDate=${dateRange.end}`
+      );
+      
+      if (!response.ok) {
+        throw new Error('조리계획서 목록을 가져오는데 실패했습니다.');
+      }
+      
+      const data = await response.json();
+      setCookingPlanList(data);
+      
+    } catch (error) {
+      console.error('조리계획서 목록 가져오기 오류:', error);
+      toast({
+        title: "오류",
+        description: "조리계획서 목록을 가져오는데 실패했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [companyId, dateRange, toast]);
+
+  // 모달이 열릴 때 목록 가져오기
+  useEffect(() => {
+    if (open) {
+      fetchCookingPlanList();
+    }
+  }, [open, fetchCookingPlanList]);
+
   // 조리계획서 조회
   const fetchCookingPlan = useCallback(async () => {
     if (!selectedDate) {
@@ -297,6 +349,13 @@ export function CookingPlanImportModal({
       safeSetState(() => setIsLoading(false));
     }
   }, [selectedDate, companyId, toast, safeSetState]);
+
+  // 캘린더 뷰에서 날짜 선택 시 자동 조회
+  useEffect(() => {
+    if (selectedDate && activeView === 'calendar') {
+      fetchCookingPlan();
+    }
+  }, [selectedDate, activeView, fetchCookingPlan]);
 
   // 항목 선택/해제
   const toggleItemSelection = useCallback((itemId: string) => {
@@ -570,7 +629,9 @@ export function CookingPlanImportModal({
             notes: `조리계획서 기반 ${transactionMode === 'incoming' ? '입고' : '출고'} (${cookingPlanData?.date || format(selectedDate!, 'yyyy-MM-dd')}) - ${transactionMode === 'incoming' ? '발주량 기준' : '그룹별 최대 수량 적용'}${useMultipleWarehouses ? ' (다중 창고)' : ''}`,
             directProcess: true,
             useMultipleWarehouses, // 다중 창고 모드 플래그
-            isGroupedTransaction: true // 그룹화된 거래임을 표시
+            isGroupedTransaction: true, // 그룹화된 거래임을 표시
+            // 조리계획서 참조 정보를 notes에 포함
+            cookingPlanDate: cookingPlanData?.date || format(selectedDate!, 'yyyy-MM-dd')
           }),
         }
       );
@@ -616,9 +677,11 @@ export function CookingPlanImportModal({
         });
       }
 
-      // 성공한 경우 모달 닫기 및 새로고침
+      // 성공한 경우 목록 새로고침 및 모달 닫기
       if (successful > 0) {
         onImportComplete();
+        // 조리계획서 목록 새로고침 (상태 업데이트)
+        await fetchCookingPlanList();
         // 즉시 모달 닫기 (timeout 제거)
         onOpenChange(false);
       }
@@ -655,14 +718,128 @@ export function CookingPlanImportModal({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4">
-          {/* 날짜 선택 섹션 */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
+          {/* 탭 네비게이션 */}
+          <div className="flex items-center space-x-1 bg-muted p-1 rounded-lg">
+            <button
+              onClick={() => setActiveView('list')}
+              className={cn(
+                "flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                activeView === 'list'
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <List className="h-4 w-4" />
+                조리계획서 목록으로 선택하기
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveView('calendar')}
+              className={cn(
+                "flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                activeView === 'calendar'
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <div className="flex items-center justify-center gap-2">
                 <CalendarIcon className="h-4 w-4" />
-                날짜 선택
-              </CardTitle>
-            </CardHeader>
+                캘린더로 선택하기
+              </div>
+            </button>
+          </div>
+
+          {/* 목록 보기 */}
+          {activeView === 'list' && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <List className="h-4 w-4" />
+                  조리계획서 목록
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  조리계획서를 선택하여 재고 거래를 생성하세요. 이미 처리된 항목은 상태로 표시됩니다.
+                </p>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                    <span className="text-sm text-muted-foreground">조리계획서 목록을 불러오는 중...</span>
+                  </div>
+                ) : cookingPlanList.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="p-3 bg-muted rounded-full w-fit mx-auto mb-4">
+                      <AlertCircle className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <h3 className="font-semibold text-base mb-2">조리계획서가 없습니다</h3>
+                    <p className="text-muted-foreground text-sm">
+                      현재 기간에 조리계획서가 없습니다.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {cookingPlanList.map((plan) => (
+                      <div
+                        key={plan.date}
+                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                                                 onClick={() => {
+                           setSelectedDate(new Date(plan.date));
+                           setActiveView('calendar');
+                         }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-primary/10 rounded-lg">
+                            <ChefHat className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <div className="font-medium">
+                              {format(new Date(plan.date), 'yyyy년 MM월 dd일 (E)', { locale: ko })}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {plan.meal_times.join(', ')} · 총 {plan.total_headcount}명
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {/* 처리 상태 표시 */}
+                          {plan.stock_status.incoming && (
+                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                              <ArrowDown className="h-3 w-3 mr-1" />
+                              입고 완료
+                            </Badge>
+                          )}
+                          {plan.stock_status.outgoing && (
+                            <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
+                              <ArrowUp className="h-3 w-3 mr-1" />
+                              출고 완료
+                            </Badge>
+                          )}
+                          {!plan.stock_status.incoming && !plan.stock_status.outgoing && (
+                            <Badge variant="secondary" className="text-xs">
+                              미처리
+                            </Badge>
+                          )}
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 캘린더 보기 */}
+          {activeView === 'calendar' && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <CalendarIcon className="h-4 w-4" />
+                  날짜 선택
+                </CardTitle>
+              </CardHeader>
             <CardContent className="space-y-3">
               {/* 날짜 선택 버튼 */}
               <div className="flex items-center gap-3">
@@ -718,7 +895,53 @@ export function CookingPlanImportModal({
                     locale={ko}
                     today={today}
                     className="rounded-md"
+                    modifiers={{
+                      processed: cookingPlanList
+                        .filter(plan => plan.stock_status.incoming || plan.stock_status.outgoing)
+                        .map(plan => new Date(plan.date)),
+                      incoming: cookingPlanList
+                        .filter(plan => plan.stock_status.incoming)
+                        .map(plan => new Date(plan.date)),
+                      outgoing: cookingPlanList
+                        .filter(plan => plan.stock_status.outgoing)
+                        .map(plan => new Date(plan.date))
+                    }}
+                    modifiersStyles={{
+                      processed: { 
+                        backgroundColor: '#f0f9ff', 
+                        color: '#0ea5e9',
+                        fontWeight: 'bold'
+                      },
+                      incoming: { 
+                        backgroundColor: '#ecfdf5', 
+                        color: '#059669',
+                        fontWeight: 'bold'
+                      },
+                      outgoing: { 
+                        backgroundColor: '#fff7ed', 
+                        color: '#ea580c',
+                        fontWeight: 'bold'
+                      }
+                    }}
                   />
+                  {/* 캘린더 범례 */}
+                  <div className="mt-3 pt-3 border-t">
+                    <div className="text-xs text-muted-foreground mb-2">상태 표시:</div>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded bg-green-100 border border-green-200"></div>
+                        <span>입고 완료</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded bg-orange-100 border border-orange-200"></div>
+                        <span>출고 완료</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded bg-blue-100 border border-blue-200"></div>
+                        <span>부분 처리</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -754,9 +977,10 @@ export function CookingPlanImportModal({
               )}
             </CardContent>
           </Card>
+          )}
 
           {/* 창고 설정 섹션 */}
-          {cookingPlanData && allItems.length > 0 && (
+          {activeView === 'calendar' && cookingPlanData && allItems.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -799,7 +1023,7 @@ export function CookingPlanImportModal({
           )}
 
           {/* 조리계획서 데이터 표시 */}
-          {cookingPlanData && (
+          {activeView === 'calendar' && cookingPlanData && (
             <>
               {allItems.length > 0 ? (
                 <Card>

@@ -120,18 +120,56 @@ export async function GET(request: NextRequest, context: RouteContext) {
         }
         
         // 식사 시간 추가 (meal_plans가 있는 경우)
-        if (portion.meal_plans && portion.meal_plans.meal_time) {
-          dateGroups[portion.date].meal_times.add(portion.meal_plans.meal_time);
+        if (portion.meal_plans && (portion.meal_plans as any).meal_time) {
+          dateGroups[portion.date].meal_times.add((portion.meal_plans as any).meal_time);
         }
         
         // 총 식수 누적
         dateGroups[portion.date].total_headcount += portion.headcount;
       });
+
+      // 재고 거래 처리 상태 확인 (notes 필드에서 조리계획서 날짜 검색)
+      const dates = Object.keys(dateGroups);
+      if (dates.length > 0) {
+        // notes 필드에서 [조리계획서:날짜] 패턴을 가진 거래 검색
+        const { data: stockTransactions } = await supabase
+          .from('stock_transactions')
+          .select('notes, transaction_type')
+          .or(dates.map(date => `notes.like.%[조리계획서:${date}]%`).join(','));
+
+        // 각 날짜별 처리 상태 추가
+        if (stockTransactions) {
+          const transactionByDate: Record<string, { incoming: boolean; outgoing: boolean }> = {};
+          
+          stockTransactions.forEach(transaction => {
+            // notes에서 조리계획서 날짜 추출
+            const match = transaction.notes?.match(/\[조리계획서:([^\]]+)\]/);
+            if (match) {
+              const transactionDate = match[1];
+              if (!transactionByDate[transactionDate]) {
+                transactionByDate[transactionDate] = { incoming: false, outgoing: false };
+              }
+              
+              if (transaction.transaction_type === 'incoming') {
+                transactionByDate[transactionDate].incoming = true;
+              } else if (transaction.transaction_type === 'outgoing') {
+                transactionByDate[transactionDate].outgoing = true;
+              }
+            }
+          });
+
+          // 처리 상태 정보를 각 날짜 그룹에 추가
+          Object.keys(dateGroups).forEach(date => {
+            dateGroups[date].stock_status = transactionByDate[date] || { incoming: false, outgoing: false };
+          });
+        }
+      }
       
       // Set을 배열로 변환
       const result = Object.values(dateGroups).map(group => ({
         ...group,
-        meal_times: Array.from(group.meal_times as Set<string>)
+        meal_times: Array.from(group.meal_times as Set<string>),
+        stock_status: group.stock_status || { incoming: false, outgoing: false }
       }));
       
       return NextResponse.json(result);
